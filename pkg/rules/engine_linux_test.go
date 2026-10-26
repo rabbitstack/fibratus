@@ -140,11 +140,11 @@ func TestRunLinuxDetectionRules(t *testing.T) {
 		PID:       4242,
 		Timestamp: time.Now(),
 		PS:        tmpPS,
-		Params: event.Params{
-			params.ProcessID: {Name: params.ProcessID, Type: params.PID, Value: uint64(4242)},
-			params.Exe:       {Name: params.Exe, Type: params.Path, Value: "/tmp/dropper"},
-			params.Retval:    {Name: params.Retval, Type: params.Int64, Value: int64(0)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.ProcessID, params.PID, params.U32(4242)),
+			event.NewParam(params.Exe, params.Path, params.Str("/tmp/dropper")),
+			event.NewParam(params.Retval, params.Int64, params.I64(int64(0))),
+		),
 		Metadata: make(map[event.MetadataKey]any),
 	}
 	require.True(t, processEvent(t, e, execTmp))
@@ -156,11 +156,11 @@ func TestRunLinuxDetectionRules(t *testing.T) {
 		PID:       4242,
 		Timestamp: time.Now(),
 		PS:        testPS("injector", "/usr/bin/injector", 4242, 200),
-		Params: event.Params{
-			params.ProcessID:       {Name: params.ProcessID, Type: params.PID, Value: uint64(4242)},
-			params.PtraceRequest:   {Name: params.PtraceRequest, Type: params.Int64, Value: int64(16)},
-			params.TargetProcessID: {Name: params.TargetProcessID, Type: params.Int64, Value: int64(99)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.ProcessID, params.PID, params.U32(4242)),
+			event.NewParam(params.PtraceRequest, params.Int64, params.I64(int64(16))),
+			event.NewParam(params.TargetProcessID, params.Int64, params.I64(int64(99))),
+		),
 		Metadata: make(map[event.MetadataKey]any),
 	}
 	require.True(t, processEvent(t, e, ptrace))
@@ -172,11 +172,11 @@ func TestRunLinuxDetectionRules(t *testing.T) {
 		PID:       4242,
 		Timestamp: time.Now(),
 		PS:        testPS("killer", "/usr/bin/killer", 4242, 200),
-		Params: event.Params{
-			params.ProcessID:       {Name: params.ProcessID, Type: params.PID, Value: uint64(4242)},
-			params.Signal:          {Name: params.Signal, Type: params.Int32, Value: int32(9)},
-			params.TargetProcessID: {Name: params.TargetProcessID, Type: params.Int64, Value: int64(99)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.ProcessID, params.PID, params.U32(4242)),
+			event.NewParam(params.Signal, params.Int32, params.I32(int32(9))),
+			event.NewParam(params.TargetProcessID, params.Int64, params.I64(int64(99))),
+		),
 		Metadata: make(map[event.MetadataKey]any),
 	}
 	require.True(t, processEvent(t, e, sigkill))
@@ -188,11 +188,11 @@ func TestRunLinuxDetectionRules(t *testing.T) {
 		PID:       4242,
 		Timestamp: time.Now(),
 		PS:        testPS("killer", "/usr/bin/killer", 4242, 200),
-		Params: event.Params{
-			params.ProcessID:       {Name: params.ProcessID, Type: params.PID, Value: uint64(4242)},
-			params.Signal:          {Name: params.Signal, Type: params.Int32, Value: int32(9)},
-			params.TargetProcessID: {Name: params.TargetProcessID, Type: params.Int64, Value: int64(4242)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.ProcessID, params.PID, params.U32(4242)),
+			event.NewParam(params.Signal, params.Int32, params.I32(int32(9))),
+			event.NewParam(params.TargetProcessID, params.Int64, params.I64(int64(4242))),
+		),
 		Metadata: make(map[event.MetadataKey]any),
 	}
 	require.False(t, processEvent(t, e, selfKill))
@@ -213,11 +213,11 @@ func TestLinuxLifecycleSequence(t *testing.T) {
 		PID:       4242,
 		Timestamp: time.Now(),
 		PS:        ps,
-		Params: event.Params{
-			params.ProcessID: {Name: params.ProcessID, Type: params.PID, Value: uint64(4242)},
-			params.Exe:       {Name: params.Exe, Type: params.Path, Value: "/bin/bash"},
-			params.Retval:    {Name: params.Retval, Type: params.Int64, Value: int64(0)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.ProcessID, params.PID, params.U32(4242)),
+			event.NewParam(params.Exe, params.Path, params.Str("/bin/bash")),
+			event.NewParam(params.Retval, params.Int64, params.I64(int64(0))),
+		),
 		Metadata: make(map[event.MetadataKey]any),
 	}
 	connect := &event.Event{
@@ -228,12 +228,12 @@ func TestLinuxLifecycleSequence(t *testing.T) {
 		PID:       4242,
 		Timestamp: time.Now().Add(time.Second),
 		PS:        ps,
-		Params: event.Params{
-			params.ProcessID:  {Name: params.ProcessID, Type: params.PID, Value: uint64(4242)},
-			params.SockFamily: {Name: params.SockFamily, Type: params.Uint16, Value: uint16(2)},
-			params.NetDIP:     {Name: params.NetDIP, Type: params.IPv4, Value: net.IPv4(1, 2, 3, 4).To4()},
-			params.NetDport:   {Name: params.NetDport, Type: params.Port, Value: uint16(4444)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.ProcessID, params.PID, params.U32(4242)),
+			event.NewParam(params.SockFamily, params.Uint16, params.U16(uint16(2))),
+			event.NewParam(params.NetDIP, params.IPv4, params.IPAddr(net.IPv4(1, 2, 3, 4).To4())),
+			event.NewParam(params.NetDport, params.Port, params.U16(uint16(4444))),
+		),
 		Metadata: make(map[event.MetadataKey]any),
 	}
 
@@ -269,9 +269,9 @@ func TestSharedSemanticRuleFixtures(t *testing.T) {
 		Category: event.Net,
 		PID:      7,
 		PS:       testPS("bash", "/bin/bash", 7, 10),
-		Params: event.Params{
-			params.NetDport: {Name: params.NetDport, Type: params.Port, Value: uint16(443)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.NetDport, params.Port, params.U16(uint16(443))),
+		),
 		Metadata: make(map[event.MetadataKey]any),
 	}
 

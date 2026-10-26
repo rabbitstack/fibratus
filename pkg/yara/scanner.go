@@ -175,7 +175,7 @@ func (s scanner) CanEnqueue() bool { return false }
 func (s *scanner) ProcessEvent(evt *event.Event) (bool, error) {
 	if evt.IsTerminateProcess() {
 		// cleanup
-		pid := evt.Params.MustGetPid()
+		pid := evt.Params.GetPid()
 		delete(s.rwxs, pid)
 		delete(s.mmaps, pid)
 	}
@@ -190,7 +190,7 @@ func (s scanner) Scan(e *event.Event) (bool, error) {
 	switch e.Type {
 	case event.CreateProcess:
 		// scan the created child process
-		pid := e.Params.MustGetPid()
+		pid := e.Params.GetPid()
 		log.Debugf("scanning child process. pid: %d, exe: %s", pid, e.GetParamAsString(params.Exe))
 		matches, err = s.scan(pid)
 		procScans.Add(1)
@@ -225,9 +225,9 @@ func (s scanner) Scan(e *event.Event) (bool, error) {
 		}
 
 		// scan dropped PE files
-		isDLL := strings.ToLower(filepath.Ext(filename)) == ".dll" || e.Params.TryGetBool(params.FileIsDLL)
-		isDriver := strings.ToLower(filepath.Ext(filename)) == ".sys" || e.Params.TryGetBool(params.FileIsDriver)
-		isExe := strings.ToLower(filepath.Ext(filename)) == ".exe" || e.Params.TryGetBool(params.FileIsExecutable)
+		isDLL := strings.ToLower(filepath.Ext(filename)) == ".dll" || e.Params.GetBoolByName(params.FileIsDLL)
+		isDriver := strings.ToLower(filepath.Ext(filename)) == ".sys" || e.Params.GetBoolByName(params.FileIsDriver)
+		isExe := strings.ToLower(filepath.Ext(filename)) == ".exe" || e.Params.GetBoolByName(params.FileIsExecutable)
 
 		if isExe || isDLL || isDriver {
 			log.Debugf("scanning PE file %s. pid: %d", filename, e.PID)
@@ -259,9 +259,9 @@ func (s scanner) Scan(e *event.Event) (bool, error) {
 			return false, nil
 		}
 		// scan process allocating RWX memory region
-		pid := e.Params.MustGetPid()
-		addr := e.Params.TryGetAddress(params.MemBaseAddress)
-		if e.PID != 4 && e.Params.TryGetUint32(params.MemProtect) == windows.PAGE_EXECUTE_READWRITE && !s.isRwxMatched(pid) {
+		pid := e.Params.GetPid()
+		addr := e.Params.GetAddressByName(params.MemBaseAddress)
+		if e.PID != 4 && e.Params.GetUint32ByName(params.MemProtect) == windows.PAGE_EXECUTE_READWRITE && !s.isRwxMatched(pid) {
 			log.Debugf("scanning RWX allocation. pid: %d, exe: %s, addr: %s", pid, e.GetParamAsString(params.Exe),
 				e.GetParamAsString(params.MemBaseAddress))
 			matches, err = s.scan(pid)
@@ -276,12 +276,12 @@ func (s scanner) Scan(e *event.Event) (bool, error) {
 			return false, nil
 		}
 		// scan process mapping a suspicious RX/RWX section view
-		pid := e.Params.MustGetPid()
-		prot := e.Params.MustGetUint32(params.MemProtect)
-		size := e.Params.MustGetUint64(params.FileViewSize)
+		pid := e.Params.GetPid()
+		prot := e.Params.GetUint32ByName(params.MemProtect)
+		size := e.Params.GetUint64ByName(params.FileViewSize)
 		if e.PID != 4 && size >= 4096 && ((prot&sys.SectionRX) != 0 && (prot&sys.SectionRWX) != 0) && !s.isMmapMatched(pid) {
 			filename := e.GetParamAsString(params.FilePath)
-			addr := e.Params.MustGetUint64(params.FileViewBase)
+			addr := e.Params.GetUint64ByName(params.FileViewBase)
 			// data/module file was mapped?
 			if filename != "" {
 				if s.config.ShouldSkipFile(filename) {
@@ -310,7 +310,7 @@ func (s scanner) Scan(e *event.Event) (bool, error) {
 			return false, nil
 		}
 		// scan registry binary values
-		if typ := e.Params.TryGetUint32(params.RegValueType); typ != registry.BINARY {
+		if typ := e.Params.GetUint32ByName(params.RegValueType); typ != registry.BINARY {
 			return false, nil
 		}
 		v, err := e.Params.Get(params.RegData)

@@ -55,9 +55,9 @@ func TestFormat(t *testing.T) {
 	template := "{{ .Seq }} {{.CPU}} -  ({{.Type}}) -- pid: {{ .Params.Pid }} ({{.Params}}) {{ .Meta }}"
 	f, err := NewFormatter(template)
 	require.NoError(t, err)
-	pars := Params{
-		params.ProcessID: {Name: params.ProcessID, Type: params.PID, Value: uint32(876)},
-	}
+	pars := ParamsOf(
+		NewParam(params.ProcessID, params.PID, params.U32(uint32(876))),
+	)
 	s := f.Format(&Event{CPU: uint8(4), Type: CreateProcess, Seq: uint64(1999), Params: pars, Metadata: map[MetadataKey]any{"key1": "value1"}})
 	assert.Equal(t, "1999 4 -  (CreateProcess) -- pid: 876 (pid➜ 876) key1: value1", string(s))
 }
@@ -66,9 +66,9 @@ func TestFormatPS(t *testing.T) {
 	template := "{{ .Seq }} {{ .Process }} ({{ .Cwd }}) {{ .Ppid }} ({{ .Sid }})"
 	f, err := NewFormatter(template)
 	require.NoError(t, err)
-	pars := Params{
-		params.ProcessID: {Name: params.ProcessID, Type: params.PID, Value: uint32(876)},
-	}
+	pars := ParamsOf(
+		NewParam(params.ProcessID, params.PID, params.U32(uint32(876))),
+	)
 	s := f.Format(&Event{
 		CPU:    uint8(4),
 		Seq:    uint64(1999),

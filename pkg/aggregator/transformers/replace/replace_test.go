@@ -33,10 +33,10 @@ func TestTransform(t *testing.T) {
 		Type: event.RegCreateKey,
 		Tid:  2484,
 		PID:  859,
-		Params: event.Params{
-			params.RegPath: {Name: params.RegPath, Type: params.UnicodeString, Value: `HKEY_LOCAL_MACHINE\SYSTEM\Setup\Pid`},
-			params.RegKCB:  {Name: params.RegKCB, Type: params.Address, Value: uint64(18446666033449935464)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.RegPath, params.String, params.Str(`HKEY_LOCAL_MACHINE\SYSTEM\Setup\Pid`)),
+			event.NewParam(params.RegKCB, params.Address, params.U64(uint64(18446666033449935464))),
+		),
 	}
 
 	transf, err := transformers.Load(transformers.Config{Type: transformers.Replace, Transformer: Config{Replacements: []Replacement{{Param: "key_path", Old: "HKEY_LOCAL_MACHINE", New: "HKLM"}}}})
@@ -44,7 +44,7 @@ func TestTransform(t *testing.T) {
 
 	require.NoError(t, transf.Transform(evt))
 
-	keyName, _ := evt.Params.GetString(params.RegPath)
+	keyName := evt.Params.GetStringByName(params.RegPath)
 
 	assert.Equal(t, `HKLM\SYSTEM\Setup\Pid`, keyName)
 }

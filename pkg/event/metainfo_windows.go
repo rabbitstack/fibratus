@@ -21,6 +21,8 @@ package event
 import (
 	"cmp"
 	"slices"
+
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 )
 
 const (
@@ -38,39 +40,39 @@ const (
 )
 
 var table = [MaxEvent]Info{
-	CreateProcess:          {Name: "CreateProcess", Category: Process, Source: SystemLogger, Description: "Creates a new process and its primary thread", Flags: WaitStack},
-	TerminateProcess:       {Name: "TerminateProcess", Category: Process, Source: SystemLogger, Description: "Terminates the process and all of its threads"},
-	OpenProcess:            {Name: "OpenProcess", Category: Process, Source: SecurityTelemetryLogger, Description: "Opens the process handle"},
-	ProcessRundown:         {Name: "ProcessRundown", Category: Process, Source: SecurityTelemetryLogger, Description: "Builds the snapshot state of running processes in the system.", Flags: OnlyState | StateSnapshot},
-	CreateProcessInternal:  {Name: "CreateProcessInternal", Category: Process, Source: SystemLogger, Description: "Only purpose of this event is to enrich the process state with some extra attributes. Never published to the event stream", Flags: OnlyState},
-	ProcessRundownInternal: {Name: "ProcessRundownInternal", Category: Process, Source: SecurityTelemetryLogger, Description: "Opens the process handle", Flags: OnlyState | StateSnapshot},
+	CreateProcess:          {Name: "CreateProcess", Category: Process, Source: SystemLogger, Description: "Creates a new process and its primary thread", Flags: WaitStack, Params: params.CreateProcessDescriptor},
+	TerminateProcess:       {Name: "TerminateProcess", Category: Process, Source: SystemLogger, Description: "Terminates the process and all of its threads", Params: params.TerminateProcessDescriptor},
+	OpenProcess:            {Name: "OpenProcess", Category: Process, Source: SecurityTelemetryLogger, Description: "Opens the process handle", Params: params.OpenProcessDescriptor},
+	ProcessRundown:         {Name: "ProcessRundown", Category: Process, Source: SecurityTelemetryLogger, Description: "Builds the snapshot state of running processes in the system.", Flags: OnlyState | StateSnapshot, Params: params.ProcessRundownDescriptor},
+	CreateProcessInternal:  {Name: "CreateProcessInternal", Category: Process, Source: SystemLogger, Description: "Only purpose of this event is to enrich the process state with some extra attributes. Never published to the event stream", Flags: OnlyState, Params: params.CreateProcessInternalDescriptor},
+	ProcessRundownInternal: {Name: "ProcessRundownInternal", Category: Process, Source: SecurityTelemetryLogger, Description: "Opens the process handle", Flags: OnlyState | StateSnapshot, Params: params.ProcessRundownInternalDescriptor},
 
-	CreateThread:     {Name: "CreateThread", Category: Thread, Source: SystemLogger, Description: "Creates a thread to execute within the virtual address space of the calling process", Flags: WaitStack},
-	TerminateThread:  {Name: "TerminateThread", Category: Thread, Source: SystemLogger, Description: "Terminates a thread within the process", Flags: WaitStack},
-	OpenThread:       {Name: "OpenThread", Category: Thread, Source: SecurityTelemetryLogger, Description: "Opens the thread handle"},
-	SetThreadContext: {Name: "SetThreadContext", Category: Thread, Source: SecurityTelemetryLogger, Description: "Sets the thread context"},
-	StackWalk:        {Name: "StackWalk", Category: Thread, Source: SystemLogger, Description: "Delivers call stack return addresses. Never published to the event stream", Flags: OnlyState},
-	ThreadRundown:    {Name: "ThreadRundown", Category: Thread, Source: SystemLogger, Description: "Builds the snapshot state of running threads in the system", Flags: OnlyState | StateSnapshot},
+	CreateThread:     {Name: "CreateThread", Category: Thread, Source: SystemLogger, Description: "Creates a thread to execute within the virtual address space of the calling process", Flags: WaitStack, Params: params.CreateThreadDescriptor},
+	TerminateThread:  {Name: "TerminateThread", Category: Thread, Source: SystemLogger, Description: "Terminates a thread within the process", Flags: WaitStack, Params: params.TerminateThreadDescriptor},
+	OpenThread:       {Name: "OpenThread", Category: Thread, Source: SecurityTelemetryLogger, Description: "Opens the thread handle", Params: params.OpenThreadDescriptor},
+	SetThreadContext: {Name: "SetThreadContext", Category: Thread, Source: SecurityTelemetryLogger, Description: "Sets the thread context", Params: params.SetThreadContextDescriptor},
+	StackWalk:        {Name: "StackWalk", Category: Thread, Source: SystemLogger, Description: "Delivers call stack return addresses. Never published to the event stream", Flags: OnlyState, Params: params.StackWalkDescriptor},
+	ThreadRundown:    {Name: "ThreadRundown", Category: Thread, Source: SystemLogger, Description: "Builds the snapshot state of running threads in the system", Flags: OnlyState | StateSnapshot, Params: params.ThreadRundownDescriptor},
 
 	UnloadModule:       {Name: "UnloadModule", Category: Module, Source: SystemLogger, Description: "Unloads the module from the address space of the calling process"},
 	LoadModule:         {Name: "LoadModule", Category: Module, Source: SystemLogger, Description: "Loads the module into the address space of the calling process", Flags: WaitStack},
 	ModuleRundown:      {Name: "ModuleRundown", Category: Module, Source: SystemLogger, Description: "Builds the snapshot of loaded modules in the system", Flags: OnlyState | StateSnapshot},
 	LoadModuleInternal: {Name: "LoadModuleInternal", Category: Module, Source: SecurityTelemetryLogger, Description: "Only purpose is to populate the module state. Never published to the event stream", Flags: OnlyState},
 
-	RegCreateKey:        {Name: "RegCreateKey", Category: Registry, Source: SystemLogger, Description: "Creates a registry key or opens it if the key already exists", Flags: WaitStack},
-	RegOpenKey:          {Name: "RegOpenKey", Category: Registry, Source: SystemLogger, Description: "Opens the registry key"},
-	RegDeleteKey:        {Name: "RegDeleteKey", Category: Registry, Source: SystemLogger, Description: "Removes the registry key", Flags: WaitStack},
-	RegQueryKey:         {Name: "RegQueryKey", Category: Registry, Source: SystemLogger, Description: "Enumerates subkeys of the parent key"},
-	RegSetValue:         {Name: "RegSetValue", Category: Registry, Source: SystemLogger, Description: "Sets the data for the value of a registry key", Flags: WaitStack},
+	RegCreateKey:        {Name: "RegCreateKey", Category: Registry, Source: SystemLogger, Description: "Creates a registry key or opens it if the key already exists", Flags: WaitStack, Params: params.RegCreateKeyDescriptor},
+	RegOpenKey:          {Name: "RegOpenKey", Category: Registry, Source: SystemLogger, Description: "Opens the registry key", Params: params.RegistryDescriptor},
+	RegDeleteKey:        {Name: "RegDeleteKey", Category: Registry, Source: SystemLogger, Description: "Removes the registry key", Flags: WaitStack, Params: params.RegDeleteKeyDescriptor},
+	RegQueryKey:         {Name: "RegQueryKey", Category: Registry, Source: SystemLogger, Description: "Enumerates subkeys of the parent key", Params: params.RegistryDescriptor},
+	RegSetValue:         {Name: "RegSetValue", Category: Registry, Source: SystemLogger, Description: "Sets the data for the value of a registry key", Flags: WaitStack, Params: params.RegSetValueDescriptor},
 	RegSetValueInternal: {Name: "RegSetValueInternal", Category: Registry, Source: SecurityTelemetryLogger, Description: "Closes the registry key", Flags: OnlyState},
-	RegDeleteValue:      {Name: "RegDeleteValue", Category: Registry, Source: SystemLogger, Description: "Removes the registry value", Flags: WaitStack},
-	RegQueryValue:       {Name: "RegQueryValue", Category: Registry, Source: SystemLogger, Description: "Reads the data for the value of a registry key"},
-	RegCloseKey:         {Name: "RegCloseKey", Category: Registry, Source: SystemLogger, Description: "Closes the registry key. Never published to the event stream", Flags: OnlyState},
-	RegCreateKCB:        {Name: "RegCreateKCB", Category: Registry, Source: SystemLogger, Description: "Create the Key Control Block. Never published to the event stream", Flags: OnlyState},
-	RegDeleteKCB:        {Name: "RegDeleteKCB", Category: Registry, Source: SystemLogger, Description: "Removes the Key Control Block. Never published to the event stream", Flags: OnlyState},
-	RegKCBRundown:       {Name: "RegKCBRundown", Category: Registry, Source: SystemLogger, Description: "Builds the snapshot of existing Key Control Block objects", Flags: OnlyState | StateSnapshot},
+	RegDeleteValue:      {Name: "RegDeleteValue", Category: Registry, Source: SystemLogger, Description: "Removes the registry value", Flags: WaitStack, Params: params.RegDeleteValueDescriptor},
+	RegQueryValue:       {Name: "RegQueryValue", Category: Registry, Source: SystemLogger, Description: "Reads the data for the value of a registry key", Params: params.RegistryDescriptor},
+	RegCloseKey:         {Name: "RegCloseKey", Category: Registry, Source: SystemLogger, Description: "Closes the registry key. Never published to the event stream", Flags: OnlyState, Params: params.RegistryDescriptor},
+	RegCreateKCB:        {Name: "RegCreateKCB", Category: Registry, Source: SystemLogger, Description: "Create the Key Control Block. Never published to the event stream", Flags: OnlyState, Params: params.RegistryDescriptor},
+	RegDeleteKCB:        {Name: "RegDeleteKCB", Category: Registry, Source: SystemLogger, Description: "Removes the Key Control Block. Never published to the event stream", Flags: OnlyState, Params: params.RegistryDescriptor},
+	RegKCBRundown:       {Name: "RegKCBRundown", Category: Registry, Source: SystemLogger, Description: "Builds the snapshot of existing Key Control Block objects", Flags: OnlyState | StateSnapshot, Params: params.RegistryDescriptor},
 
-	CreateFile:         {Name: "CreateFile", Category: File, Source: SystemLogger, Description: "Creates or opens a new file, directory, I/O device, pipe, console"},
+	CreateFile:         {Name: "CreateFile", Category: File, Source: SystemLogger, Description: "Creates or opens a new file, directory, I/O device, pipe, console", Params: params.CreateFileDescriptor},
 	ReleaseFile:        {Name: "ReleaseFile", Category: File, Source: SystemLogger, Description: "Closes the last handle to the file object. Never published to the event stream", Flags: OnlyState},
 	CloseFile:          {Name: "CloseFile", Category: File, Source: SystemLogger, Description: "Closes the file handle. Never published to the event stream", Flags: OnlyState},
 	ReadFile:           {Name: "ReadFile", Category: File, Source: SystemLogger, Description: "Reads data from the file or I/O device"},
@@ -103,7 +105,9 @@ var table = [MaxEvent]Info{
 
 // GetTypesInfo returns event types metadata excluding only-state events.
 func GetTypesInfo() []Info {
-	t := table[:]
+	// work on a copy, otherwise the in-place deletion and sorting
+	// would corrupt the table which is indexed by the event type
+	t := slices.Clone(table[:])
 	t = slices.DeleteFunc(t, func(info Info) bool {
 		return info.Flags&OnlyState != 0 || info.Name == ""
 	})

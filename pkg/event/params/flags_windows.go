@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package event
+package params
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/sys"
@@ -37,7 +37,7 @@ const (
 )
 
 // PsCreationFlags describes the process creation flags.
-var PsCreationFlags = []ParamFlag{
+var PsCreationFlags = Flags{
 	{"APPLICATION_ID", PsApplicationID},
 	{"WOW64", PsWOW64},
 	{"PROTECTED", PsProtected},
@@ -48,7 +48,7 @@ var PsCreationFlags = []ParamFlag{
 const AllAccess = windows.STANDARD_RIGHTS_REQUIRED | windows.SYNCHRONIZE | 0xFFFF
 
 // PsAccessRightFlags describes flags for the process access rights.
-var PsAccessRightFlags = []ParamFlag{
+var PsAccessRightFlags = Flags{
 	{"ALL_ACCESS", AllAccess},
 	{"DELETE", windows.DELETE},
 	{"READ_CONTROL", windows.READ_CONTROL},
@@ -72,7 +72,7 @@ var PsAccessRightFlags = []ParamFlag{
 }
 
 // ThreadAccessRightFlags describes flags for the thread access rights.
-var ThreadAccessRightFlags = []ParamFlag{
+var ThreadAccessRightFlags = Flags{
 	{"ALL_ACCESS", AllAccess},
 	{"DELETE", windows.DELETE},
 	{"READ_CONTROL", windows.READ_CONTROL},
@@ -93,7 +93,7 @@ var ThreadAccessRightFlags = []ParamFlag{
 }
 
 // FileAttributeFlags describes file attribute flags.
-var FileAttributeFlags = []ParamFlag{
+var FileAttributeFlags = Flags{
 	{"READ_ONLY", windows.FILE_ATTRIBUTE_READONLY},
 	{"HIDDEN", windows.FILE_ATTRIBUTE_HIDDEN},
 	{"SYSTEM", windows.FILE_ATTRIBUTE_SYSTEM},
@@ -118,7 +118,7 @@ var FileAttributeFlags = []ParamFlag{
 }
 
 // FileCreateOptionsFlags describes file create options flags
-var FileCreateOptionsFlags = []ParamFlag{
+var FileCreateOptionsFlags = Flags{
 	{"DIRECTORY_FILE", windows.FILE_DIRECTORY_FILE},
 	{"WRITE_THROUGH", windows.FILE_WRITE_THROUGH},
 	{"SEQUENTIAL_ONLY", windows.FILE_SEQUENTIAL_ONLY},
@@ -144,7 +144,7 @@ var FileCreateOptionsFlags = []ParamFlag{
 }
 
 // FileShareModeFlags describes file share mask flags
-var FileShareModeFlags = []ParamFlag{
+var FileShareModeFlags = Flags{
 	{"DENY", 0},
 	{"READ", windows.FILE_SHARE_READ},
 	{"WRITE", windows.FILE_SHARE_WRITE},
@@ -152,7 +152,7 @@ var FileShareModeFlags = []ParamFlag{
 }
 
 // MemAllocationFlags describes virtual allocation/free type flags
-var MemAllocationFlags = []ParamFlag{
+var MemAllocationFlags = Flags{
 	{"COMMIT", windows.MEM_COMMIT},
 	{"RESERVE", windows.MEM_RESERVE},
 	{"RESET", windows.MEM_RESET},
@@ -166,7 +166,7 @@ var MemAllocationFlags = []ParamFlag{
 }
 
 // MemProtectionFlags represents memory protection option flags.
-var MemProtectionFlags = []ParamFlag{
+var MemProtectionFlags = Flags{
 	{"NONE", 0},
 	{"EXECUTE", windows.PAGE_EXECUTE},
 	{"EXECUTE_READ", windows.PAGE_EXECUTE_READ},
@@ -186,7 +186,7 @@ var MemProtectionFlags = []ParamFlag{
 // ViewProtectionFlags describes section protection flags. These
 // have different values than the memory protection flags as they
 // are reported by the kernel.
-var ViewProtectionFlags = []ParamFlag{
+var ViewProtectionFlags = Flags{
 	{"EXECUTE_READWRITE", sys.SectionRWX},
 	{"EXECUTE_WRITECOPY", sys.SectionWXC},
 	{"NOCACHE", sys.SectionNC},
@@ -199,7 +199,7 @@ var ViewProtectionFlags = []ParamFlag{
 }
 
 // DNSOptsFlags describes DNS query/response options.
-var DNSOptsFlags = []ParamFlag{
+var DNSOptsFlags = Flags{
 	{"STANDARD", 0x00000000},
 	{"ACCEPT_TRUNCATED_RESPONSE", 0x00000001},
 	{"USE_TCP_ONLY", 0x00000002},
@@ -223,7 +223,7 @@ var DNSOptsFlags = []ParamFlag{
 }
 
 // AccessMaskFlags describes the generic and specific access rights
-var AccessMaskFlags = []ParamFlag{
+var AccessMaskFlags = Flags{
 	{"DELETE", windows.DELETE},
 	{"READ_CONTROL", windows.READ_CONTROL},
 	{"WRITE_DAC", windows.WRITE_DAC},

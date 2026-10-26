@@ -49,9 +49,10 @@ func TestAlertString(t *testing.T) {
 		{
 			NewAlertWithEvents("Credential discovery via VaultCmd.exe", "Suspicious vault enumeration via VaultCmd tool", nil, Normal, []*event.Event{{
 				Type: event.CreateProcess,
-				Params: event.Params{
-					params.Cmdline:     {Name: params.Cmdline, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\svchost-fake.exe -k RPCSS"},
-					params.ProcessName: {Name: params.ProcessName, Type: params.AnsiString, Value: "svchost-fake.exe"}},
+				Params: event.ParamsOf(
+					event.NewParam(params.Cmdline, params.String, params.Str("C:\\Windows\\system32\\svchost-fake.exe -k RPCSS")),
+					event.NewParam(params.ProcessName, params.String, params.Str("svchost-fake.exe")),
+				),
 				PID: 1023,
 				PS: &pstypes.PS{
 					Name:                "svchost.exe",
@@ -69,9 +70,10 @@ func TestAlertString(t *testing.T) {
 		{
 			NewAlertWithEvents("Credential discovery via VaultCmd.exe", "", nil, Normal, []*event.Event{{
 				Type: event.CreateProcess,
-				Params: event.Params{
-					params.Cmdline:     {Name: params.Cmdline, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\svchost-fake.exe -k RPCSS"},
-					params.ProcessName: {Name: params.ProcessName, Type: params.AnsiString, Value: "svchost-fake.exe"}},
+				Params: event.ParamsOf(
+					event.NewParam(params.Cmdline, params.String, params.Str("C:\\Windows\\system32\\svchost-fake.exe -k RPCSS")),
+					event.NewParam(params.ProcessName, params.String, params.Str("svchost-fake.exe")),
+				),
 				PID: 1023,
 				PS: &pstypes.PS{
 					Name:                "svchost.exe",
@@ -98,9 +100,10 @@ func TestAlertString(t *testing.T) {
 func TestAlertJSON(t *testing.T) {
 	alert := NewAlertWithEvents("Credential discovery via VaultCmd.exe", "Suspicious vault enumeration via VaultCmd tool", nil, Normal, []*event.Event{{
 		Type: event.CreateProcess,
-		Params: event.Params{
-			params.Cmdline:     {Name: params.Cmdline, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\svchost-fake.exe -k RPCSS"},
-			params.ProcessName: {Name: params.ProcessName, Type: params.AnsiString, Value: "svchost-fake.exe"}},
+		Params: event.ParamsOf(
+			event.NewParam(params.Cmdline, params.String, params.Str("C:\\Windows\\system32\\svchost-fake.exe -k RPCSS")),
+			event.NewParam(params.ProcessName, params.String, params.Str("svchost-fake.exe")),
+		),
 		PID: 1023,
 		PS: &pstypes.PS{
 			Name:                "svchost.exe",

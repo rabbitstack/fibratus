@@ -236,7 +236,6 @@ func (e *Event) StringShort() string {
 // Empty return a pristine event instance.
 func Empty() *Event {
 	return &Event{
-		Params:   map[string]*Param{},
 		Metadata: make(map[MetadataKey]any),
 		PS:       &pstypes.PS{},
 	}
@@ -245,7 +244,6 @@ func Empty() *Event {
 // NewFromCapture recovers the event instance from the capture byte buffer.
 func NewFromCapture(buf []byte, ver capver.Version) (*Event, error) {
 	e := &Event{
-		Params:   make(Params),
 		Metadata: make(map[MetadataKey]any),
 	}
 	if err := e.UnmarshalRaw(buf, ver); err != nil {
@@ -333,19 +331,11 @@ func (e *Event) AddSequenceLink(link any) {
 	}
 }
 
-// AppendParam adds a new parameter to this event.
-func (e *Event) AppendParam(name string, typ params.Type, value params.Value, opts ...ParamOption) {
-	e.Params.Append(name, typ, value, opts...)
-}
-
-// AppendEnum adds the enum parameter to this event.
-func (e *Event) AppendEnum(name string, value uint32, enum ParamEnum) {
-	e.AppendParam(name, params.Enum, value, WithEnum(enum))
-}
-
-// AppendFlags adds the flags parameter to this event.
-func (e *Event) AppendFlags(name string, value uint32, flags ParamFlags) {
-	e.AppendParam(name, params.Flags, value, WithFlags(flags))
+// SetParam sets the parameter value. The parameter type, flags, and
+// enumeration are described by the event schema in the event table. If the
+// schema doesn't declare the parameter, it is appended to the parameters.
+func (e *Event) SetParam(name string, v params.Value) {
+	e.Params.SetByName(name, v)
 }
 
 // GetParamAsString returns the specified parameter value as string.
@@ -355,11 +345,7 @@ func (e *Event) AppendFlags(name string, value uint32, flags ParamFlags) {
 // Returns an empty string if the given parameter name is not found
 // in event parameters.
 func (e *Event) GetParamAsString(name string) string {
-	par, err := e.Params.Get(name)
-	if err != nil {
-		return ""
-	}
-	return par.String()
+	return e.Params.FormatByName(name)
 }
 
 // GetFlagsAsSlice returns parameter flags as a slice of bitmask string values.
@@ -369,12 +355,12 @@ func (e *Event) GetFlagsAsSlice(name string) []string {
 
 // GetParamAsUint64 returns the uint64 value of the given parameter.
 func (e *Event) GetParamAsUint64(name string) uint64 {
-	return e.Params.TryGetUint64(name)
+	return e.Params.GetUint64ByName(name)
 }
 
 // GetParamAsUint32 returns the uint32 value of the given parameter.
 func (e *Event) GetParamAsUint32(name string) uint32 {
-	return e.Params.TryGetUint32(name)
+	return e.Params.GetUint32ByName(name)
 }
 
 // SequenceLink returns the sequence link values from event metadata.

@@ -112,11 +112,11 @@ func (r *registryProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, er
 func (r *registryProcessor) processEvent(e *event.Event) (*event.Event, error) {
 	switch e.Type {
 	case event.RegKCBRundown, event.RegCreateKCB:
-		kcb := e.Params.MustGetUint64(params.RegKCB)
-		r.keys[kcb] = e.Params.MustGetString(params.RegPath)
+		kcb := e.Params.GetUint64ByName(params.RegKCB)
+		r.keys[kcb] = e.Params.GetStringByName(params.RegPath)
 		kcbCount.Add(1)
 	case event.RegDeleteKCB:
-		kcb := e.Params.MustGetUint64(params.RegKCB)
+		kcb := e.Params.GetUint64ByName(params.RegKCB)
 		delete(r.keys, kcb)
 		kcbCount.Add(-1)
 	default:
@@ -126,7 +126,7 @@ func (r *registryProcessor) processEvent(e *event.Event) (*event.Event, error) {
 			return e, nil
 		}
 
-		kcb := e.Params.MustGetUint64(params.RegKCB)
+		kcb := e.Params.GetUint64ByName(params.RegKCB)
 		// we have to obey a straightforward algorithm to connect relative
 		// key names to their root keys. If the KCB is equal to zero we
 		// have a full key name and don't have to go further resolving the
@@ -136,7 +136,7 @@ func (r *registryProcessor) processEvent(e *event.Event) (*event.Event, error) {
 		// last resort is to scan process' handles and check if any of the
 		// key handles contain the partial key name. In this case we assume
 		// the correct key is encountered.
-		path := e.Params.MustGetString(params.RegPath)
+		path := e.Params.GetStringByName(params.RegPath)
 		if kcb != 0 {
 			if baseKey, ok := r.keys[kcb]; ok {
 				path = key.ConcatPaths(baseKey, path)
@@ -144,9 +144,7 @@ func (r *registryProcessor) processEvent(e *event.Event) (*event.Event, error) {
 				kcbMissCount.Add(1)
 				path = r.findMatchingKey(e.PID, path)
 			}
-			if err := e.Params.SetValue(params.RegPath, path); err != nil {
-				return e, err
-			}
+			e.SetParam(params.RegPath, params.Str(path))
 		}
 
 		if e.IsRegSetValue() {
@@ -162,13 +160,11 @@ func (r *registryProcessor) processEvent(e *event.Event) (*event.Event, error) {
 			capturedDataHits.Add(1)
 
 			// enrich the event with value data/type parameters
-			typ, err := v.Params.GetUint32(params.RegValueType)
-			if err == nil {
-				e.AppendEnum(params.RegValueType, typ, key.RegistryValueTypes)
+			if v.Params.Contains(params.RegValueType) {
+				e.SetParam(params.RegValueType, v.Params.ValueByName(params.RegValueType))
 			}
-			data, err := v.Params.Get(params.RegData)
-			if err == nil {
-				e.AppendParam(params.RegData, data.Type, data.Value)
+			if v.Params.Contains(params.RegData) {
+				e.SetParam(params.RegData, v.Params.ValueByName(params.RegData))
 			}
 
 			return e, nil
@@ -199,19 +195,21 @@ func (r *registryProcessor) processEvent(e *event.Event) (*event.Event, error) {
 			}
 			return e, ErrReadValue(rootkey.String(), path, err)
 		}
-		e.AppendEnum(params.RegValueType, typ, key.RegistryValueTypes)
+		e.SetParam(params.RegValueType, params.U32(typ))
 
-		switch typ {
-		case registry.SZ, registry.EXPAND_SZ:
-			e.AppendParam(params.RegData, params.UnicodeString, val)
-		case registry.MULTI_SZ:
-			e.AppendParam(params.RegData, params.Slice, val)
-		case registry.BINARY:
-			e.AppendParam(params.RegData, params.Binary, val)
-		case registry.QWORD:
-			e.AppendParam(params.RegData, params.Uint64, val)
-		case registry.DWORD:
-			e.AppendParam(params.RegData, params.Uint32, uint32(val.(uint64)))
+		switch v := val.(type) {
+		case string:
+			e.SetParam(params.RegData, params.Str(v))
+		case []string:
+			e.SetParam(params.RegData, params.StrSlice(v))
+		case []byte:
+			e.SetParam(params.RegData, params.Bin(v))
+		case uint64:
+			if typ == registry.DWORD {
+				e.SetParam(params.RegData, params.U32(uint32(v)))
+			} else {
+				e.SetParam(params.RegData, params.U64(v))
+			}
 		}
 	}
 

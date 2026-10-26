@@ -175,7 +175,7 @@ func (ctx *ActionContext) UniquePids() []uint32 {
 	pids := make(map[uint32]struct{})
 	for _, e := range ctx.Events {
 		if e.IsCreateProcess() {
-			pids[e.Params.MustGetPid()] = struct{}{}
+			pids[e.Params.GetPid()] = struct{}{}
 		} else {
 			pids[e.PID] = struct{}{}
 		}

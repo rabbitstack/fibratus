@@ -44,38 +44,29 @@ func (p psProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, error) {
 	case event.CreateProcess, event.CreateProcessInternal, event.TerminateProcess, event.ProcessRundown, event.ProcessRundownInternal:
 		evt, err := p.processEvent(e)
 		if evt.IsTerminateProcess() {
-			p.regionProber.Remove(evt.Params.MustGetPid())
+			p.regionProber.Remove(evt.Params.GetPid())
 			return evt, false, multierror.Wrap(err, p.psnap.Remove(evt))
 		}
 
 		return evt, false, multierror.Wrap(err, p.psnap.Write(evt))
 	case event.CreateThread, event.TerminateThread, event.ThreadRundown:
-		pid, err := e.Params.GetPid()
-		if err != nil {
-			return e, false, err
-		}
+		pid := e.Params.GetPid()
 		proc := p.psnap.FindAndPut(pid)
 		if proc != nil {
-			e.AppendParam(params.Exe, params.UnicodeString, proc.Exe)
+			e.SetParam(params.Exe, params.Str(proc.Exe))
 		}
 		if !e.IsTerminateThread() {
 			return e, false, p.psnap.AddThread(e)
 		}
-		tid, err := e.Params.GetTid()
-		if err != nil {
-			return e, false, err
-		}
+		tid := e.Params.GetTid()
 
 		return e, false, p.psnap.RemoveThread(pid, tid)
 	case event.OpenProcess, event.OpenThread:
-		pid, err := e.Params.GetPid()
-		if err != nil {
-			return e, false, err
-		}
+		pid := e.Params.GetPid()
 		proc := p.psnap.FindAndPut(pid)
 		if proc != nil {
-			e.AppendParam(params.Exe, params.Path, proc.Exe)
-			e.AppendParam(params.ProcessName, params.AnsiString, proc.Name)
+			e.SetParam(params.Exe, params.Str(proc.Exe))
+			e.SetParam(params.ProcessName, params.Str(proc.Name))
 		}
 
 		return e, false, nil
@@ -104,19 +95,19 @@ func (p psProcessor) processEvent(e *event.Event) (*event.Event, error) {
 	if exe == "" {
 		exe = e.GetParamAsString(params.ProcessName)
 	}
-	e.AppendParam(params.Exe, params.Path, exe)
+	e.SetParam(params.Exe, params.Str(exe))
 
 	if e.IsTerminateProcess() {
 		return e, nil
 	}
 
 	// query process start time
-	pid := e.Params.MustGetPid()
+	pid := e.Params.GetPid()
 	started, err := getStartTime(pid, e)
 	if err != nil {
 		started = e.Timestamp
 	}
-	e.AppendParam(params.StartTime, params.Time, started)
+	e.SetParam(params.StartTime, params.Timestamp(started))
 
 	return e, nil
 }

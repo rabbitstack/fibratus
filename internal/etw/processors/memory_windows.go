@@ -25,13 +25,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 )
 
-// MemPageTypes represents the type of the pages in the allocated region.
-var MemPageTypes = event.ParamEnum{
-	va.MemImage:   "IMAGE",
-	va.MemMapped:  "MAPPED",
-	va.MemPrivate: "PRIVATE",
-}
-
 type memProcessor struct {
 	psnap        psnap.Snapshotter
 	regionProber *va.RegionProber
@@ -49,27 +42,27 @@ func (m memProcessor) Close() {
 
 func (m memProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, error) {
 	if e.Category() == event.Memory {
-		pid := e.Params.MustGetPid()
+		pid := e.Params.GetPid()
 		if e.IsVirtualAlloc() {
 			// retrieve info about the range of pages and enrich the event
 			// with allocation protection options and the type of pages in
 			// the allocated region. If the region is mapped, we try to find
 			// the backing file name
-			addr := e.Params.MustGetUint64(params.MemBaseAddress)
+			addr := e.Params.GetUint64ByName(params.MemBaseAddress)
 			region := m.regionProber.Query(pid, addr)
 			if region != nil {
 				if region.IsMapped() {
-					e.AppendParam(params.FilePath, params.DOSPath, region.GetMappedFile())
+					e.SetParam(params.FilePath, params.Str(region.GetMappedFile()))
 				}
-				e.AppendEnum(params.MemPageType, region.Type, MemPageTypes)
-				e.AppendFlags(params.MemProtect, region.Protect, event.MemProtectionFlags)
-				e.AppendParam(params.MemProtectMask, params.AnsiString, region.ProtectMask())
+				e.SetParam(params.MemPageType, params.U32(region.Type))
+				e.SetParam(params.MemProtect, params.U32(region.Protect))
+				e.SetParam(params.MemProtectMask, params.Str(region.ProtectMask()))
 			}
 		}
 		proc := m.psnap.FindAndPut(pid)
 		if proc != nil {
-			e.AppendParam(params.Exe, params.Path, proc.Exe)
-			e.AppendParam(params.ProcessName, params.AnsiString, proc.Name)
+			e.SetParam(params.Exe, params.Str(proc.Exe))
+			e.SetParam(params.ProcessName, params.Str(proc.Name))
 		}
 		return e, false, nil
 	}

@@ -82,9 +82,11 @@ func TestSyscallEventMatrix(t *testing.T) {
 		evt := raw.toEvent()
 		require.Equal(t, row.typ, evt.Type, row.name)
 		for _, name := range row.params {
-			_, err := evt.Params.Get(name)
-			assert.NoErrorf(t, err, "%s missing param %s", row.name, name)
+			assert.Truef(t, evt.Params.Contains(name), "%s missing param %s", row.name, name)
 		}
+		// all parameters have to be declared by the event schema, otherwise
+		// they are appended dynamically, which defeats the preallocated slots
+		assert.Equalf(t, event.GetTypeInfo(row.typ).ParamCount(), evt.Params.Size(), "%s appended params that are not in the schema", row.name)
 	}
 	for _, typ := range event.AllTypes() {
 		assert.Truef(t, seen[typ], "event type %s missing from the syscall matrix", typ)

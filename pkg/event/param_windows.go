@@ -20,21 +20,15 @@ package event
 
 import (
 	"expvar"
-	"fmt"
-	"net"
 	"strconv"
-	"strings"
-	"time"
 	"unsafe"
 
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
-	"github.com/rabbitstack/fibratus/pkg/network"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/rabbitstack/fibratus/pkg/util/colorizer"
-	"github.com/rabbitstack/fibratus/pkg/util/ip"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
 	"github.com/rabbitstack/fibratus/pkg/util/ntstatus"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
@@ -43,47 +37,29 @@ import (
 
 var unknownKeysCount = expvar.NewInt("registry.unknown.keys.count")
 
-// NewParam creates a new event parameter. Since the parameter type is already categorized,
-// we can coerce the value to the appropriate representation (e.g. hex, IP address)
-func NewParam(name string, typ params.Type, value params.Value, options ...ParamOption) *Param {
-	var opts paramOpts
-	for _, opt := range options {
-		opt(&opts)
-	}
-	var v params.Value
-	switch typ {
-	case params.IPv4:
-		v = ip.ToIPv4(value.(uint32))
-	case params.IPv6:
-		v = ip.ToIPv6(value.([]byte))
-	case params.Port:
-		v = windows.Ntohs(value.(uint16))
-	default:
-		v = value
-	}
-	return &Param{Name: name, Type: typ, Value: v, Flags: opts.flags, Enum: opts.enum}
-}
-
+// String returns the string representation of the parameter. The parameter
+// value is resolved according to the parameter type.
 func (p Param) String() string {
-	if p.Value == nil {
+	v := p.Value
+	if v.IsNull() {
 		return ""
 	}
-	switch p.Type {
-	case params.UnicodeString, params.AnsiString, params.Path:
-		return p.Value.(string)
-	case params.SID, params.WbemSID:
-		sid, err := getSID(&p)
-		if err != nil {
+	switch p.Type() {
+	case params.String, params.Path:
+		return v.Str()
+	case params.SID, params.WbemSID, params.TokenIntegrityLevel:
+		sid := convertToSID(p)
+		if sid == nil {
 			return ""
 		}
-		if p.Name == params.ProcessTokenIntegrityLevel {
+		if p.Type() == params.TokenIntegrityLevel {
 			return sys.RidToString(sid)
 		}
 		return sid.String()
 	case params.DOSPath:
-		return fs.GetDevMapper().Convert(p.Value.(string))
+		return fs.GetDevMapper().Convert(v.Str())
 	case params.Key:
-		rootKey, keyName := key.Format(p.Value.(string))
+		rootKey, keyName := key.Format(v.Str())
 		if keyName != "" && rootKey != key.Invalid {
 			return rootKey.String() + "\\" + keyName
 		}
@@ -93,79 +69,39 @@ func (p Param) String() string {
 		unknownKeysCount.Add(1)
 		return keyName
 	case params.HandleType:
-		return htypes.ConvertTypeIDToName(p.Value.(uint16))
+		return htypes.ConvertTypeIDToName(v.Uint16())
 	case params.Status:
-		v, ok := p.Value.(uint32)
-		if !ok {
+		if v.Kind() != params.KindUint {
 			return ""
 		}
-		return ntstatus.FormatMessage(v)
+		return ntstatus.FormatMessage(v.Uint32())
 	case params.Address:
-		v, ok := p.Value.(uint64)
-		if !ok {
+		if v.Kind() != params.KindUint {
 			return ""
 		}
-		return va.Address(v).String()
-	case params.Int8:
-		return strconv.Itoa(int(p.Value.(int8)))
-	case params.Uint8:
-		return strconv.Itoa(int(p.Value.(uint8)))
-	case params.Int16:
-		return strconv.Itoa(int(p.Value.(int16)))
-	case params.Uint16, params.Port:
-		return strconv.Itoa(int(p.Value.(uint16)))
-	case params.Uint32, params.PID, params.TID:
-		return strconv.Itoa(int(p.Value.(uint32)))
-	case params.Int32:
-		return strconv.Itoa(int(p.Value.(int32)))
-	case params.Uint64:
-		return strconv.FormatUint(p.Value.(uint64), 10)
-	case params.Int64:
-		return strconv.Itoa(int(p.Value.(int64)))
-	case params.IPv4, params.IPv6:
-		return p.Value.(net.IP).String()
-	case params.Bool:
-		return strconv.FormatBool(p.Value.(bool))
-	case params.Float:
-		return strconv.FormatFloat(float64(p.Value.(float32)), 'f', 6, 32)
-	case params.Double:
-		return strconv.FormatFloat(p.Value.(float64), 'f', 6, 64)
-	case params.Time:
-		return p.Value.(time.Time).String()
+		return va.Address(v.Uint64()).String()
+	case params.Int8, params.Int16, params.Int32, params.Int64:
+		return strconv.FormatInt(v.Int64(), 10)
+	case params.Uint8, params.Uint16, params.Uint32, params.Uint64, params.Port, params.PID, params.TID:
+		return strconv.FormatUint(v.Uint64(), 10)
+	case params.IP, params.IPv4, params.IPv6:
+		return v.IP().String()
 	case params.Enum:
-		if p.Enum == nil {
+		enum := p.Enum()
+		if enum == nil || v.Kind() != params.KindUint {
 			return ""
 		}
-		e := p.Value
-		v, ok := e.(uint32)
-		if !ok {
+		return enum[v.Uint32()]
+	case params.Flags32, params.Flags64:
+		flags := p.Flags()
+		if flags == nil || v.Kind() != params.KindUint {
 			return ""
 		}
-		return p.Enum[v]
-	case params.Flags, params.Flags64:
-		if p.Flags == nil {
-			return ""
-		}
-		f := p.Value
-		switch v := f.(type) {
-		case uint32:
-			return p.Flags.String(uint64(v))
-		case uint64:
-			return p.Flags.String(v)
-		default:
-			return ""
-		}
-	case params.Slice:
-		switch slice := p.Value.(type) {
-		case []string:
-			return strings.Join(slice, ",")
-		default:
-			return fmt.Sprintf("%v", slice)
-		}
-	case params.Binary:
-		return string(p.Value.([]byte))
+		return flags.String(v.Uint64())
 	default:
-		return fmt.Sprintf("%v", p.Value)
+		// bool, float, time, slice, binary, and variant
+		// types are rendered according to the value kind
+		return v.String()
 	}
 }
 
@@ -175,149 +111,78 @@ func (p Param) String() string {
 // type is converted to string param type, as drive mapping is performed
 // on the target where the capture is being taken.
 func (p Param) CaptureType() params.Type {
-	switch p.Type {
-	case params.HandleType, params.DOSPath, params.Key:
-		return params.UnicodeString
+	switch p.Type() {
+	case params.HandleType, params.DOSPath, params.Key, params.String:
+		return params.String
+	case params.IP, params.IPv4, params.IPv6:
+		if p.Value.IsIPv4() {
+			return params.IPv4
+		}
+		return params.IPv6
+	case params.Variant:
+		t := p.Value.ParamType()
+		if t == params.IP {
+			if p.Value.IsIPv4() {
+				return params.IPv4
+			}
+			return params.IPv6
+		}
+		return params.String
 	default:
-		return p.Type
+		return p.Type()
 	}
 }
 
-// NewParamFromCapture builds a parameter from restored capture state.
-func NewParamFromCapture(name string, typ params.Type, value params.Value, etype Type) *Param {
-	var enum ParamEnum
-	var flags ParamFlags
-	switch name {
-	case params.FileOperation:
-		enum = fs.FileCreateDispositions
-	case params.FileCreateOptions:
-		flags = FileCreateOptionsFlags
-	case params.FileAttributes:
-		flags = FileAttributeFlags
-	case params.FileShareMask:
-		flags = FileShareModeFlags
-	case params.FileInfoClass:
-		enum = fs.FileInfoClasses
-	case params.FileType:
-		enum = fs.FileTypes
-	case params.NetL4Proto:
-		enum = network.ProtoNames
-	case params.RegValueType:
-		enum = key.RegistryValueTypes
-	case params.MemAllocType:
-		flags = MemAllocationFlags
-	case params.FileViewSectionType:
-		enum = ViewSectionTypes
-	case params.DNSOpts:
-		flags = DNSOptsFlags
-	case params.DNSRR:
-		enum = DNSRecordTypes
-	case params.DNSRcode:
-		enum = DNSResponseCodes
-	case params.DesiredAccess:
-		if etype == OpenProcess {
-			flags = PsAccessRightFlags
-		} else {
-			flags = ThreadAccessRightFlags
-		}
-	case params.MemProtect:
-		if etype == VirtualAlloc || etype == VirtualFree {
-			flags = MemProtectionFlags
-		} else {
-			flags = ViewProtectionFlags
-		}
+// setFromCapture sets the parameter restored from the capture state. If the schema
+// declares the parameter, the value is assigned to the existing slot. Parameter types that
+// the capture converts to strings are given the string type, so the value is not converted
+// again when the parameter is rendered.
+func (pars *Params) setFromCapture(name string, typ params.Type, v params.Value) {
+	i := pars.Index(name)
+	if i < 0 {
+		*pars = append(*pars, Param{Value: v, info: &params.ParamInfo{Name: name, Type: typ}})
+		return
 	}
-	return &Param{Name: name, Type: typ, Value: value, Enum: enum, Flags: flags}
+	cur := (*pars)[i].info
+	switch cur.Type {
+	case params.HandleType, params.DOSPath, params.Key:
+		info := *cur
+		info.Type = params.String
+		(*pars)[i].info = &info
+	}
+	(*pars)[i].Value = v
 }
 
 // GetPid returns the process identifier.
-func (pars Params) GetPid() (uint32, error) {
-	return pars.getID(params.ProcessID, params.PID)
-}
-
-// MustGetPid returns the process identifier or panics.
-func (pars Params) MustGetPid() uint32 {
-	id, err := pars.GetPid()
-	if err != nil {
-		panic(err)
-	}
-	return id
-}
+func (pars Params) GetPid() uint32 { return pars.GetUint32ByName(params.ProcessID) }
 
 // GetPpid returns the parent process identifier.
-func (pars Params) GetPpid() (uint32, error) {
-	return pars.getID(params.ProcessParentID, params.PID)
-}
-
-// MustGetPpid returns the parent process identifier or panics.
-func (pars Params) MustGetPpid() uint32 {
-	id, err := pars.GetPpid()
-	if err != nil {
-		panic(err)
-	}
-	return id
-}
+func (pars Params) GetPpid() uint32 { return pars.GetUint32ByName(params.ProcessParentID) }
 
 // GetTid returns the thread identifier.
-func (pars Params) GetTid() (uint32, error) {
-	return pars.getID(params.ThreadID, params.TID)
-}
-
-// MustGetTid returns the thread identifier or panics.
-func (pars Params) MustGetTid() uint32 {
-	id, err := pars.GetTid()
-	if err != nil {
-		panic(err)
-	}
-	return id
-}
-
-func (pars Params) getID(name string, typ params.Type) (uint32, error) {
-	param, err := pars.findParam(name)
-	if err != nil {
-		return 0, err
-	}
-	if param.Type != typ {
-		return 0, fmt.Errorf("%q parameter has unexpected identifier type", name)
-	}
-	value, ok := param.Value.(uint32)
-	if !ok {
-		return 0, fmt.Errorf("unable to type cast %q parameter to uint32 identifier", name)
-	}
-	return value, nil
-}
+func (pars Params) GetTid() uint32 { return pars.GetUint32ByName(params.ThreadID) }
 
 // GetSID returns the raw Windows security identifier parameter.
-func (pars Params) GetSID() (*windows.SID, error) {
-	param, err := pars.findParam(params.UserSID)
-	if err != nil {
-		return nil, err
-	}
-	return getSID(param)
-}
+// It returns nil if the parameter is absent or has an invalid value.
+func (pars Params) GetSID() *windows.SID { return convertToSID(pars.GetByName(params.UserSID)) }
 
-func getSID(param *Param) (*windows.SID, error) {
-	sid, ok := param.Value.([]byte)
-	if !ok {
-		return nil, fmt.Errorf("unable to type cast %q parameter to []byte value", param.Name)
-	}
-	if sid == nil {
-		return nil, fmt.Errorf("sid linked to parameter %s is empty", param.Name)
+func convertToSID(param Param) *windows.SID {
+	sid := param.Value.Bytes()
+	if len(sid) == 0 {
+		return nil
 	}
 	pointer := uintptr(unsafe.Pointer(&sid[0]))
-	if param.Type == params.WbemSID {
+	if param.Type() == params.WbemSID {
 		pointer += uintptr(8 * 2)
 	}
-	return (*windows.SID)(unsafe.Pointer(pointer)), nil
+	return (*windows.SID)(unsafe.Pointer(pointer))
 }
 
-// MustGetSID returns the Windows security identifier or panics.
-func (pars Params) MustGetSID() *windows.SID {
-	sid, err := pars.GetSID()
-	if err != nil {
-		panic(err)
-	}
-	return sid
+func DecodeParams(r *etw.EventRecord, e *Event) error {
+	d := AcquireDecoder()
+	err := d.Decode(r, e)
+	ReleaseDecoder(d)
+	return err
 }
 
 var paramDecoder = &ParamDecoder{}
@@ -333,7 +198,6 @@ func (e *Event) decodeParams(r *etw.EventRecord) {
 	case AuditAPIEventGUID.Data1:
 		switch r.Header.EventDescriptor.ID {
 		case OpenProcessID:
-			paramDecoder.DecodeOpenProcess(r, e)
 		case OpenThreadID:
 			paramDecoder.DecodeOpenThread(r, e)
 		case SetThreadContextID:
@@ -367,9 +231,9 @@ func (e *Event) decodeParams(r *etw.EventRecord) {
 
 // color applies a semantic colour to a single parameter value based
 // on its type and for string types its content.
-func (p *Param) color() string {
-	switch p.Type {
-	case params.UnicodeString, params.AnsiString, params.SID:
+func (p Param) color() string {
+	switch p.Type() {
+	case params.String, params.SID:
 		return colorizer.Span(colorizer.White, p.String())
 	case params.Status:
 		if p.String() == ntstatus.Success {
@@ -383,15 +247,14 @@ func (p *Param) color() string {
 		params.Float, params.Double:
 		return colorizer.Span(colorizer.Yellow, p.String())
 	case params.Bool:
-		b, ok := p.Value.(bool)
-		if !ok {
+		if p.Value.Kind() != params.KindBool {
 			return colorizer.Span(colorizer.Coral, p.String())
 		}
-		if b {
+		if p.Value.Bool() {
 			return colorizer.Span(colorizer.Green, p.String())
 		}
 		return colorizer.Span(colorizer.Coral, p.String())
-	case params.IPv4, params.IPv6:
+	case params.IP, params.IPv4, params.IPv6:
 		return colorizer.Span(colorizer.Blue, p.String())
 	case params.Port:
 		return colorizer.Span(colorizer.Cyan, p.String())

@@ -69,7 +69,7 @@ func getParentPs(e *event.Event) *pstypes.PS {
 	return e.PS.Parent
 }
 
-func (e *evtAccessor) Get(f Field, evt *event.Event) (params.Value, error) {
+func (e *evtAccessor) Get(f Field, evt *event.Event) (any, error) {
 	v, err := e.get(f, evt)
 	if v != nil {
 		return v, err
@@ -98,7 +98,7 @@ func (psAccessor) IsFieldAccessible(e *event.Event) bool {
 
 func newPSAccessor(psnap psnap.Snapshotter) Accessor { return &psAccessor{psnap: psnap} }
 
-func (ps *psAccessor) Get(f Field, e *event.Event) (params.Value, error) {
+func (ps *psAccessor) Get(f Field, e *event.Event) (any, error) {
 	switch f.Name {
 	case fields.PsPid:
 		return e.PID, nil
@@ -184,7 +184,7 @@ func (ps *psAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 		if e.Type != event.OpenProcess {
 			return nil, nil
 		}
-		return e.Params.GetString(params.DesiredAccess)
+		return param(e, params.DesiredAccess, event.Params.GetStringByName)
 	case fields.PsAccessMaskNames:
 		if e.Type != event.OpenProcess {
 			return nil, nil
@@ -499,14 +499,14 @@ func newThreadAccessor() Accessor {
 	return &threadAccessor{}
 }
 
-func (t *threadAccessor) Get(f Field, e *event.Event) (params.Value, error) {
+func (t *threadAccessor) Get(f Field, e *event.Event) (any, error) {
 	switch f.Name {
 	case fields.ThreadBasePrio:
-		return e.Params.GetUint8(params.BasePrio)
+		return param(e, params.BasePrio, event.Params.GetUint8ByName)
 	case fields.ThreadIOPrio:
-		return e.Params.GetUint8(params.IOPrio)
+		return param(e, params.IOPrio, event.Params.GetUint8ByName)
 	case fields.ThreadPagePrio:
-		return e.Params.GetUint8(params.PagePrio)
+		return param(e, params.PagePrio, event.Params.GetUint8ByName)
 	case fields.ThreadKstackBase:
 		return e.GetParamAsString(params.KstackBase), nil
 	case fields.ThreadKstackLimit:
@@ -518,14 +518,14 @@ func (t *threadAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 	case fields.ThreadEntrypoint, fields.ThreadStartAddress:
 		return e.GetParamAsString(params.StartAddress), nil
 	case fields.ThreadPID:
-		return e.Params.GetUint32(params.ProcessID)
+		return param(e, params.ProcessID, event.Params.GetUint32ByName)
 	case fields.ThreadTEB:
 		return e.GetParamAsString(params.TEB), nil
 	case fields.ThreadAccessMask:
 		if e.Type != event.OpenThread {
 			return nil, nil
 		}
-		return e.Params.GetString(params.DesiredAccess)
+		return param(e, params.DesiredAccess, event.Params.GetStringByName)
 	case fields.ThreadAccessMaskNames:
 		if e.Type != event.OpenThread {
 			return nil, nil
@@ -701,7 +701,7 @@ func newFileAccessor() Accessor {
 	return &fileAccessor{}
 }
 
-func (l *fileAccessor) Get(f Field, e *event.Event) (params.Value, error) {
+func (l *fileAccessor) Get(f Field, e *event.Event) (any, error) {
 	switch f.Name {
 	case fields.FilePath:
 		return e.GetParamAsString(params.FilePath), nil
@@ -717,15 +717,15 @@ func (l *fileAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 	case fields.FileExtension:
 		return filepath.Ext(e.GetParamAsString(params.FilePath)), nil
 	case fields.FileOffset:
-		return e.Params.GetUint64(params.FileOffset)
+		return param(e, params.FileOffset, event.Params.GetUint64ByName)
 	case fields.FileIOSize:
-		return e.Params.GetUint32(params.FileIoSize)
+		return param(e, params.FileIoSize, event.Params.GetUint32ByName)
 	case fields.FileShareMode, fields.FileShareMask:
 		return e.GetParamAsString(params.FileShareMask), nil
 	case fields.FileOperation:
 		return e.GetParamAsString(params.FileOperation), nil
 	case fields.FileObject:
-		return e.Params.GetUint64(params.FileObject)
+		return param(e, params.FileObject, event.Params.GetUint64ByName)
 	case fields.FileType:
 		return e.GetParamAsString(params.FileType), nil
 	case fields.FileAttributes:
@@ -738,7 +738,7 @@ func (l *fileAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 	case fields.FileViewBase:
 		return e.GetParamAsString(params.FileViewBase), nil
 	case fields.FileViewSize:
-		return e.Params.GetUint64(params.FileViewSize)
+		return param(e, params.FileViewSize, event.Params.GetUint64ByName)
 	case fields.FileViewType:
 		return e.GetParamAsString(params.FileViewSectionType), nil
 	case fields.FileViewProtection:
@@ -761,22 +761,22 @@ func (l *fileAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 		}
 		return false, nil
 	case fields.FilePID:
-		return e.Params.GetPid()
+		return param(e, params.ProcessID, event.Params.GetUint32ByName)
 	case fields.FileKey:
-		return e.Params.GetUint64(params.FileKey)
+		return param(e, params.FileKey, event.Params.GetUint64ByName)
 	case fields.FileInfoClass:
 		return e.GetParamAsString(params.FileInfoClass), nil
 	case fields.FileInfoAllocationSize:
-		if e.Params.TryGetUint32(params.FileInfoClass) == fs.AllocationClass {
-			return e.Params.GetUint64(params.FileExtraInfo)
+		if e.Params.GetUint32ByName(params.FileInfoClass) == fs.AllocationClass {
+			return param(e, params.FileExtraInfo, event.Params.GetUint64ByName)
 		}
 	case fields.FileInfoEOFSize:
-		if e.Params.TryGetUint32(params.FileInfoClass) == fs.EOFClass {
-			return e.Params.GetUint64(params.FileExtraInfo)
+		if e.Params.GetUint32ByName(params.FileInfoClass) == fs.EOFClass {
+			return param(e, params.FileExtraInfo, event.Params.GetUint64ByName)
 		}
 	case fields.FileInfoIsDispositionDeleteFile:
-		return e.Params.TryGetUint32(params.FileInfoClass) == fs.DispositionClass &&
-			e.Params.TryGetUint64(params.FileExtraInfo) > 0, nil
+		return e.Params.GetUint32ByName(params.FileInfoClass) == fs.DispositionClass &&
+			e.Params.GetUint64ByName(params.FileExtraInfo) > 0, nil
 	}
 
 	return nil, nil
@@ -796,17 +796,17 @@ func newModuleAccessor() Accessor {
 	return &moduleAccessor{}
 }
 
-func (m *moduleAccessor) Get(f Field, e *event.Event) (params.Value, error) {
+func (m *moduleAccessor) Get(f Field, e *event.Event) (any, error) {
 	if e.IsLoadModule() && (f.Name.IsModuleSignature() || f.Name == fields.ImageSignatureType || f.Name == fields.ImageSignatureLevel || f.Name.IsImageCert()) {
 		sign := signature.GetSignatures().DoRequest(e.SignatureKey())
 
 		if sign != nil && sign.HasCertificate() {
 			cert := sign.Cert()
-			e.AppendParam(params.ModuleCertIssuer, params.UnicodeString, cert.Issuer)
-			e.AppendParam(params.ModuleCertSubject, params.UnicodeString, cert.Subject)
-			e.AppendParam(params.ModuleCertSerial, params.UnicodeString, cert.SerialNumber)
-			e.AppendParam(params.ModuleCertNotAfter, params.Time, cert.NotAfter)
-			e.AppendParam(params.ModuleCertNotBefore, params.Time, cert.NotBefore)
+			e.SetParam(params.ModuleCertIssuer, params.Str(cert.Issuer))
+			e.SetParam(params.ModuleCertSubject, params.Str(cert.Subject))
+			e.SetParam(params.ModuleCertSerial, params.Str(cert.SerialNumber))
+			e.SetParam(params.ModuleCertNotAfter, params.Timestamp(cert.NotAfter))
+			e.SetParam(params.ModuleCertNotBefore, params.Timestamp(cert.NotBefore))
 		}
 
 		switch f.Name {
@@ -834,11 +834,11 @@ func (m *moduleAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 	case fields.ImageBase, fields.ModuleBase, fields.DllBase:
 		return e.GetParamAsString(params.ModuleBase), nil
 	case fields.ImageSize, fields.ModuleSize, fields.DllSize:
-		return e.Params.GetUint64(params.ModuleSize)
+		return param(e, params.ModuleSize, event.Params.GetUint64ByName)
 	case fields.ImageChecksum, fields.ModuleChecksum:
-		return e.Params.GetUint32(params.ModuleCheckSum)
+		return param(e, params.ModuleCheckSum, event.Params.GetUint32ByName)
 	case fields.ImagePID, fields.ModulePID, fields.DllPID:
-		return e.Params.GetPid()
+		return param(e, params.ProcessID, event.Params.GetUint32ByName)
 	case fields.ImageSignatureType, fields.ModuleSignatureType, fields.DllSignatureType:
 		return e.GetParamAsString(params.ModuleSignatureType), nil
 	case fields.ImageSignatureLevel, fields.ModuleSignatureLevel, fields.DllSignatureLevel:
@@ -850,9 +850,9 @@ func (m *moduleAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 	case fields.ImageCertSerial, fields.ModuleSignatureSerial, fields.DllSignatureSerial:
 		return e.GetParamAsString(params.ModuleCertSerial), nil
 	case fields.ImageCertBefore, fields.ModuleSignatureBefore, fields.DllSignatureBefore:
-		return e.Params.GetTime(params.ModuleCertNotBefore)
+		return param(e, params.ModuleCertNotBefore, event.Params.GetTimeByName)
 	case fields.ImageCertAfter, fields.ModuleSignatureAfter, fields.DllSignatureAfter:
-		return e.Params.GetTime(params.ModuleCertNotAfter)
+		return param(e, params.ModuleCertNotAfter, event.Params.GetTimeByName)
 	case fields.ImageIsDLL, fields.ModuleIsDLL, fields.ImageIsDriver,
 		fields.ModuleIsDriver, fields.ImageIsExecutable, fields.ModuleIsExecutable,
 		fields.ImageIsDotnet, fields.ModuleIsDotnet, fields.DllIsDotnet:
@@ -894,7 +894,7 @@ func newRegistryAccessor() Accessor {
 	return &registryAccessor{}
 }
 
-func (r *registryAccessor) Get(f Field, e *event.Event) (params.Value, error) {
+func (r *registryAccessor) Get(f Field, e *event.Event) (any, error) {
 	switch f.Name {
 	case fields.RegistryPath:
 		return e.GetParamAsString(params.RegPath), nil
@@ -912,7 +912,7 @@ func (r *registryAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 		}
 		return nil, nil
 	case fields.RegistryValueType:
-		return e.Params.GetString(params.RegValueType)
+		return param(e, params.RegValueType, event.Params.GetStringByName)
 	case fields.RegistryData:
 		return e.GetParamAsString(params.RegData), nil
 	case fields.RegistryStatus:
@@ -944,28 +944,28 @@ func (networkAccessor) IsFieldAccessible(e *event.Event) bool {
 
 func newNetworkAccessor() Accessor { return &networkAccessor{} }
 
-func (n *networkAccessor) Get(f Field, e *event.Event) (params.Value, error) {
+func (n *networkAccessor) Get(f Field, e *event.Event) (any, error) {
 	switch f.Name {
 	case fields.NetDIP:
-		return e.Params.GetIP(params.NetDIP)
+		return param(e, params.NetDIP, event.Params.GetIPByName)
 	case fields.NetSIP:
-		return e.Params.GetIP(params.NetSIP)
+		return param(e, params.NetSIP, event.Params.GetIPByName)
 	case fields.NetDport:
-		return e.Params.GetUint16(params.NetDport)
+		return param(e, params.NetDport, event.Params.GetUint16ByName)
 	case fields.NetSport:
-		return e.Params.GetUint16(params.NetSport)
+		return param(e, params.NetSport, event.Params.GetUint16ByName)
 	case fields.NetDportName:
-		return e.Params.GetString(params.NetDportName)
+		return param(e, params.NetDportName, event.Params.GetStringByName)
 	case fields.NetSportName:
-		return e.Params.GetString(params.NetSportName)
+		return param(e, params.NetSportName, event.Params.GetStringByName)
 	case fields.NetL4Proto:
 		return e.GetParamAsString(params.NetL4Proto), nil
 	case fields.NetPacketSize:
-		return e.Params.GetUint32(params.NetSize)
+		return param(e, params.NetSize, event.Params.GetUint32ByName)
 	case fields.NetDIPNames:
-		return n.resolveNamesForIP(e.Params.MustGetIP(params.NetDIP))
+		return n.resolveNamesForIP(e.Params.GetIPByName(params.NetDIP))
 	case fields.NetSIPNames:
-		return n.resolveNamesForIP(e.Params.MustGetIP(params.NetSIP))
+		return n.resolveNamesForIP(e.Params.GetIPByName(params.NetSIP))
 	}
 
 	return nil, nil
@@ -1051,7 +1051,7 @@ func newPEAccessor() Accessor {
 	return &peAccessor{}
 }
 
-func (pa *peAccessor) Get(f Field, e *event.Event) (params.Value, error) {
+func (pa *peAccessor) Get(f Field, e *event.Event) (any, error) {
 	// ignore System process
 	if e.PID == psnap.SystemPID {
 		return nil, nil
@@ -1082,13 +1082,13 @@ func (pa *peAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 	// executable image
 	if e.IsLoadModule() && f.Name.IsPeModified() {
 		filename := e.GetParamAsString(params.ModulePath)
-		isExecutable := filepath.Ext(filename) == ".exe" || e.Params.TryGetBool(params.FileIsExecutable)
+		isExecutable := filepath.Ext(filename) == ".exe" || e.Params.GetBoolByName(params.FileIsExecutable)
 		if !isExecutable {
 			return nil, nil
 		}
 
-		pid := e.Params.MustGetPid()
-		addr := e.Params.MustGetUint64(params.ModuleBase)
+		pid := e.Params.GetPid()
+		addr := e.Params.GetUint64ByName(params.ModuleBase)
 
 		file, err := pe.ParseFile(filename, pa.parserOpts()...)
 		if err != nil {
@@ -1168,11 +1168,11 @@ func (pa *peAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 		}
 		return p.Cert.NotBefore, nil
 	case fields.PeIsDLL:
-		return e.Params.GetBool(params.FileIsDLL)
+		return param(e, params.FileIsDLL, event.Params.GetBoolByName)
 	case fields.PeIsDriver:
-		return e.Params.GetBool(params.FileIsDriver)
+		return param(e, params.FileIsDriver, event.Params.GetBoolByName)
 	case fields.PeIsExecutable:
-		return e.Params.GetBool(params.FileIsExecutable)
+		return param(e, params.FileIsExecutable, event.Params.GetBoolByName)
 	case fields.PeCompany, fields.PsPeCompany:
 		return p.VersionResources[pe.Company], nil
 	case fields.PeCopyright, fields.PsPeCopyright:
@@ -1230,7 +1230,7 @@ func newMemAccessor() Accessor {
 	return &memAccessor{}
 }
 
-func (*memAccessor) Get(f Field, e *event.Event) (params.Value, error) {
+func (*memAccessor) Get(f Field, e *event.Event) (any, error) {
 	switch f.Name {
 	case fields.MemPageType:
 		return e.GetParamAsString(params.MemPageType), nil
@@ -1239,11 +1239,11 @@ func (*memAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 	case fields.MemProtection:
 		return e.GetParamAsString(params.MemProtect), nil
 	case fields.MemBaseAddress:
-		return e.Params.GetUint64(params.MemBaseAddress)
+		return param(e, params.MemBaseAddress, event.Params.GetUint64ByName)
 	case fields.MemRegionSize:
-		return e.Params.GetUint64(params.MemRegionSize)
+		return param(e, params.MemRegionSize, event.Params.GetUint64ByName)
 	case fields.MemProtectionMask:
-		return e.Params.GetString(params.MemProtectMask)
+		return param(e, params.MemProtectMask, event.Params.GetStringByName)
 	}
 
 	return nil, nil
@@ -1262,7 +1262,7 @@ func newDNSAccessor() Accessor {
 	return &dnsAccessor{}
 }
 
-func (*dnsAccessor) Get(f Field, e *event.Event) (params.Value, error) {
+func (*dnsAccessor) Get(f Field, e *event.Event) (any, error) {
 	switch f.Name {
 	case fields.DNSName:
 		return e.GetParamAsString(params.DNSName), nil
@@ -1273,7 +1273,7 @@ func (*dnsAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 	case fields.DNSOptions:
 		return e.GetFlagsAsSlice(params.DNSOpts), nil
 	case fields.DNSAnswers:
-		return e.Params.GetSlice(params.DNSAnswers)
+		return param(e, params.DNSAnswers, event.Params.GetStringSliceByName)
 	}
 
 	return nil, nil

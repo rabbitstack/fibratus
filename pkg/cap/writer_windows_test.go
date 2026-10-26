@@ -74,12 +74,12 @@ func TestWrite(t *testing.T) {
 			Seq:       uint64(i + 1),
 			Timestamp: time.Now(),
 			Host:      "archrabbit",
-			Params: event.Params{
-				params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
-				params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
-				params.FileType:      {Name: params.FileType, Type: params.AnsiString, Value: "file"},
-				params.FileOperation: {Name: params.FileOperation, Type: params.AnsiString, Value: "open"},
-			},
+			Params: event.ParamsOf(
+				event.NewParam(params.FileObject, params.Uint64, params.U64(uint64(12456738026482168384))),
+				event.NewParam(params.FilePath, params.String, params.Str("\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll")),
+				event.NewParam(params.FileType, params.String, params.Str("file")),
+				event.NewParam(params.FileOperation, params.String, params.Str("open")),
+			),
 			Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barz"},
 			PS: &pstypes.PS{
 				PID:       2436,

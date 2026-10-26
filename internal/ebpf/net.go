@@ -30,34 +30,30 @@ import (
 )
 
 func appendSockParams(evt *event.Event, r rawEvent) {
-	evt.Params.Append(params.FD, params.Int64, int64(r.Arg0))
+	evt.Params.SetByName(params.FD, params.I64(int64(r.Arg0)))
 	if r.Type == uint32(event.Accept) && r.Retval >= 0 {
-		evt.Params.Append(params.NewFD, params.Int64, r.Retval)
+		evt.Params.SetByName(params.NewFD, params.I64(r.Retval))
 	}
 	if r.Flags != 0 {
-		evt.Params.Append(params.SockFlags, params.Uint64, r.Flags)
+		evt.Params.SetByName(params.SockFlags, params.U64(r.Flags))
 	}
 
 	family, ip, port, unixPath := parseSockaddr(r.Aux[:])
-	evt.Params.Append(params.SockFamily, params.Uint16, family)
+	evt.Params.SetByName(params.SockFamily, params.U16(family))
 	if unixPath != "" {
-		evt.Params.Append(params.SockPath, params.Path, unixPath)
+		evt.Params.SetByName(params.SockPath, params.Str(unixPath))
 		return
 	}
 	if ip == nil {
 		return
 	}
-	ipParam := params.IPv4
-	if ip.To4() == nil {
-		ipParam = params.IPv6
-	}
 	if r.Type == uint32(event.Connect) {
-		evt.Params.Append(params.NetDIP, ipParam, ip)
-		evt.Params.Append(params.NetDport, params.Port, port)
+		evt.Params.SetByName(params.NetDIP, params.IPAddr(ip))
+		evt.Params.SetByName(params.NetDport, params.U16(port))
 		return
 	}
-	evt.Params.Append(params.NetSIP, ipParam, ip)
-	evt.Params.Append(params.NetSport, params.Port, port)
+	evt.Params.SetByName(params.NetSIP, params.IPAddr(ip))
+	evt.Params.SetByName(params.NetSport, params.U16(port))
 }
 
 func parseSockaddr(b []byte) (family uint16, ip net.IP, port uint16, unixPath string) {

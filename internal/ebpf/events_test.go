@@ -126,7 +126,8 @@ func goldenEvent(evt *event.Event) golden {
 		Seq:    evt.Seq,
 		Params: map[string]string{},
 	}
-	for name := range evt.Params {
+	for _, par := range evt.Params.Present() {
+		name := par.Name()
 		g.Params[name] = evt.GetParamAsString(name)
 	}
 	return g
@@ -142,7 +143,7 @@ func prettyJSON(t *testing.T, v any) []byte {
 func TestSucceededHelper(t *testing.T) {
 	evt := sampleExecve().toEvent()
 	assert.True(t, succeeded(evt))
-	evt.Params.Append(params.Retval, params.Int64, int64(-2))
+	evt.Params.Append(params.Retval, params.Int64, params.I64(int64(-2)))
 	assert.False(t, succeeded(evt))
 }
 
@@ -163,8 +164,8 @@ func TestSignalTargetKeepsPidSign(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			evt := rawEvent{Type: uint32(event.Kill), Arg0: tt.arg0, Arg1: 9}.toEvent()
-			target, err := evt.Params.GetInt64(params.TargetProcessID)
-			require.NoError(t, err)
+			require.True(t, evt.Params.Contains(params.TargetProcessID))
+			target := evt.Params.GetInt64ByName(params.TargetProcessID)
 			assert.Equal(t, tt.want, target)
 		})
 	}
@@ -172,12 +173,10 @@ func TestSignalTargetKeepsPidSign(t *testing.T) {
 
 func TestPtraceAndProcessVMTargetsAreSigned(t *testing.T) {
 	ptrace := rawEvent{Type: uint32(event.Ptrace), Arg0: 16, Arg1: 4242}.toEvent()
-	target, err := ptrace.Params.GetInt64(params.TargetProcessID)
-	require.NoError(t, err)
+	target := ptrace.Params.GetInt64ByName(params.TargetProcessID)
 	assert.Equal(t, int64(4242), target)
 
 	vmread := rawEvent{Type: uint32(event.ProcessVMRead), Arg0: 4242}.toEvent()
-	target, err = vmread.Params.GetInt64(params.TargetProcessID)
-	require.NoError(t, err)
+	target = vmread.Params.GetInt64ByName(params.TargetProcessID)
 	assert.Equal(t, int64(4242), target)
 }

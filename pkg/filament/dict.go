@@ -80,33 +80,29 @@ func newEventDict(evt *event.Event) (*cpython.Dict, error) {
 
 	// insert event parameters
 	pars := cpython.NewDict()
-	for _, par := range evt.Params {
+	for _, par := range evt.Params.Present() {
 		var val interface{}
-		var err error
-		switch par.Type {
+		switch par.Type() {
 		case params.Uint8:
-			val, err = evt.Params.GetUint8(par.Name)
+			val = par.Value.Uint8()
 		case params.Uint16, params.Port:
-			val, err = evt.Params.GetUint16(par.Name)
+			val = par.Value.Uint16()
 		case params.Uint32, params.PID, params.TID:
-			val, err = evt.Params.GetUint32(par.Name)
+			val = par.Value.Uint32()
 		case params.Uint64:
-			val, err = evt.Params.GetUint64(par.Name)
+			val = par.Value.Uint64()
 		case params.Time:
-			val, err = evt.Params.GetTime(par.Name)
-		case params.IP:
-			val, err = evt.Params.GetIP(par.Name)
+			val = par.Value.Time()
+		case params.IP, params.IPv4, params.IPv6:
+			val = par.Value.IP()
 		default:
-			val = evt.GetParamAsString(par.Name)
-		}
-		if err != nil {
-			continue
+			val = par.String()
 		}
 		param := cpython.NewPyObjectFromValue(val)
 		if param.IsNull() {
 			continue
 		}
-		pars.Insert(cpython.PyUnicodeFromString(par.Name), param)
+		pars.Insert(cpython.PyUnicodeFromString(par.Name()), param)
 	}
 
 	dict.Insert(parameters, pars.Object())

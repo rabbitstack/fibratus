@@ -85,10 +85,10 @@ func killEvent(pid uint32, startNs uint64) *event.Event {
 			Name:          "malware",
 			StartBootTime: startNs,
 		},
-		Params: event.Params{
-			params.ProcessID:     {Name: params.ProcessID, Type: params.PID, Value: pid},
-			params.StartBootTime: {Name: params.StartBootTime, Type: params.Uint64, Value: startNs},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.ProcessID, params.PID, params.U32(pid)),
+			event.NewParam(params.StartBootTime, params.Uint64, params.U64(startNs)),
+		),
 	}
 }
 
@@ -217,7 +217,7 @@ func TestKillResolvesCloneChildPid(t *testing.T) {
 
 	clone := killEvent(testPID, testStartNs)
 	clone.Type = event.Clone
-	clone.Params.Append(params.CloneFlags, params.Uint64, uint64(0))
+	clone.Params.Append(params.CloneFlags, params.Uint64, params.U64(uint64(0)))
 	require.True(t, clone.IsCreateProcess())
 
 	require.NoError(t, k.kill(killContext(clone)))

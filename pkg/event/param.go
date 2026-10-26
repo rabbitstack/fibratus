@@ -19,20 +19,16 @@
 package event
 
 import (
-	"fmt"
 	"net"
-	"reflect"
-	"sort"
 	"strings"
 	"time"
+	"unsafe"
 
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/util/colorizer"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
-
-	"github.com/rabbitstack/fibratus/pkg/errors"
-	"github.com/rabbitstack/fibratus/pkg/event/params"
 )
 
 var caser = cases.Title(language.English)
@@ -57,584 +53,461 @@ var ParamNameCaseStyle = SnakeCase
 // ParamKVDelimiter specifies the character that delimits parameter's key from its value
 var ParamKVDelimiter = "➜ "
 
-// ParamEnum defines the type for the event parameter enumeration values. Enums
-// are a direct mapping from the parameter integer value to some symbolical name
-type ParamEnum map[uint32]string
-
-type paramOpts struct {
-	flags ParamFlags
-	enum  ParamEnum
-}
-
-// ParamOption represents the option for the parameter literal constructor.
-type ParamOption func(o *paramOpts)
-
-// WithFlags appends the parameter with a list of bitmask flags.
-func WithFlags(flags ParamFlags) ParamOption {
-	return func(o *paramOpts) {
-		o.flags = flags
-	}
-}
-
-// WithEnum appends the parameter with the enum mapping.
-func WithEnum(enum ParamEnum) ParamOption {
-	return func(o *paramOpts) {
-		o.enum = enum
-	}
-}
-
-// Param defines the layout of the event parameter.
+// Param is the event parameter. It contains only the value of the
+// parameter and a reference to the descriptor in the event table that
+// provides the name, type, flags, and enumeration of the parameter.
+// An absent parameter has the null value.
 type Param struct {
-	// Type is the type of the parameter. For example, `sport` parameter has the `Port` type although its value
-	// is the uint16 numeric type.
-	Type params.Type `json:"-"`
-	// Value is the container for parameter values. To access the underlying value use the appropriate `Get` methods.
-	Value params.Value `json:"value"`
-	// Name represents the name of the parameter (e.g. pid, sport).
-	Name string `json:"name"`
-	// Flags represents parameter flags
-	Flags ParamFlags `json:"flags"`
-	// Enum represents parameter enumeration
-	Enum ParamEnum `json:"enum"`
+	// Value is the container for parameter values. It is a tagged union, so
+	// the value is stored without boxing it into an interface.
+	Value params.Value
+	info  *params.ParamInfo
 }
+
+// Name returns the parameter name.
+func (p Param) Name() string {
+	if p.info == nil {
+		return ""
+	}
+	return p.info.Name
+}
+
+// Type returns the logical parameter type.
+func (p Param) Type() params.Type {
+	if p.info == nil {
+		return params.Null
+	}
+	return p.info.Type
+}
+
+// Flags returns the bitmask flags of the parameter.
+func (p Param) Flags() params.Flags {
+	if p.info == nil {
+		return nil
+	}
+	return p.info.Flags
+}
+
+// Enum returns the enumeration of the parameter.
+func (p Param) Enum() params.Enumeration {
+	if p.info == nil {
+		return nil
+	}
+	return p.info.Enum
+}
+
+// IsNull indicates if the parameter is absent.
+func (p Param) IsNull() bool { return p.Value.IsNull() }
 
 // IsNumber determines if the parameter stores the integer value type.
-func (p Param) IsNumber() bool {
-	return p.Type == params.Int8 || p.Type == params.Int16 || p.Type == params.Int32 || p.Type == params.Int64 ||
-		p.Type == params.Uint8 || p.Type == params.Uint16 || p.Type == params.Uint32 || p.Type == params.Uint64
-}
+func (p Param) IsNumber() bool { return p.Type().IsNumber() }
 
-// Params is the type that represents the sequence of event parameters
-type Params map[string]*Param
+// Params is the sequence of event parameters. The sequence is
+// indexed by the position of the parameter in the event schema,
+// that is, `table[type].Params`, and it always has as many slots as
+// there are parameters in the schema. The parameters that were not
+// populated have the null value. Parameters that are not described by
+// the schema are appended after the schema slots.
+//
+// The getter methods accept either the parameter index or the parameter
+// name (methods with the ByName suffix). Getters don't return errors. If the
+// parameter is not found, or it holds the value of a different kind, the zero
+// value of the requested type is returned.
+type Params []Param
 
-// Append adds a new parameter with the specified name, type and value.
-func (pars Params) Append(name string, typ params.Type, value params.Value, opts ...ParamOption) Params {
-	pars[name] = NewParam(name, typ, value, opts...)
+// NewParams creates the parameters for the specified event type, with the slots
+// allocated according to the schema in the event table.
+func NewParams(typ Type) Params {
+	if int(typ) >= len(table) {
+		return nil
+	}
+	schema := table[typ].Params
+	if len(schema) == 0 {
+		return nil
+	}
+	pars := make(Params, len(schema))
+	for i := range schema {
+		pars[i].info = &schema[i]
+	}
 	return pars
 }
 
-// AppendFromCapture adds a new parameter with the specified name, type and value from the cap state.
-func (pars Params) AppendFromCapture(name string, typ params.Type, value params.Value, etype Type) Params {
-	pars[name] = NewParamFromCapture(name, typ, value, etype)
-	return pars
+// NewParam creates a standalone parameter with its own descriptor, which is not part of the
+// event schema. It is useful to build parameters for events that are not tied to the table
+// schema, such as synthetic events or the test fixtures.
+func NewParam(name string, typ params.Type, v params.Value, opts ...params.ParamOption) Param {
+	var o params.ParamOpts
+	for _, opt := range opts {
+		opt(&o)
+	}
+	return Param{Value: v, info: &params.ParamInfo{Name: name, Type: typ, Flags: o.Flags, Enum: o.Enum}}
 }
 
-// Contains determines whether the specified parameter name exists.
-func (pars Params) Contains(name string) bool {
-	_, err := pars.findParam(name)
-	return err == nil
+// ParamsOf creates the parameters from the given standalone parameters.
+func ParamsOf(pars ...Param) Params { return Params(pars) }
+
+// Size returns the number of parameter slots, including the absent parameters.
+func (pars Params) Size() int { return len(pars) }
+
+// Len returns the number of parameters that are present.
+func (pars Params) Len() int {
+	var n int
+	for i := range pars {
+		if !pars[i].Value.IsNull() {
+			n++
+		}
+	}
+	return n
 }
 
-// Remove deletes the specified parameter from the map.
+// Index returns the index of the parameter slot with the given name or -1
+// if there is no such slot. The slot may be vacant, so use Has or Contains to
+// determine if the parameter has a value. A linear scan is faster than the map
+// lookup for the handful of parameters that events carry.
+func (pars Params) Index(name string) int {
+	for i := range pars {
+		if info := pars[i].info; info != nil && info.Name == name {
+			return i
+		}
+	}
+	return -1
+}
+
+// Has determines if the parameter at the given index is present.
+func (pars Params) Has(idx int) bool {
+	return idx >= 0 && idx < len(pars) && !pars[idx].Value.IsNull()
+}
+
+// Contains determines whether the parameter with the specified name is present.
+func (pars Params) Contains(name string) bool { return pars.Has(pars.Index(name)) }
+
+// Get returns the parameter at the given index. The null parameter is returned if the index is out of bounds.
+func (pars Params) Get(idx int) Param {
+	if idx < 0 || idx >= len(pars) {
+		return Param{}
+	}
+	return pars[idx]
+}
+
+// GetByName returns the parameter with the specified name. The null parameter is returned if not found.
+func (pars Params) GetByName(name string) Param { return pars.Get(pars.Index(name)) }
+
+// Name returns the name of the parameter at the given index.
+func (pars Params) Name(idx int) string { return pars.Get(idx).Name() }
+
+// Type returns the logical type of the parameter at the given index.
+func (pars Params) Type(idx int) params.Type { return pars.Get(idx).Type() }
+
+// Value returns the value of the parameter at the given index.
+func (pars Params) Value(idx int) params.Value { return pars.Get(idx).Value }
+
+// ValueByName returns the value of the parameter with the given name.
+func (pars Params) ValueByName(name string) params.Value { return pars.GetByName(name).Value }
+
+// Format returns the string representation of the parameter at the given index. The
+// parameter value is resolved according to the parameter type. For instance, if the type
+// is `Status`, the system error code is converted to the error message.
+func (pars Params) Format(idx int) string {
+	if idx < 0 || idx >= len(pars) {
+		return ""
+	}
+	return pars[idx].String()
+}
+
+// FormatByName returns the string representation of the parameter with the given name.
+func (pars Params) FormatByName(name string) string { return pars.Format(pars.Index(name)) }
+
+// Set assigns the value to the parameter at the given index. Out-of-bounds indices are ignored.
+func (pars Params) Set(idx int, v params.Value) {
+	if idx >= 0 && idx < len(pars) {
+		pars[idx].Value = v
+	}
+}
+
+// SetByName assigns the value to the parameter with the given name. If the event schema doesn't
+// declare the parameter, a new parameter is appended, and its type is inferred from the value kind.
+func (pars *Params) SetByName(name string, v params.Value) {
+	if i := pars.Index(name); i >= 0 {
+		(*pars)[i].Value = v
+		return
+	}
+	*pars = append(*pars, Param{Value: v, info: &params.ParamInfo{Name: name, Type: v.ParamType()}})
+}
+
+// Append sets the parameter value and overrides the type described in the schema. Prefer SetByName
+// when the schema already declares the correct type. This method is useful for parameters that
+// are not part of the schema, or when the type has to be changed on the event instance.
+func (pars *Params) Append(name string, typ params.Type, v params.Value, opts ...params.ParamOption) {
+	var o params.ParamOpts
+	for _, opt := range opts {
+		opt(&o)
+	}
+	if i := pars.Index(name); i >= 0 {
+		cur := (*pars)[i].info
+		if cur.Type != typ || (o.Enum != nil && cur.Enum == nil) || (o.Flags != nil && cur.Flags == nil) {
+			info := *cur
+			info.Type = typ
+			if o.Enum != nil {
+				info.Enum = o.Enum
+			}
+			if o.Flags != nil {
+				info.Flags = o.Flags
+			}
+			(*pars)[i].info = &info
+		}
+		(*pars)[i].Value = v
+		return
+	}
+	*pars = append(*pars, Param{Value: v, info: &params.ParamInfo{Name: name, Type: typ, Flags: o.Flags, Enum: o.Enum}})
+}
+
+// Remove clears the parameter with the given name.
 func (pars Params) Remove(name string) {
-	delete(pars, name)
-}
-
-// Get returns the event parameter with specified name.
-func (pars Params) Get(name string) (*Param, error) {
-	return pars.findParam(name)
-}
-
-// Len returns the number of parameters.
-func (pars Params) Len() int { return len(pars) }
-
-// Set replaces the value that is indexed at existing parameter name. It will return an error
-// if the supplied parameter is not present.
-func (pars Params) Set(name string, value params.Value, typ params.Type) error {
-	_, err := pars.findParam(name)
-	if err != nil {
-		return fmt.Errorf("setting the value on a missing %q parameter is not allowed", name)
+	if i := pars.Index(name); i >= 0 {
+		pars[i].Value = params.Value{}
 	}
-	pars[name] = &Param{Name: name, Value: value, Type: typ}
-	return nil
 }
 
-// SetValue replaces the value for the given parameter name. It will return an error
-// if the supplied parameter is not present in the parameter map.
-func (pars Params) SetValue(name string, value params.Value) error {
-	_, err := pars.findParam(name)
-	if err != nil {
-		return fmt.Errorf("setting the value on a missing %q parameter is not allowed", name)
+// Rename changes the name of the present parameter. The event schema in the table
+// is not affected, since the new descriptor is created for the renamed parameter.
+// It returns false if the parameter is not found.
+func (pars Params) Rename(old, new string) bool {
+	i := pars.Index(old)
+	if !pars.Has(i) {
+		return false
 	}
-	pars[name].Value = value
-	return nil
+	info := *pars[i].info
+	info.Name = new
+	if old == new {
+		return true
+	}
+	if j := pars.Index(new); j >= 0 {
+		// reuse the slot with the colliding name
+		pars[j].Value = pars[i].Value
+		pars[j].info = &info
+		pars[i].Value = params.Value{}
+		return true
+	}
+	pars[i].info = &info
+	return true
 }
 
-// GetRaw returns the raw value for given parameter name. It is the responsibility of the caller to probe type assertion
-// on the value before yielding its underlying type.
-func (pars Params) GetRaw(name string) (params.Value, error) {
-	par, err := pars.findParam(name)
-	if err != nil {
-		return "", err
-	}
-	return par.Value, nil
-}
-
-// GetString returns the underlying string value from the parameter.
-func (pars Params) GetString(name string) (string, error) {
-	par, err := pars.findParam(name)
-	if err != nil {
-		return "", err
-	}
-	if _, ok := par.Value.(string); !ok {
-		return "", fmt.Errorf("unable to type cast %q parameter to string value", name)
-	}
-	return par.Value.(string), nil
-}
-
-// MustGetString returns the string parameter or panics
-// if an error occurs while trying to get the parameter.
-func (pars Params) MustGetString(name string) string {
-	s, err := pars.GetString(name)
-	if err != nil {
-		panic(err)
+// Present returns the parameters that have a value.
+func (pars Params) Present() []Param {
+	s := make([]Param, 0, len(pars))
+	for i := range pars {
+		if !pars[i].Value.IsNull() {
+			s = append(s, pars[i])
+		}
 	}
 	return s
 }
 
-// GetUint8 returns the underlying uint8 value from the parameter.
-func (pars Params) GetUint8(name string) (uint8, error) {
-	par, err := pars.findParam(name)
-	if err != nil {
-		return uint8(0), err
-	}
-	v, ok := par.Value.(uint8)
-	if !ok {
-		return uint8(0), fmt.Errorf("unable to type cast %q parameter to uint8 value", name)
-	}
-	return v, nil
+// GetUint8 returns the uint8 value of the parameter at the given index.
+func (pars Params) GetUint8(idx int) uint8 { return pars.Value(idx).Uint8() }
+
+// GetUint16 returns the uint16 value of the parameter at the given index.
+func (pars Params) GetUint16(idx int) uint16 { return pars.Value(idx).Uint16() }
+
+// GetUint32 returns the uint32 value of the parameter at the given index.
+func (pars Params) GetUint32(idx int) uint32 { return pars.Value(idx).Uint32() }
+
+// GetUint64 returns the uint64 value of the parameter at the given index.
+func (pars Params) GetUint64(idx int) uint64 { return pars.Value(idx).Uint64() }
+
+// GetInt8 returns the int8 value of the parameter at the given index.
+func (pars Params) GetInt8(idx int) int8 { return pars.Value(idx).Int8() }
+
+// GetInt16 returns the int16 value of the parameter at the given index.
+func (pars Params) GetInt16(idx int) int16 { return pars.Value(idx).Int16() }
+
+// GetInt32 returns the int32 value of the parameter at the given index.
+func (pars Params) GetInt32(idx int) int32 { return pars.Value(idx).Int32() }
+
+// GetInt64 returns the int64 value of the parameter at the given index.
+func (pars Params) GetInt64(idx int) int64 { return pars.Value(idx).Int64() }
+
+// GetBool returns the boolean value of the parameter at the given index.
+func (pars Params) GetBool(idx int) bool { return pars.Value(idx).Bool() }
+
+// GetFloat32 returns the float32 value of the parameter at the given index.
+func (pars Params) GetFloat32(idx int) float32 { return pars.Value(idx).Float32() }
+
+// GetFloat64 returns the float64 value of the parameter at the given index.
+func (pars Params) GetFloat64(idx int) float64 { return pars.Value(idx).Float64() }
+
+// GetString returns the raw string value of the parameter at the given index.
+// Use Format to obtain the string representation of the parameter value of any type.
+func (pars Params) GetString(idx int) string { return pars.Value(idx).Str() }
+
+// GetBytes returns the binary value of the parameter at the given index.
+func (pars Params) GetBytes(idx int) []byte { return pars.Value(idx).Bytes() }
+
+// GetIP returns the IP address of the parameter at the given index.
+func (pars Params) GetIP(idx int) net.IP { return pars.Value(idx).IP() }
+
+// GetTime returns the timestamp of the parameter at the given index.
+// The Unix epoch is returned if the parameter is not found.
+func (pars Params) GetTime(idx int) time.Time { return pars.Value(idx).Time() }
+
+// GetAddress returns the memory address of the parameter at the given index.
+func (pars Params) GetAddress(idx int) va.Address { return va.Address(pars.Value(idx).Uint64()) }
+
+// GetUint64Slice returns the slice of integers of the parameter at the given index.
+func (pars Params) GetUint64Slice(idx int) []uint64 { return pars.Value(idx).U64Slice() }
+
+// GetStringSlice returns the slice of strings of the parameter at the given index.
+func (pars Params) GetStringSlice(idx int) []string { return pars.Value(idx).StrSlice() }
+
+// GetAddresses returns the slice of addresses, such as the call stack
+// return addresses, of the parameter at the given index.
+func (pars Params) GetAddresses(idx int) []va.Address { return addresses(pars.Value(idx).U64Slice()) }
+
+// GetUint8ByName returns the uint8 value of the parameter with the given name.
+func (pars Params) GetUint8ByName(name string) uint8 { return pars.ValueByName(name).Uint8() }
+
+// GetUint16ByName returns the uint16 value of the parameter with the given name.
+func (pars Params) GetUint16ByName(name string) uint16 { return pars.ValueByName(name).Uint16() }
+
+// GetUint32ByName returns the uint32 value of the parameter with the given name.
+func (pars Params) GetUint32ByName(name string) uint32 { return pars.ValueByName(name).Uint32() }
+
+// GetUint64ByName returns the uint64 value of the parameter with the given name.
+func (pars Params) GetUint64ByName(name string) uint64 { return pars.ValueByName(name).Uint64() }
+
+// GetInt8ByName returns the int8 value of the parameter with the given name.
+func (pars Params) GetInt8ByName(name string) int8 { return pars.ValueByName(name).Int8() }
+
+// GetInt16ByName returns the int16 value of the parameter with the given name.
+func (pars Params) GetInt16ByName(name string) int16 { return pars.ValueByName(name).Int16() }
+
+// GetInt32ByName returns the int32 value of the parameter with the given name.
+func (pars Params) GetInt32ByName(name string) int32 { return pars.ValueByName(name).Int32() }
+
+// GetInt64ByName returns the int64 value of the parameter with the given name.
+func (pars Params) GetInt64ByName(name string) int64 { return pars.ValueByName(name).Int64() }
+
+// GetBoolByName returns the boolean value of the parameter with the given name.
+func (pars Params) GetBoolByName(name string) bool { return pars.ValueByName(name).Bool() }
+
+// GetFloat32ByName returns the float32 value of the parameter with the given name.
+func (pars Params) GetFloat32ByName(name string) float32 { return pars.ValueByName(name).Float32() }
+
+// GetFloat64ByName returns the float64 value of the parameter with the given name.
+func (pars Params) GetFloat64ByName(name string) float64 { return pars.ValueByName(name).Float64() }
+
+// GetStringByName returns the raw string value of the parameter with the given name.
+func (pars Params) GetStringByName(name string) string { return pars.ValueByName(name).Str() }
+
+// GetBytesByName returns the binary value of the parameter with the given name.
+func (pars Params) GetBytesByName(name string) []byte { return pars.ValueByName(name).Bytes() }
+
+// GetIPByName returns the IP address of the parameter with the given name.
+func (pars Params) GetIPByName(name string) net.IP { return pars.ValueByName(name).IP() }
+
+// GetTimeByName returns the timestamp of the parameter with the given name.
+func (pars Params) GetTimeByName(name string) time.Time { return pars.ValueByName(name).Time() }
+
+// GetAddressByName returns the memory address of the parameter with the given name.
+func (pars Params) GetAddressByName(name string) va.Address {
+	return va.Address(pars.ValueByName(name).Uint64())
 }
 
-// GetBool returns the underlying boolean value from the parameter.
-func (pars Params) GetBool(name string) (bool, error) {
-	par, err := pars.findParam(name)
-	if err != nil {
-		return false, err
-	}
-	v, ok := par.Value.(bool)
-	if !ok {
-		return false, fmt.Errorf("unable to type cast %q parameter to bool value", name)
-	}
-	return v, nil
+// GetUint64SliceByName returns the slice of integers of the parameter with the given name.
+func (pars Params) GetUint64SliceByName(name string) []uint64 {
+	return pars.ValueByName(name).U64Slice()
 }
 
-// MustGetBool returns the underlying boolean value from the parameter or
-// panics if the parameter can't be retrieved.
-func (pars Params) MustGetBool(name string) bool {
-	val, err := pars.GetBool(name)
-	if err != nil {
-		panic(err)
-	}
-	return val
+// GetStringSliceByName returns the slice of strings of the parameter with the given name.
+func (pars Params) GetStringSliceByName(name string) []string {
+	return pars.ValueByName(name).StrSlice()
 }
 
-// TryGetBool tries to retrieve the boolean value from the parameter.
-// Returns the underlying value on success, or false otherwise.
-func (pars Params) TryGetBool(name string) bool {
-	val, err := pars.GetBool(name)
-	if err != nil {
-		return false
-	}
-	return val
+// GetAddressesByName returns the slice of addresses of the parameter with the given name.
+func (pars Params) GetAddressesByName(name string) []va.Address {
+	return addresses(pars.ValueByName(name).U64Slice())
 }
 
-// GetInt8 returns the underlying int8 value from the parameter.
-func (pars Params) GetInt8(name string) (int8, error) {
-	par, err := pars.findParam(name)
-	if err != nil {
-		return int8(0), err
+func addresses(s []uint64) []va.Address {
+	if s == nil {
+		return nil
 	}
-	v, ok := par.Value.(int8)
-	if !ok {
-		return int8(0), fmt.Errorf("unable to type cast %q parameter to int8 value", name)
-	}
-	return v, nil
+	return unsafe.Slice((*va.Address)(unsafe.Pointer(unsafe.SliceData(s))), len(s))
 }
 
-// GetUint16 returns the underlying int16 value from the parameter.
-func (pars Params) GetUint16(name string) (uint16, error) {
-	par, err := pars.findParam(name)
-	if err != nil {
-		return uint16(0), err
+// sortedPresent appends to buf the indices of present parameters sorted
+// by the parameter name. The insertion sort is optimal for a few elements
+// and doesn't allocate if the buffer has enough capacity.
+func (pars Params) sortedPresent(buf []int) []int {
+	for i := range pars {
+		if !pars[i].Value.IsNull() {
+			buf = append(buf, i)
+		}
 	}
-	v, ok := par.Value.(uint16)
-	if !ok {
-		return uint16(0), fmt.Errorf("unable to type cast %q parameter to uint16 value", name)
+	for i := 1; i < len(buf); i++ {
+		for j := i; j > 0 && pars[buf[j]].Name() < pars[buf[j-1]].Name(); j-- {
+			buf[j], buf[j-1] = buf[j-1], buf[j]
+		}
 	}
-	return v, nil
+	return buf
 }
 
-// MustGetUint8 returns  the underlying uint8 value parameter. It panics if
-// an error occurs while trying to get the parameter.
-func (pars Params) MustGetUint8(name string) uint8 {
-	v, err := pars.GetUint8(name)
-	if err != nil {
-		panic(err)
+// DisplayName renders the parameter name according to the currently active parameter case style.
+func (p *Param) DisplayName() string {
+	name := p.Name()
+	switch ParamNameCaseStyle {
+	case DotCase:
+		return strings.ReplaceAll(name, "_", ".")
+	case PascalCase:
+		return strings.ReplaceAll(caser.String(strings.ReplaceAll(name, "_", " ")), " ", "")
+	case CamelCase:
+		s := strings.ReplaceAll(caser.String(strings.ReplaceAll(name, "_", " ")), " ", "")
+		if s == "" {
+			return s
+		}
+		return strings.ToLower(s[:1]) + s[1:]
+	default:
+		return name
 	}
-	return v
-}
-
-// MustGetUint16 returns  the underlying uint16 value parameter. It panics if
-// an error occurs while trying to get the parameter.
-func (pars Params) MustGetUint16(name string) uint16 {
-	v, err := pars.GetUint16(name)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// TryGetUint16 tries to retrieve the uint16 value from the parameter.
-// Returns the underlying value on success, or zero otherwise.
-func (pars Params) TryGetUint16(name string) uint16 {
-	val, err := pars.GetUint16(name)
-	if err != nil {
-		return 0
-	}
-	return val
-}
-
-// GetInt16 returns the underlying int16 value from the parameter.
-func (pars Params) GetInt16(name string) (int16, error) {
-	par, err := pars.findParam(name)
-	if err != nil {
-		return int16(0), err
-	}
-	v, ok := par.Value.(int16)
-	if !ok {
-		return int16(0), fmt.Errorf("unable to type cast %q parameter to int16 value", name)
-	}
-	return v, nil
-}
-
-// GetUint32 returns the underlying uint32 value from the parameter.
-func (pars Params) GetUint32(name string) (uint32, error) {
-	par, err := pars.findParam(name)
-	if err != nil {
-		return uint32(0), err
-	}
-	v, ok := par.Value.(uint32)
-	if !ok {
-		return uint32(0), fmt.Errorf("unable to type cast %q parameter to uint32 value", name)
-	}
-	return v, nil
-}
-
-// MustGetUint32 returns  the underlying uint32 value parameter. It panics if
-// an error occurs while trying to get the parameter.
-func (pars Params) MustGetUint32(name string) uint32 {
-	v, err := pars.GetUint32(name)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// TryGetUint32 tries to retrieve the uint32 value from the parameter.
-// Returns the underlying value on success, or zero otherwise.
-func (pars Params) TryGetUint32(name string) uint32 {
-	val, err := pars.GetUint32(name)
-	if err != nil {
-		return 0
-	}
-	return val
-}
-
-// GetInt32 returns the underlying int32 value from the parameter.
-func (pars Params) GetInt32(name string) (int32, error) {
-	par, err := pars.findParam(name)
-	if err != nil {
-		return int32(0), err
-	}
-	v, ok := par.Value.(int32)
-	if !ok {
-		return int32(0), fmt.Errorf("unable to type cast %q parameter to int32 value", name)
-	}
-	return v, nil
-}
-
-// GetUint64 returns the underlying uint64 value from the parameter.
-func (pars Params) GetUint64(name string) (uint64, error) {
-	par, err := pars.findParam(name)
-	if err != nil {
-		return uint64(0), err
-	}
-	v, ok := par.Value.(uint64)
-	if !ok {
-		return uint64(0), fmt.Errorf("unable to type cast %q parameter to uint64 value", name)
-	}
-	return v, nil
-}
-
-// MustGetUint64 returns  the underlying uint64 value parameter. It panics if
-// an error occurs while trying to get the parameter.
-func (pars Params) MustGetUint64(name string) uint64 {
-	v, err := pars.GetUint64(name)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// TryGetUint64 tries to retrieve the uint64 value from the parameter.
-// Returns the underlying value on success, or zero otherwise.
-func (pars Params) TryGetUint64(name string) uint64 {
-	val, err := pars.GetUint64(name)
-	if err != nil {
-		return 0
-	}
-	return val
-}
-
-// GetInt64 returns the underlying int64 value from the parameter.
-func (pars Params) GetInt64(name string) (int64, error) {
-	par, err := pars.findParam(name)
-	if err != nil {
-		return int64(0), err
-	}
-	v, ok := par.Value.(int64)
-	if !ok {
-		return int64(0), fmt.Errorf("unable to type cast %q parameter to int64 value", name)
-	}
-	return v, nil
-}
-
-// GetFloat returns the underlying float value from the parameter.
-func (pars Params) GetFloat(name string) (float32, error) {
-	par, err := pars.findParam(name)
-	if err != nil {
-		return float32(0), err
-	}
-	v, ok := par.Value.(float32)
-	if !ok {
-		return float32(0), fmt.Errorf("unable to type cast %q parameter to float32 value", name)
-	}
-	return v, nil
-}
-
-// GetDouble returns the underlying double (float64) value from the parameter.
-func (pars Params) GetDouble(name string) (float64, error) {
-	par, err := pars.findParam(name)
-	if err != nil {
-		return float64(0), err
-	}
-	v, ok := par.Value.(float64)
-	if !ok {
-		return float64(0), fmt.Errorf("unable to type cast %q parameter to float64 value", name)
-	}
-	return v, nil
-}
-
-// TryGetAddress attempts to convert the underlying type to address.
-func (pars Params) TryGetAddress(name string) va.Address {
-	par, err := pars.findParam(name)
-	if err != nil {
-		return 0
-	}
-	v, ok := par.Value.(uint64)
-	if !ok {
-		return 0
-	}
-	return va.Address(v)
-}
-
-// GetIPv4 returns the underlying IPv4 address from the parameter.
-func (pars Params) GetIPv4(name string) (net.IP, error) {
-	par, err := pars.findParam(name)
-	if err != nil {
-		return net.IP{}, err
-	}
-	if par.Type != params.IPv4 {
-		return net.IP{}, fmt.Errorf("%q parameter is not an IPv4 address", name)
-	}
-	v, ok := par.Value.(net.IP)
-	if !ok {
-		return net.IP{}, fmt.Errorf("unable to type cast %q parameter to net.IP value", name)
-	}
-	return v, nil
-}
-
-// GetIPv6 returns the underlying IPv6 address from the parameter.
-func (pars Params) GetIPv6(name string) (net.IP, error) {
-	par, err := pars.findParam(name)
-	if err != nil {
-		return net.IP{}, err
-	}
-	if par.Type != params.IPv6 {
-		return net.IP{}, fmt.Errorf("%q parameter is not an IPv6 address", name)
-	}
-	v, ok := par.Value.(net.IP)
-	if !ok {
-		return net.IP{}, fmt.Errorf("unable to type cast %q parameter to net.IP value", name)
-	}
-	return v, nil
-}
-
-// GetIP returns either the IPv4 or IPv6 address from the parameter.
-func (pars Params) GetIP(name string) (net.IP, error) {
-	par, err := pars.findParam(name)
-	if err != nil {
-		return net.IP{}, err
-	}
-	if par.Type != params.IPv4 && par.Type != params.IPv6 {
-		return net.IP{}, fmt.Errorf("%q parameter is not an IP address", name)
-	}
-	v, ok := par.Value.(net.IP)
-	if !ok {
-		return net.IP{}, fmt.Errorf("unable to type cast %q parameter to net.IP value", name)
-	}
-	return v, nil
-}
-
-// MustGetIP returns the IP address parameter or panics if an error occurs.
-func (pars Params) MustGetIP(name string) net.IP {
-	ip, err := pars.GetIP(name)
-	if err != nil {
-		panic(err)
-	}
-	return ip
-}
-
-// GetTime returns the underlying time structure from the parameter.
-func (pars Params) GetTime(name string) (time.Time, error) {
-	par, err := pars.findParam(name)
-	if err != nil {
-		return time.Unix(0, 0), err
-	}
-	v, ok := par.Value.(time.Time)
-	if !ok {
-		return time.Unix(0, 0), fmt.Errorf("unable to type cast %q parameter to Time value", name)
-	}
-	return v, nil
-}
-
-// MustGetTime returns the underlying time structure from the parameter or panics
-// if any errors occur.
-func (pars Params) MustGetTime(name string) time.Time {
-	par, err := pars.findParam(name)
-	if err != nil {
-		panic(err)
-	}
-	v, ok := par.Value.(time.Time)
-	if !ok {
-		panic(fmt.Errorf("unable to type cast %q parameter to Time value", name))
-	}
-	return v
-}
-
-// GetStringSlice returns the string slice from the event parameter.
-func (pars Params) GetStringSlice(name string) ([]string, error) {
-	par, err := pars.GetSlice(name)
-	if err != nil {
-		return nil, err
-	}
-	v, ok := par.([]string)
-	if !ok {
-		return nil, fmt.Errorf("unable to type cast %q parameter to string slice", name)
-	}
-	return v, nil
-}
-
-// GetSlice returns the slice of generic values from the parameter.
-func (pars Params) GetSlice(name string) (params.Value, error) {
-	par, err := pars.findParam(name)
-	if err != nil {
-		return nil, err
-	}
-	if reflect.TypeOf(par.Value).Kind() != reflect.Slice {
-		return nil, fmt.Errorf("%q parameter is not a slice", name)
-	}
-	return par.Value, nil
-}
-
-// MustGetSlice returns the slice of generic values from the parameter or
-// panics if the parameter cannot be found.
-func (pars Params) MustGetSlice(name string) params.Value {
-	par, err := pars.findParam(name)
-	if err != nil {
-		panic(err)
-	}
-	return par.Value
-}
-
-// MustGetSliceAddrs returns the slice of addresses or panics if the parameter
-// is not found, or either a parameter is not a slice of addresses.
-func (pars Params) MustGetSliceAddrs(name string) []va.Address {
-	val := pars.MustGetSlice(name)
-	addrs, ok := val.([]va.Address)
-	if !ok {
-		panic("must be a slice of addresses")
-	}
-	return addrs
 }
 
 // String returns the string representation of the event parameters. Parameter names are rendered according
 // to the currently active parameter style case.
 func (pars Params) String() string {
 	var sb strings.Builder
-	// sort parameters by name
-	s := make([]*Param, 0, len(pars))
-	for _, par := range pars {
-		s = append(s, par)
-	}
-	sort.Slice(s, func(i, j int) bool { return s[i].Name < s[j].Name })
-	for i, par := range s {
-		switch ParamNameCaseStyle {
-		case SnakeCase:
-			sb.WriteString(par.Name + ParamKVDelimiter + par.String())
-		case DotCase:
-			sb.WriteString(strings.ReplaceAll(par.Name, "_", ".") + ParamKVDelimiter + par.String())
-		case PascalCase:
-			sb.WriteString(strings.ReplaceAll(caser.String(strings.ReplaceAll(par.Name, "_", " ")), " ", "") + ParamKVDelimiter + par.String())
-		case CamelCase:
-		}
-		if i != len(pars)-1 {
+	var buf [32]int
+	idx := pars.sortedPresent(buf[:0])
+	for i, n := range idx {
+		par := pars[n]
+		sb.WriteString(par.DisplayName())
+		sb.WriteString(ParamKVDelimiter)
+		sb.WriteString(par.String())
+		if i != len(idx)-1 {
 			sb.WriteString(", ")
 		}
 	}
 	return sb.String()
 }
 
-// Find returns the parameter with the specified name. If it is not found, nil value is returned.
-func (pars Params) Find(name string) *Param {
-	par, err := pars.findParam(name)
-	if err != nil {
-		return nil
-	}
-	return par
-}
-
-// findParam lookups a parameter in the map and returns an error if it doesn't exist.
-func (pars Params) findParam(name string) (*Param, error) {
-	if _, ok := pars[name]; !ok {
-		return nil, &errors.ErrParamNotFound{Name: name}
-	}
-	return pars[name], nil
-}
-
 // Colorize renders the full parameter list for the {{.Params}} tag.
 // Each entry is formatted as: key <separator> value, with the key in
 // amber, the separator dim, and the value semantically coloured.
 func (pars Params) Colorize() string {
-	if len(pars) == 0 {
+	var buf [32]int
+	idx := pars.sortedPresent(buf[:0])
+	if len(idx) == 0 {
 		return ""
 	}
 
-	// sort parameters by name
-	s := make([]*Param, 0, len(pars))
-	for _, par := range pars {
-		s = append(s, par)
-	}
-	sort.Slice(s, func(i, j int) bool { return s[i].Name < s[j].Name })
-
 	var b strings.Builder
-	b.Grow(len(pars) * 40)
+	b.Grow(len(idx) * 40)
 
-	for i, p := range s {
+	for i, n := range idx {
+		p := pars[n]
 		if i > 0 {
 			b.WriteString(colorizer.SpanDim(", "))
 		}
-		b.WriteString(colorizer.Span(colorizer.Amber, p.Name))
+		b.WriteString(colorizer.Span(colorizer.Amber, p.Name()))
 		b.WriteString(colorizer.SpanDim(ParamKVDelimiter))
 		b.WriteString(p.color())
 	}

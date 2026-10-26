@@ -21,6 +21,10 @@ package params
 const (
 	// ProcessID represents the process identifier.
 	ProcessID = "pid"
+	// ProcessSequenceNumber represents the process sequence number.
+	ProcessSequenceNumber = "process_sequence_number"
+	// ParentProcessSequenceNumber represents the parent process sequence number.
+	ParentProcessSequenceNumber = "process_sequence_number"
 	// TargetProcessID represents the target process identifier.
 	TargetProcessID = "target_pid"
 	// ThreadID field represents the thread identifier.

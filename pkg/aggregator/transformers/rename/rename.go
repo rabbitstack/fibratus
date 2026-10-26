@@ -42,13 +42,7 @@ func initRenameTransformer(config transformers.Config) (transformers.Transformer
 
 func (r rename) Transform(evt *event.Event) error {
 	for _, p := range r.c.Params {
-		par, ok := evt.Params[p.Old]
-		if !ok {
-			continue
-		}
-		evt.Params.Remove(p.Old)
-		par.Name = p.New
-		evt.Params[p.New] = par
+		evt.Params.Rename(p.Old, p.New)
 	}
 	return nil
 }

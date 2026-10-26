@@ -76,11 +76,11 @@ func TestOnNextEvent(t *testing.T) {
 			CPU:       uint8(i / 2),
 			Seq:       uint64(i),
 			Timestamp: time.Now(),
-			Params: event.Params{
-				params.RegPath:      {Name: params.RegPath, Type: params.UnicodeString, Value: `HKEY_LOCAL_MACHINE\SYSTEM\Setup`},
-				params.RegKeyHandle: {Name: params.RegKeyHandle, Type: params.Address, Value: uint64(18446666033449935464)},
-				params.NetDIP:       {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("216.58.201.174")},
-			},
+			Params: event.ParamsOf(
+				event.NewParam(params.RegPath, params.String, params.Str(`HKEY_LOCAL_MACHINE\SYSTEM\Setup`)),
+				event.NewParam(params.RegKeyHandle, params.Address, params.U64(uint64(18446666033449935464))),
+				event.NewParam(params.NetDIP, params.IPv4, params.IPAddr(net.ParseIP("216.58.201.174"))),
+			),
 		}
 		events <- evt
 	}
@@ -103,12 +103,12 @@ func TestFilamentFilter(t *testing.T) {
 	require.NotNil(t, filament)
 	defer filament.Close()
 	require.NotNil(t, filament.Filter())
-	pars := event.Params{
-		params.Cmdline:         {Name: params.Cmdline, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\svchost.exe -k RPCSS"},
-		params.ProcessName:     {Name: params.ProcessName, Type: params.AnsiString, Value: "svchost.exe"},
-		params.ProcessID:       {Name: params.ProcessID, Type: params.Uint32, Value: uint32(1234)},
-		params.ProcessParentID: {Name: params.ProcessParentID, Type: params.Uint32, Value: uint32(345)},
-	}
+	pars := event.ParamsOf(
+		event.NewParam(params.Cmdline, params.String, params.Str("C:\\Windows\\system32\\svchost.exe -k RPCSS")),
+		event.NewParam(params.ProcessName, params.String, params.Str("svchost.exe")),
+		event.NewParam(params.ProcessID, params.Uint32, params.U32(uint32(1234))),
+		event.NewParam(params.ProcessParentID, params.Uint32, params.U32(uint32(345))),
+	)
 
 	evt := &event.Event{
 		Type:   event.CreateProcess,

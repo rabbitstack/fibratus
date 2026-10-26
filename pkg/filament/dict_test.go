@@ -83,12 +83,12 @@ func TestProduceEventDictWithIPAddresses(t *testing.T) {
 		Type: event.Send,
 		Tid:  2484,
 		PID:  859,
-		Params: event.Params{
-			params.NetDport: {Name: params.NetDport, Type: params.Uint16, Value: uint16(443)},
-			params.NetSport: {Name: params.NetSport, Type: params.Uint16, Value: uint16(43123)},
-			params.NetSIP:   {Name: params.NetSIP, Type: params.IPv6, Value: net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334")},
-			params.NetDIP:   {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("216.58.201.174")},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.NetDport, params.Uint16, params.U16(uint16(443))),
+			event.NewParam(params.NetSport, params.Uint16, params.U16(uint16(43123))),
+			event.NewParam(params.NetSIP, params.IPv6, params.IPAddr(net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"))),
+			event.NewParam(params.NetDIP, params.IPv4, params.IPAddr(net.ParseIP("216.58.201.174"))),
+		),
 	}
 
 	dict, err := newEventDict(evt)

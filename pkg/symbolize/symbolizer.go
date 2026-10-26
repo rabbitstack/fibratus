@@ -202,7 +202,7 @@ func (s *Symbolizer) Close() {
 func (s *Symbolizer) ProcessEvent(e *event.Event) (bool, error) {
 	if e.IsTerminateProcess() {
 		// release symbol handler and process handle
-		pid := e.Params.MustGetPid()
+		pid := e.Params.GetPid()
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		delete(s.mods, pid)
@@ -222,12 +222,12 @@ func (s *Symbolizer) ProcessEvent(e *event.Event) (bool, error) {
 
 	if e.IsLoadModule() || e.IsUnloadModule() {
 		path := e.GetParamAsString(params.ModulePath)
-		size := e.Params.TryGetUint64(params.ModuleSize)
-		addr := e.Params.TryGetAddress(params.ModuleBase)
+		size := e.Params.GetUint64ByName(params.ModuleSize)
+		addr := e.Params.GetAddressByName(params.ModuleBase)
 		// if the kernel driver is loaded or unloaded,
 		// load/unload symbol handlers respectively or
 		// update the driver store
-		if strings.ToLower(filepath.Ext(path)) == ".sys" || e.Params.TryGetBool(params.FileIsDriver) {
+		if strings.ToLower(filepath.Ext(path)) == ".sys" || e.Params.GetBoolByName(params.FileIsDriver) {
 			if e.IsLoadModule() {
 				if s.config.SymbolizeKernelAddresses {
 					err := s.r.LoadModule(windows.CurrentProcess(), path, addr)
@@ -273,8 +273,8 @@ func (s *Symbolizer) ProcessEvent(e *event.Event) (bool, error) {
 // the map, we get its export directory and insert
 // into the map.
 func (s *Symbolizer) syncModules(e *event.Event) error {
-	base := e.Params.TryGetAddress(params.ModuleBase)
-	size := e.Params.TryGetUint64(params.ModuleSize)
+	base := e.Params.GetAddressByName(params.ModuleBase)
+	size := e.Params.GetUint64ByName(params.ModuleSize)
 
 	if e.IsUnloadModule() {
 		s.mu.Lock()
@@ -301,7 +301,7 @@ func (s *Symbolizer) syncModules(e *event.Event) error {
 }
 
 func (s *Symbolizer) processCallstack(e *event.Event) error {
-	addrs := e.Params.MustGetSliceAddrs(params.Callstack)
+	addrs := e.Params.GetAddressesByName(params.Callstack)
 	e.Callstack.Init(len(addrs))
 
 	s.mu.Lock()
@@ -316,8 +316,8 @@ func (s *Symbolizer) processCallstack(e *event.Event) error {
 		// get the address that we want to symbolize
 		switch e.Type {
 		case event.CreateThread:
-			pid = e.Params.MustGetPid()
-			addr = e.Params.TryGetAddress(params.StartAddress)
+			pid = e.Params.GetPid()
+			addr = e.Params.GetAddressByName(params.StartAddress)
 		}
 
 		// symbolize thread start or thread pool callback address
@@ -333,14 +333,14 @@ func (s *Symbolizer) processCallstack(e *event.Event) error {
 			if symbol != "" && symbol != "?" {
 				switch e.Type {
 				case event.CreateThread:
-					e.Params.Append(params.StartAddressSymbol, params.UnicodeString, symbol)
+					e.Params.SetByName(params.StartAddressSymbol, params.Str(symbol))
 				}
 			}
 
 			if mod != nil {
 				switch e.Type {
 				case event.CreateThread:
-					e.Params.Append(params.StartAddressModule, params.UnicodeString, mod.Name)
+					e.Params.SetByName(params.StartAddressModule, params.Str(mod.Name))
 				}
 			}
 		}
@@ -429,7 +429,7 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *event.Event) callstack.Fra
 	// process state
 	if e.IsSurrogateProcess() {
 		var ok bool
-		ok, ps = s.psnap.Find(e.Params.MustGetUint32(params.ProcessRealParentID))
+		ok, ps = s.psnap.Find(e.Params.GetUint32ByName(params.ProcessRealParentID))
 		if !ok {
 			ps = e.PS
 		}

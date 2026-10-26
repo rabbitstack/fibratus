@@ -121,12 +121,12 @@ func fireRules(t *testing.T, c *config.Config) bool {
 		Type: event.Recv,
 		Tid:  2484,
 		PID:  859,
-		Params: event.Params{
-			params.NetDport: {Name: params.NetDport, Type: params.Uint16, Value: uint16(443)},
-			params.NetSport: {Name: params.NetSport, Type: params.Uint16, Value: uint16(43123)},
-			params.NetSIP:   {Name: params.NetSIP, Type: params.IPv4, Value: net.ParseIP("127.0.0.1")},
-			params.NetDIP:   {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("216.58.201.174")},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.NetDport, params.Uint16, params.U16(uint16(443))),
+			event.NewParam(params.NetSport, params.Uint16, params.U16(uint16(43123))),
+			event.NewParam(params.NetSIP, params.IPv4, params.IPAddr(net.ParseIP("127.0.0.1"))),
+			event.NewParam(params.NetDIP, params.IPv4, params.IPAddr(net.ParseIP("216.58.201.174"))),
+		),
 		Metadata: make(map[event.MetadataKey]any),
 	}
 	compileRules(t, e)
@@ -189,9 +189,9 @@ func TestSharedSemanticRuleFixtures(t *testing.T) {
 	netevt := &event.Event{
 		Type: event.Recv,
 		PID:  859,
-		Params: event.Params{
-			params.NetDport: {Name: params.NetDport, Type: params.Uint16, Value: uint16(443)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.NetDport, params.Uint16, params.U16(uint16(443))),
+		),
 		Metadata: make(map[event.MetadataKey]any),
 	}
 
@@ -215,10 +215,10 @@ func TestRunSequenceRule(t *testing.T) {
 			Name: "firefox.exe",
 			Exe:  "C:\\Program Files\\Firefox\\firefox.exe",
 		},
-		Params: event.Params{
-			params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: uint32(2243)},
-			params.ProcessName: {Name: params.ProcessName, Type: params.UnicodeString, Value: "firefox.exe"},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.ProcessID, params.PID, params.U32(uint32(2243))),
+			event.NewParam(params.ProcessName, params.String, params.Str("firefox.exe")),
+		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
@@ -233,10 +233,10 @@ func TestRunSequenceRule(t *testing.T) {
 			Exe:     "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
 			Cmdline: "C:\\Program Files\\Mozilla Firefox\\firefox.exe\" -contentproc --channel=\"10464.7.539748228\\1366525930\" -childID 6 -isF",
 		},
-		Params: event.Params{
-			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
-			params.FileOperation: {Name: params.FileOperation, Type: params.Enum, Value: uint32(2), Enum: fs.FileCreateDispositions},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.FilePath, params.String, params.Str("C:\\Temp\\dropper.exe")),
+			event.NewParam(params.FileOperation, params.Enum, params.U32(uint32(2)), event.WithEnum(fs.FileCreateDispositions)),
+		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
@@ -251,9 +251,9 @@ func TestRunSequenceRule(t *testing.T) {
 			Exe:     "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
 			Cmdline: "C:\\Program Files\\Mozilla Firefox\\firefox.exe\" -contentproc --channel=\"10464.7.539748228\\1366525930\" -childID 6 -isF",
 		},
-		Params: event.Params{
-			params.NetDIP: {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("10.0.2.3")},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.NetDIP, params.IPv4, params.IPAddr(net.ParseIP("10.0.2.3"))),
+		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
@@ -300,10 +300,10 @@ func TestRunSequenceRuleWithPsUUIDLink(t *testing.T) {
 			Name: "firefox.exe",
 			Exe:  "C:\\Program Files\\Firefox\\firefox.exe",
 		},
-		Params: event.Params{
-			params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: uint32(os.Getpid())},
-			params.ProcessName: {Name: params.ProcessName, Type: params.UnicodeString, Value: "firefox.exe"},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.ProcessID, params.PID, params.U32(uint32(os.Getpid()))),
+			event.NewParam(params.ProcessName, params.String, params.Str("firefox.exe")),
+		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
@@ -319,10 +319,10 @@ func TestRunSequenceRuleWithPsUUIDLink(t *testing.T) {
 			Exe:     "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
 			Cmdline: "C:\\Program Files\\Mozilla Firefox\\firefox.exe\" -contentproc --channel=\"10464.7.539748228\\1366525930\" -childID 6 -isF",
 		},
-		Params: event.Params{
-			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
-			params.FileOperation: {Name: params.FileOperation, Type: params.Enum, Value: uint32(2), Enum: fs.FileCreateDispositions},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.FilePath, params.String, params.Str("C:\\Temp\\dropper.exe")),
+			event.NewParam(params.FileOperation, params.Enum, params.U32(uint32(2)), event.WithEnum(fs.FileCreateDispositions)),
+		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
@@ -358,10 +358,10 @@ func TestRunSimpleAndSequenceRules(t *testing.T) {
 				Name: "powershell.exe",
 				Exe:  "C:\\Windows\\system32\\powershell.exe",
 			},
-			Params: event.Params{
-				params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: uint32(2243)},
-				params.ProcessName: {Name: params.ProcessName, Type: params.UnicodeString, Value: "powershell.exe"},
-			},
+			Params: event.ParamsOf(
+				event.NewParam(params.ProcessID, params.PID, params.U32(uint32(2243))),
+				event.NewParam(params.ProcessName, params.String, params.Str("powershell.exe")),
+			),
 			Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 		},
 		{
@@ -374,10 +374,10 @@ func TestRunSimpleAndSequenceRules(t *testing.T) {
 				Name: "cmd.exe",
 				Exe:  "C:\\Windows\\system32\\cmd.exe",
 			},
-			Params: event.Params{
-				params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
-				params.FileOperation: {Name: params.FileOperation, Type: params.Enum, Value: uint32(2)},
-			},
+			Params: event.ParamsOf(
+				event.NewParam(params.FilePath, params.String, params.Str("C:\\Temp\\dropper.exe")),
+				event.NewParam(params.FileOperation, params.Enum, params.U32(uint32(2))),
+			),
 			Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 		},
 		{
@@ -394,10 +394,10 @@ func TestRunSimpleAndSequenceRules(t *testing.T) {
 					Exe:  "C:\\Windows\\system32\\cmd.exe",
 				},
 			},
-			Params: event.Params{
-				params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: uint32(2243)},
-				params.ProcessName: {Name: params.ProcessName, Type: params.UnicodeString, Value: "chrome.exe"},
-			},
+			Params: event.ParamsOf(
+				event.NewParam(params.ProcessID, params.PID, params.U32(uint32(2243))),
+				event.NewParam(params.ProcessName, params.String, params.Str("chrome.exe")),
+			),
 			Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 		},
 	}
@@ -437,12 +437,12 @@ func TestAlertAction(t *testing.T) {
 		PS: &types.PS{
 			Name: "cmd.exe",
 		},
-		Params: event.Params{
-			params.NetDport: {Name: params.NetDport, Type: params.Uint16, Value: uint16(443)},
-			params.NetSport: {Name: params.NetSport, Type: params.Uint16, Value: uint16(43123)},
-			params.NetSIP:   {Name: params.NetSIP, Type: params.IPv4, Value: net.ParseIP("127.0.0.1")},
-			params.NetDIP:   {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("216.58.201.174")},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.NetDport, params.Uint16, params.U16(uint16(443))),
+			event.NewParam(params.NetSport, params.Uint16, params.U16(uint16(43123))),
+			event.NewParam(params.NetSIP, params.IPv4, params.IPAddr(net.ParseIP("127.0.0.1"))),
+			event.NewParam(params.NetDIP, params.IPv4, params.IPAddr(net.ParseIP("216.58.201.174"))),
+		),
 		Metadata: make(map[event.MetadataKey]any),
 	}
 
@@ -497,10 +497,10 @@ func TestKillAction(t *testing.T) {
 			Name: "calc.exe",
 			Exe:  "C:\\Windows\\system32\\calc.exe",
 		},
-		Params: event.Params{
-			params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: pi.ProcessId},
-			params.ProcessName: {Name: params.ProcessName, Type: params.UnicodeString, Value: "calc.exe"},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.ProcessID, params.PID, params.U32(pi.ProcessId)),
+			event.NewParam(params.ProcessName, params.String, params.Str("calc.exe")),
+		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
@@ -526,12 +526,12 @@ func BenchmarkRunRules(b *testing.B) {
 			PS: &types.PS{
 				Name: "cmd.exe",
 			},
-			Params: event.Params{
-				params.NetDport: {Name: params.NetDport, Type: params.Uint16, Value: uint16(443)},
-				params.NetSport: {Name: params.NetSport, Type: params.Uint16, Value: uint16(43123)},
-				params.NetSIP:   {Name: params.NetSIP, Type: params.IPv4, Value: net.ParseIP("127.0.0.1")},
-				params.NetDIP:   {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("216.58.201.174")},
-			},
+			Params: event.ParamsOf(
+				event.NewParam(params.NetDport, params.Uint16, params.U16(uint16(443))),
+				event.NewParam(params.NetSport, params.Uint16, params.U16(uint16(43123))),
+				event.NewParam(params.NetSIP, params.IPv4, params.IPAddr(net.ParseIP("127.0.0.1"))),
+				event.NewParam(params.NetDIP, params.IPv4, params.IPAddr(net.ParseIP("216.58.201.174"))),
+			),
 			Metadata: make(map[event.MetadataKey]any),
 		},
 		{
@@ -541,14 +541,14 @@ func BenchmarkRunRules(b *testing.B) {
 			PS: &types.PS{
 				Name: "powershell.exe",
 			},
-			Params: event.Params{
-				params.ProcessID:       {Name: params.ProcessID, Type: params.PID, Value: 2323},
-				params.ProcessParentID: {Name: params.ProcessParentID, Type: params.PID, Value: uint32(8390)},
-				params.ProcessName:     {Name: params.ProcessName, Type: params.UnicodeString, Value: "spotify.exe"},
-				params.Cmdline:         {Name: params.Cmdline, Type: params.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`},
-				params.Exe:             {Name: params.Exe, Type: params.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe`},
-				params.UserSID:         {Name: params.UserSID, Type: params.UnicodeString, Value: `admin\SYSTEM`},
-			},
+			Params: event.ParamsOf(
+				event.NewParam(params.ProcessID, params.PID, params.U32(2323)),
+				event.NewParam(params.ProcessParentID, params.PID, params.U32(uint32(8390))),
+				event.NewParam(params.ProcessName, params.String, params.Str("spotify.exe")),
+				event.NewParam(params.Cmdline, params.String, params.Str(`C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`)),
+				event.NewParam(params.Exe, params.String, params.Str(`C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe`)),
+				event.NewParam(params.UserSID, params.String, params.Str(`admin\SYSTEM`)),
+			),
 			Metadata: make(map[event.MetadataKey]any),
 		},
 		{
@@ -558,9 +558,9 @@ func BenchmarkRunRules(b *testing.B) {
 			PS: &types.PS{
 				Name: "powershell.exe",
 			},
-			Params: event.Params{
-				params.ProcessID: {Name: params.ProcessID, Type: params.PID, Value: 2323},
-			},
+			Params: event.ParamsOf(
+				event.NewParam(params.ProcessID, params.PID, params.U32(2323)),
+			),
 			Metadata: make(map[event.MetadataKey]any),
 		},
 	}

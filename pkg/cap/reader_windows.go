@@ -184,14 +184,14 @@ func (r *reader) updateSnapshotters(evt *event.Event) error {
 			return err
 		}
 	case event.TerminateThread:
-		pid := evt.Params.MustGetPid()
-		tid := evt.Params.MustGetTid()
+		pid := evt.Params.GetPid()
+		tid := evt.Params.GetTid()
 		if err := r.psnapshotter.RemoveThread(pid, tid); err != nil {
 			return err
 		}
 	case event.UnloadModule:
-		pid := evt.Params.MustGetPid()
-		addr := evt.Params.TryGetAddress(params.ModuleBase)
+		pid := evt.Params.GetPid()
+		addr := evt.Params.GetAddressByName(params.ModuleBase)
 		if err := r.psnapshotter.RemoveModule(pid, addr); err != nil {
 			return err
 		}

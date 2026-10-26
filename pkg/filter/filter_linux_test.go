@@ -136,9 +136,9 @@ func TestSharedFieldSemantics(t *testing.T) {
 		PID:      4242,
 		Tid:      4242,
 		PS:       ps,
-		Params: event.Params{
-			params.FilePath: {Name: params.FilePath, Type: params.Path, Value: "/tmp/secret.txt"},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.FilePath, params.Path, params.Str("/tmp/secret.txt")),
+		),
 	}
 	connect := &event.Event{
 		Type:     event.Connect,
@@ -146,10 +146,10 @@ func TestSharedFieldSemantics(t *testing.T) {
 		Name:     "connect",
 		PID:      4242,
 		PS:       ps,
-		Params: event.Params{
-			params.NetDIP:   {Name: params.NetDIP, Type: params.IPv4, Value: net.IPv4(1, 2, 3, 4).To4()},
-			params.NetDport: {Name: params.NetDport, Type: params.Port, Value: uint16(443)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.NetDIP, params.IPv4, params.IPAddr(net.IPv4(1, 2, 3, 4).To4())),
+			event.NewParam(params.NetDport, params.Port, params.U16(uint16(443))),
+		),
 	}
 	mmap := &event.Event{
 		Type:     event.Mmap,
@@ -157,11 +157,11 @@ func TestSharedFieldSemantics(t *testing.T) {
 		Name:     "mmap",
 		PID:      4242,
 		PS:       ps,
-		Params: event.Params{
-			params.MemBaseAddress: {Name: params.MemBaseAddress, Type: params.Address, Value: uint64(8192)},
-			params.MemRegionSize:  {Name: params.MemRegionSize, Type: params.Uint64, Value: uint64(4096)},
-			params.MemProtect:     {Name: params.MemProtect, Type: params.Uint32, Value: uint32(3)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.MemBaseAddress, params.Address, params.U64(uint64(8192))),
+			event.NewParam(params.MemRegionSize, params.Uint64, params.U64(uint64(4096))),
+			event.NewParam(params.MemProtect, params.Uint32, params.U32(uint32(3))),
+		),
 	}
 
 	require.True(t, evalFilter(t, `ps.name = 'bash'`, openat))
@@ -189,13 +189,13 @@ func TestProcFilter(t *testing.T) {
 		Tid:      4242,
 		CPU:      2,
 		PS:       ps,
-		Params: event.Params{
-			params.Retval:    {Name: params.Retval, Type: params.Int64, Value: int64(0)},
-			params.SyscallID: {Name: params.SyscallID, Type: params.Uint32, Value: uint32(59)},
-			params.UID:       {Name: params.UID, Type: params.Uint32, Value: uint32(1000)},
-			params.GID:       {Name: params.GID, Type: params.Uint32, Value: uint32(1000)},
-			params.Exe:       {Name: params.Exe, Type: params.Path, Value: "/bin/bash"},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.Retval, params.Int64, params.I64(int64(0))),
+			event.NewParam(params.SyscallID, params.Uint32, params.U32(uint32(59))),
+			event.NewParam(params.UID, params.Uint32, params.U32(uint32(1000))),
+			event.NewParam(params.GID, params.Uint32, params.U32(uint32(1000))),
+			event.NewParam(params.Exe, params.Path, params.Str("/bin/bash")),
+		),
 	}
 	kill := &event.Event{
 		Type:     event.Kill,
@@ -203,11 +203,11 @@ func TestProcFilter(t *testing.T) {
 		Name:     "kill",
 		PID:      4242,
 		PS:       ps,
-		Params: event.Params{
-			params.TargetProcessID: {Name: params.TargetProcessID, Type: params.Int64, Value: int64(99)},
-			params.Signal:          {Name: params.Signal, Type: params.Int32, Value: int32(9)},
-			params.Retval:          {Name: params.Retval, Type: params.Int64, Value: int64(0)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.TargetProcessID, params.Int64, params.I64(int64(99))),
+			event.NewParam(params.Signal, params.Int32, params.I32(int32(9))),
+			event.NewParam(params.Retval, params.Int64, params.I64(int64(0))),
+		),
 	}
 	// kill accepts a pid_t whose sign selects the scope of the signal
 	broadcastKill := &event.Event{
@@ -216,10 +216,10 @@ func TestProcFilter(t *testing.T) {
 		Name:     "kill",
 		PID:      4242,
 		PS:       ps,
-		Params: event.Params{
-			params.TargetProcessID: {Name: params.TargetProcessID, Type: params.Int64, Value: int64(-1)},
-			params.Signal:          {Name: params.Signal, Type: params.Int32, Value: int32(9)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.TargetProcessID, params.Int64, params.I64(int64(-1))),
+			event.NewParam(params.Signal, params.Int32, params.I32(int32(9))),
+		),
 	}
 	groupKill := &event.Event{
 		Type:     event.Kill,
@@ -227,10 +227,10 @@ func TestProcFilter(t *testing.T) {
 		Name:     "kill",
 		PID:      4242,
 		PS:       ps,
-		Params: event.Params{
-			params.TargetProcessID: {Name: params.TargetProcessID, Type: params.Int64, Value: int64(-4242)},
-			params.Signal:          {Name: params.Signal, Type: params.Int32, Value: int32(9)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.TargetProcessID, params.Int64, params.I64(int64(-4242))),
+			event.NewParam(params.Signal, params.Int32, params.I32(int32(9))),
+		),
 	}
 	ptrace := &event.Event{
 		Type:     event.Ptrace,
@@ -238,10 +238,10 @@ func TestProcFilter(t *testing.T) {
 		Name:     "ptrace",
 		PID:      4242,
 		PS:       ps,
-		Params: event.Params{
-			params.PtraceRequest:   {Name: params.PtraceRequest, Type: params.Int64, Value: int64(16)},
-			params.TargetProcessID: {Name: params.TargetProcessID, Type: params.Int64, Value: int64(99)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.PtraceRequest, params.Int64, params.I64(int64(16))),
+			event.NewParam(params.TargetProcessID, params.Int64, params.I64(int64(99))),
+		),
 	}
 	prctl := &event.Event{
 		Type:     event.Prctl,
@@ -249,9 +249,9 @@ func TestProcFilter(t *testing.T) {
 		Name:     "prctl",
 		PID:      4242,
 		PS:       ps,
-		Params: event.Params{
-			params.PrctlOption: {Name: params.PrctlOption, Type: params.Int64, Value: int64(15)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.PrctlOption, params.Int64, params.I64(int64(15))),
+		),
 	}
 	clone := &event.Event{
 		Type:     event.Clone,
@@ -259,9 +259,9 @@ func TestProcFilter(t *testing.T) {
 		Name:     "clone",
 		PID:      4242,
 		PS:       ps,
-		Params: event.Params{
-			params.CloneFlags: {Name: params.CloneFlags, Type: params.Uint64, Value: uint64(0)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.CloneFlags, params.Uint64, params.U64(uint64(0))),
+		),
 	}
 
 	tests := []struct {
@@ -319,33 +319,33 @@ func TestFileFilter(t *testing.T) {
 		Category: event.File,
 		Name:     "openat",
 		PID:      4242,
-		Params: event.Params{
-			params.FilePath:  {Name: params.FilePath, Type: params.Path, Value: "/etc/passwd"},
-			params.DirFD:     {Name: params.DirFD, Type: params.Int64, Value: int64(-100)},
-			params.FileFlags: {Name: params.FileFlags, Type: params.Uint64, Value: uint64(0)},
-			params.FileMode:  {Name: params.FileMode, Type: params.Uint64, Value: uint64(420)},
-			params.FD:        {Name: params.FD, Type: params.Int64, Value: int64(3)},
-			params.Retval:    {Name: params.Retval, Type: params.Int64, Value: int64(3)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.FilePath, params.Path, params.Str("/etc/passwd")),
+			event.NewParam(params.DirFD, params.Int64, params.I64(int64(-100))),
+			event.NewParam(params.FileFlags, params.Uint64, params.U64(uint64(0))),
+			event.NewParam(params.FileMode, params.Uint64, params.U64(uint64(420))),
+			event.NewParam(params.FD, params.Int64, params.I64(int64(3))),
+			event.NewParam(params.Retval, params.Int64, params.I64(int64(3))),
+		),
 	}
 	rename := &event.Event{
 		Type:     event.Rename,
 		Category: event.File,
 		Name:     "rename",
 		PID:      4242,
-		Params: event.Params{
-			params.FilePath:    {Name: params.FilePath, Type: params.Path, Value: "/tmp/old"},
-			params.FileNewPath: {Name: params.FileNewPath, Type: params.Path, Value: "/tmp/new"},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.FilePath, params.Path, params.Str("/tmp/old")),
+			event.NewParam(params.FileNewPath, params.Path, params.Str("/tmp/new")),
+		),
 	}
 	unlink := &event.Event{
 		Type:     event.Unlink,
 		Category: event.File,
 		Name:     "unlink",
 		PID:      4242,
-		Params: event.Params{
-			params.FilePath: {Name: params.FilePath, Type: params.Path, Value: "/tmp/gone.log"},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.FilePath, params.Path, params.Str("/tmp/gone.log")),
+		),
 	}
 
 	tests := []struct {
@@ -379,35 +379,35 @@ func TestNetFilter(t *testing.T) {
 		Category: event.Net,
 		Name:     "connect",
 		PID:      4242,
-		Params: event.Params{
-			params.FD:         {Name: params.FD, Type: params.Int64, Value: int64(5)},
-			params.SockFamily: {Name: params.SockFamily, Type: params.Uint16, Value: uint16(2)},
-			params.NetDIP:     {Name: params.NetDIP, Type: params.IPv4, Value: net.IPv4(172, 17, 0, 3).To4()},
-			params.NetDport:   {Name: params.NetDport, Type: params.Port, Value: uint16(443)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.FD, params.Int64, params.I64(int64(5))),
+			event.NewParam(params.SockFamily, params.Uint16, params.U16(uint16(2))),
+			event.NewParam(params.NetDIP, params.IPv4, params.IPAddr(net.IPv4(172, 17, 0, 3).To4())),
+			event.NewParam(params.NetDport, params.Port, params.U16(uint16(443))),
+		),
 	}
 	accept := &event.Event{
 		Type:     event.Accept,
 		Category: event.Net,
 		Name:     "accept",
 		PID:      4242,
-		Params: event.Params{
-			params.FD:         {Name: params.FD, Type: params.Int64, Value: int64(6)},
-			params.SockFamily: {Name: params.SockFamily, Type: params.Uint16, Value: uint16(2)},
-			params.NetSIP:     {Name: params.NetSIP, Type: params.IPv4, Value: net.IPv4(127, 0, 0, 1).To4()},
-			params.NetSport:   {Name: params.NetSport, Type: params.Port, Value: uint16(80)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.FD, params.Int64, params.I64(int64(6))),
+			event.NewParam(params.SockFamily, params.Uint16, params.U16(uint16(2))),
+			event.NewParam(params.NetSIP, params.IPv4, params.IPAddr(net.IPv4(127, 0, 0, 1).To4())),
+			event.NewParam(params.NetSport, params.Port, params.U16(uint16(80))),
+		),
 	}
 	unixc := &event.Event{
 		Type:     event.Connect,
 		Category: event.Net,
 		Name:     "connect",
 		PID:      4242,
-		Params: event.Params{
-			params.FD:         {Name: params.FD, Type: params.Int64, Value: int64(7)},
-			params.SockFamily: {Name: params.SockFamily, Type: params.Uint16, Value: uint16(1)},
-			params.SockPath:   {Name: params.SockPath, Type: params.Path, Value: "/tmp/app.sock"},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.FD, params.Int64, params.I64(int64(7))),
+			event.NewParam(params.SockFamily, params.Uint16, params.U16(uint16(1))),
+			event.NewParam(params.SockPath, params.Path, params.Str("/tmp/app.sock")),
+		),
 	}
 
 	require.True(t, evalFilter(t, `net.dip = 172.17.0.3`, connect))
@@ -426,35 +426,35 @@ func TestMemFilter(t *testing.T) {
 		Category: event.Mem,
 		Name:     "mmap",
 		PID:      4242,
-		Params: event.Params{
-			params.MemBaseAddress: {Name: params.MemBaseAddress, Type: params.Address, Value: uint64(8192)},
-			params.MemRegionSize:  {Name: params.MemRegionSize, Type: params.Uint64, Value: uint64(8192)},
-			params.MemProtect:     {Name: params.MemProtect, Type: params.Uint32, Value: uint32(3)},
-			params.MmapFlags:      {Name: params.MmapFlags, Type: params.Uint64, Value: uint64(1)},
-			params.FD:             {Name: params.FD, Type: params.Int64, Value: int64(3)},
-			params.MmapOffset:     {Name: params.MmapOffset, Type: params.Uint64, Value: uint64(0)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.MemBaseAddress, params.Address, params.U64(uint64(8192))),
+			event.NewParam(params.MemRegionSize, params.Uint64, params.U64(uint64(8192))),
+			event.NewParam(params.MemProtect, params.Uint32, params.U32(uint32(3))),
+			event.NewParam(params.MmapFlags, params.Uint64, params.U64(uint64(1))),
+			event.NewParam(params.FD, params.Int64, params.I64(int64(3))),
+			event.NewParam(params.MmapOffset, params.Uint64, params.U64(uint64(0))),
+		),
 	}
 	vmread := &event.Event{
 		Type:     event.ProcessVMRead,
 		Category: event.Mem,
 		Name:     "process_vm_readv",
 		PID:      4242,
-		Params: event.Params{
-			params.TargetProcessID: {Name: params.TargetProcessID, Type: params.Int64, Value: int64(99)},
-			params.MemBaseAddress:  {Name: params.MemBaseAddress, Type: params.Address, Value: uint64(4096)},
-			params.MemRegionSize:   {Name: params.MemRegionSize, Type: params.Uint64, Value: uint64(16)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.TargetProcessID, params.Int64, params.I64(int64(99))),
+			event.NewParam(params.MemBaseAddress, params.Address, params.U64(uint64(4096))),
+			event.NewParam(params.MemRegionSize, params.Uint64, params.U64(uint64(16))),
+		),
 	}
 	vmwrite := &event.Event{
 		Type:     event.ProcessVMWrite,
 		Category: event.Mem,
 		Name:     "process_vm_writev",
 		PID:      4242,
-		Params: event.Params{
-			params.TargetProcessID: {Name: params.TargetProcessID, Type: params.Int64, Value: int64(77)},
-			params.MemBaseAddress:  {Name: params.MemBaseAddress, Type: params.Address, Value: uint64(4096)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.TargetProcessID, params.Int64, params.I64(int64(77))),
+			event.NewParam(params.MemBaseAddress, params.Address, params.U64(uint64(4096))),
+		),
 	}
 
 	require.True(t, evalFilter(t, `mem.address = 8192`, mmap))
@@ -474,9 +474,9 @@ func TestThreadFilter(t *testing.T) {
 		Name:     "clone",
 		PID:      4242,
 		Tid:      4243,
-		Params: event.Params{
-			params.CloneFlags: {Name: params.CloneFlags, Type: params.Uint64, Value: uint64(0x00010000)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.CloneFlags, params.Uint64, params.U64(uint64(0x00010000))),
+		),
 	}
 	cloneProc := &event.Event{
 		Type:     event.Clone,
@@ -484,9 +484,9 @@ func TestThreadFilter(t *testing.T) {
 		Name:     "clone",
 		PID:      4242,
 		Tid:      4242,
-		Params: event.Params{
-			params.CloneFlags: {Name: params.CloneFlags, Type: params.Uint64, Value: uint64(0)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.CloneFlags, params.Uint64, params.U64(uint64(0))),
+		),
 	}
 
 	require.True(t, evalFilter(t, `thread.tid = 4243`, cloneThread))
@@ -523,30 +523,30 @@ func TestTruncatedFields(t *testing.T) {
 		Type:     event.Openat,
 		Category: event.File,
 		Name:     "openat",
-		Params: event.Params{
-			params.FilePath:  {Name: params.FilePath, Type: params.Path, Value: "/tmp/partial"},
-			params.Truncated: {Name: params.Truncated, Type: params.Uint32, Value: uint32(1)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.FilePath, params.Path, params.Str("/tmp/partial")),
+			event.NewParam(params.Truncated, params.Uint32, params.U32(uint32(1))),
+		),
 	}
 	auxTrunc := &event.Event{
 		Type:     event.Rename,
 		Category: event.File,
 		Name:     "rename",
-		Params: event.Params{
-			params.FilePath:    {Name: params.FilePath, Type: params.Path, Value: "/tmp/old"},
-			params.FileNewPath: {Name: params.FileNewPath, Type: params.Path, Value: "/tmp/partial-dest"},
-			params.Truncated:   {Name: params.Truncated, Type: params.Uint32, Value: uint32(2)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.FilePath, params.Path, params.Str("/tmp/old")),
+			event.NewParam(params.FileNewPath, params.Path, params.Str("/tmp/partial-dest")),
+			event.NewParam(params.Truncated, params.Uint32, params.U32(uint32(2))),
+		),
 	}
 
 	notTrunc := &event.Event{
 		Type:     event.Openat,
 		Category: event.File,
 		Name:     "openat",
-		Params: event.Params{
-			params.FilePath:  {Name: params.FilePath, Type: params.Path, Value: "/tmp/full"},
-			params.Truncated: {Name: params.Truncated, Type: params.Uint32, Value: uint32(0)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.FilePath, params.Path, params.Str("/tmp/full")),
+			event.NewParam(params.Truncated, params.Uint32, params.U32(uint32(0))),
+		),
 	}
 
 	require.True(t, evalFilter(t, `evt.arg[truncated] = 1`, filenameTrunc))
@@ -560,20 +560,48 @@ func TestEveryLinuxEventType(t *testing.T) {
 		evt    *event.Event
 		filter string
 	}{
-		{&event.Event{Type: event.Execve, Category: event.Process, Name: "execve", PS: ps, Params: event.Params{params.Retval: {Name: params.Retval, Type: params.Int64, Value: int64(0)}}}, `evt.name = 'execve' and ps.name = 'bash'`},
-		{&event.Event{Type: event.Exit, Category: event.Process, Name: "exit", PS: ps, Params: event.Params{params.Retval: {Name: params.Retval, Type: params.Int64, Value: int64(0)}}}, `evt.name = 'exit' and evt.retval = 0`},
-		{&event.Event{Type: event.Clone, Category: event.Process, Name: "clone", PS: ps, Params: event.Params{params.CloneFlags: {Name: params.CloneFlags, Type: params.Uint64, Value: uint64(0)}}}, `evt.name = 'clone' and ps.clone_flags = 0`},
-		{&event.Event{Type: event.Openat, Category: event.File, Name: "openat", PS: ps, Params: event.Params{params.FilePath: {Name: params.FilePath, Type: params.Path, Value: "/tmp/x"}}}, `file.path = '/tmp/x'`},
-		{&event.Event{Type: event.Unlink, Category: event.File, Name: "unlink", PS: ps, Params: event.Params{params.FilePath: {Name: params.FilePath, Type: params.Path, Value: "/tmp/x"}}}, `file.name = 'x'`},
-		{&event.Event{Type: event.Rename, Category: event.File, Name: "rename", PS: ps, Params: event.Params{params.FileNewPath: {Name: params.FileNewPath, Type: params.Path, Value: "/tmp/y"}}}, `file.path.target = '/tmp/y'`},
-		{&event.Event{Type: event.Connect, Category: event.Net, Name: "connect", PS: ps, Params: event.Params{params.NetDport: {Name: params.NetDport, Type: params.Port, Value: uint16(443)}}}, `net.dport = 443`},
-		{&event.Event{Type: event.Accept, Category: event.Net, Name: "accept", PS: ps, Params: event.Params{params.NetSport: {Name: params.NetSport, Type: params.Port, Value: uint16(80)}}}, `net.sport = 80`},
-		{&event.Event{Type: event.Mmap, Category: event.Mem, Name: "mmap", PS: ps, Params: event.Params{params.MemRegionSize: {Name: params.MemRegionSize, Type: params.Uint64, Value: uint64(4096)}}}, `mem.size = 4096`},
-		{&event.Event{Type: event.ProcessVMRead, Category: event.Mem, Name: "process_vm_readv", PS: ps, Params: event.Params{params.TargetProcessID: {Name: params.TargetProcessID, Type: params.Int64, Value: int64(9)}}}, `mem.target.pid = 9`},
-		{&event.Event{Type: event.ProcessVMWrite, Category: event.Mem, Name: "process_vm_writev", PS: ps, Params: event.Params{params.TargetProcessID: {Name: params.TargetProcessID, Type: params.Int64, Value: int64(8)}}}, `mem.target.pid = 8`},
-		{&event.Event{Type: event.Kill, Category: event.Process, Name: "kill", PS: ps, Params: event.Params{params.Signal: {Name: params.Signal, Type: params.Int32, Value: int32(9)}}}, `ps.signal = 9`},
-		{&event.Event{Type: event.Ptrace, Category: event.Process, Name: "ptrace", PS: ps, Params: event.Params{params.PtraceRequest: {Name: params.PtraceRequest, Type: params.Int64, Value: int64(16)}}}, `ps.ptrace.request = 16`},
-		{&event.Event{Type: event.Prctl, Category: event.Process, Name: "prctl", PS: ps, Params: event.Params{params.PrctlOption: {Name: params.PrctlOption, Type: params.Int64, Value: int64(15)}}}, `ps.prctl.option = 15`},
+		{&event.Event{Type: event.Execve, Category: event.Process, Name: "execve", PS: ps, Params: event.ParamsOf(
+			event.NewParam(params.Retval, params.Int64, params.I64(int64(0))),
+		)}, `evt.name = 'execve' and ps.name = 'bash'`},
+		{&event.Event{Type: event.Exit, Category: event.Process, Name: "exit", PS: ps, Params: event.ParamsOf(
+			event.NewParam(params.Retval, params.Int64, params.I64(int64(0))),
+		)}, `evt.name = 'exit' and evt.retval = 0`},
+		{&event.Event{Type: event.Clone, Category: event.Process, Name: "clone", PS: ps, Params: event.ParamsOf(
+			event.NewParam(params.CloneFlags, params.Uint64, params.U64(uint64(0))),
+		)}, `evt.name = 'clone' and ps.clone_flags = 0`},
+		{&event.Event{Type: event.Openat, Category: event.File, Name: "openat", PS: ps, Params: event.ParamsOf(
+			event.NewParam(params.FilePath, params.Path, params.Str("/tmp/x")),
+		)}, `file.path = '/tmp/x'`},
+		{&event.Event{Type: event.Unlink, Category: event.File, Name: "unlink", PS: ps, Params: event.ParamsOf(
+			event.NewParam(params.FilePath, params.Path, params.Str("/tmp/x")),
+		)}, `file.name = 'x'`},
+		{&event.Event{Type: event.Rename, Category: event.File, Name: "rename", PS: ps, Params: event.ParamsOf(
+			event.NewParam(params.FileNewPath, params.Path, params.Str("/tmp/y")),
+		)}, `file.path.target = '/tmp/y'`},
+		{&event.Event{Type: event.Connect, Category: event.Net, Name: "connect", PS: ps, Params: event.ParamsOf(
+			event.NewParam(params.NetDport, params.Port, params.U16(uint16(443))),
+		)}, `net.dport = 443`},
+		{&event.Event{Type: event.Accept, Category: event.Net, Name: "accept", PS: ps, Params: event.ParamsOf(
+			event.NewParam(params.NetSport, params.Port, params.U16(uint16(80))),
+		)}, `net.sport = 80`},
+		{&event.Event{Type: event.Mmap, Category: event.Mem, Name: "mmap", PS: ps, Params: event.ParamsOf(
+			event.NewParam(params.MemRegionSize, params.Uint64, params.U64(uint64(4096))),
+		)}, `mem.size = 4096`},
+		{&event.Event{Type: event.ProcessVMRead, Category: event.Mem, Name: "process_vm_readv", PS: ps, Params: event.ParamsOf(
+			event.NewParam(params.TargetProcessID, params.Int64, params.I64(int64(9))),
+		)}, `mem.target.pid = 9`},
+		{&event.Event{Type: event.ProcessVMWrite, Category: event.Mem, Name: "process_vm_writev", PS: ps, Params: event.ParamsOf(
+			event.NewParam(params.TargetProcessID, params.Int64, params.I64(int64(8))),
+		)}, `mem.target.pid = 8`},
+		{&event.Event{Type: event.Kill, Category: event.Process, Name: "kill", PS: ps, Params: event.ParamsOf(
+			event.NewParam(params.Signal, params.Int32, params.I32(int32(9))),
+		)}, `ps.signal = 9`},
+		{&event.Event{Type: event.Ptrace, Category: event.Process, Name: "ptrace", PS: ps, Params: event.ParamsOf(
+			event.NewParam(params.PtraceRequest, params.Int64, params.I64(int64(16))),
+		)}, `ps.ptrace.request = 16`},
+		{&event.Event{Type: event.Prctl, Category: event.Process, Name: "prctl", PS: ps, Params: event.ParamsOf(
+			event.NewParam(params.PrctlOption, params.Int64, params.I64(int64(15))),
+		)}, `ps.prctl.option = 15`},
 	}
 	for _, tt := range cases {
 		require.True(t, evalFilter(t, tt.filter, tt.evt), tt.filter)
@@ -588,7 +616,9 @@ func TestIsFieldAccessible(t *testing.T) {
 	cloneThread := &event.Event{
 		Type:     event.Clone,
 		Category: event.Process,
-		Params:   event.Params{params.CloneFlags: {Name: params.CloneFlags, Type: params.Uint64, Value: uint64(0x00010000)}},
+		Params: event.ParamsOf(
+			event.NewParam(params.CloneFlags, params.Uint64, params.U64(uint64(0x00010000))),
+		),
 	}
 
 	require.True(t, newFileAccessor().IsFieldAccessible(fileEvt))

@@ -18,7 +18,11 @@
 
 package event
 
-import "slices"
+import (
+	"slices"
+
+	"github.com/rabbitstack/fibratus/pkg/event/params"
+)
 
 // Flags represents the event flags
 type Flags uint8
@@ -39,7 +43,17 @@ type Info struct {
 	Description string
 	// Flags describes additional properties of the event.
 	Flags Flags
+	// Params is the schema of the event parameters. It describes every parameter
+	// that the event can carry, including those that are appended later in the
+	// event lifecycle. The position of the parameter descriptor is the index of
+	// the parameter in the event's Params slice. The schema is shared by all
+	// instances of the event type and must not be mutated.
+	Params []params.ParamInfo
 }
+
+// ParamCount returns the number of parameters described by the event schema.
+// It determines the number of slots allocated for the event parameters.
+func (i Info) ParamCount() int { return len(i.Params) }
 
 // All returns all event types.
 func AllTypes() []Type {

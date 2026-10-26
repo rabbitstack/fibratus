@@ -44,14 +44,14 @@ func TestModuleProcessor(t *testing.T) {
 			"load new module",
 			&event.Event{
 				Type: event.LoadModule,
-				Params: event.Params{
-					params.ModulePath:           {Name: params.ModulePath, Type: params.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll")},
-					params.ProcessID:            {Name: params.ProcessID, Type: params.PID, Value: uint32(1023)},
-					params.ModuleCheckSum:       {Name: params.ModuleCheckSum, Type: params.Uint32, Value: uint32(2323432)},
-					params.ModuleBase:           {Name: params.ModuleBase, Type: params.Address, Value: uint64(0x7ffb313833a3)},
-					params.ModuleSignatureType:  {Name: params.ModuleSignatureType, Type: params.Enum, Value: uint32(1), Enum: signature.Types},
-					params.ModuleSignatureLevel: {Name: params.ModuleSignatureLevel, Type: params.Enum, Value: uint32(4), Enum: signature.Levels},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.ModulePath, params.String, params.Str(filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll"))),
+					event.NewParam(params.ProcessID, params.PID, params.U32(uint32(1023))),
+					event.NewParam(params.ModuleCheckSum, params.Uint32, params.U32(uint32(2323432))),
+					event.NewParam(params.ModuleBase, params.Address, params.U64(uint64(0x7ffb313833a3))),
+					event.NewParam(params.ModuleSignatureType, params.Enum, params.U32(uint32(1)), event.WithEnum(signature.Types)),
+					event.NewParam(params.ModuleSignatureLevel, params.Enum, params.U32(uint32(4)), event.WithEnum(signature.Levels)),
+				),
 			},
 			func() *ps.SnapshotterMock {
 				psnap := new(ps.SnapshotterMock)
@@ -69,14 +69,14 @@ func TestModuleProcessor(t *testing.T) {
 			"parse module characteristics",
 			&event.Event{
 				Type: event.LoadModule,
-				Params: event.Params{
-					params.ModulePath:           {Name: params.ModulePath, Type: params.UnicodeString, Value: "../_fixtures/mscorlib.dll"},
-					params.ProcessID:            {Name: params.ProcessID, Type: params.PID, Value: uint32(1023)},
-					params.ModuleCheckSum:       {Name: params.ModuleCheckSum, Type: params.Uint32, Value: uint32(2323432)},
-					params.ModuleBase:           {Name: params.ModuleBase, Type: params.Address, Value: uint64(0x7ffb313833a3)},
-					params.ModuleSignatureType:  {Name: params.ModuleSignatureType, Type: params.Enum, Value: uint32(1), Enum: signature.Types},
-					params.ModuleSignatureLevel: {Name: params.ModuleSignatureLevel, Type: params.Enum, Value: uint32(4), Enum: signature.Levels},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.ModulePath, params.String, params.Str("../_fixtures/mscorlib.dll")),
+					event.NewParam(params.ProcessID, params.PID, params.U32(uint32(1023))),
+					event.NewParam(params.ModuleCheckSum, params.Uint32, params.U32(uint32(2323432))),
+					event.NewParam(params.ModuleBase, params.Address, params.U64(uint64(0x7ffb313833a3))),
+					event.NewParam(params.ModuleSignatureType, params.Enum, params.U32(uint32(1)), event.WithEnum(signature.Types)),
+					event.NewParam(params.ModuleSignatureLevel, params.Enum, params.U32(uint32(4)), event.WithEnum(signature.Levels)),
+				),
 			},
 			func() *ps.SnapshotterMock {
 				psnap := new(ps.SnapshotterMock)
@@ -91,14 +91,14 @@ func TestModuleProcessor(t *testing.T) {
 			"unload module",
 			&event.Event{
 				Type: event.UnloadModule,
-				Params: event.Params{
-					params.ModulePath:           {Name: params.ModulePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\kernel32.dll"},
-					params.ProcessName:          {Name: params.ProcessName, Type: params.AnsiString, Value: "csrss.exe"},
-					params.ProcessID:            {Name: params.ProcessID, Type: params.PID, Value: uint32(676)},
-					params.ModuleBase:           {Name: params.ModuleBase, Type: params.Address, Value: uint64(0xfffb313833a3)},
-					params.ModuleSignatureType:  {Name: params.ModuleSignatureType, Type: params.Enum, Value: uint32(0), Enum: signature.Types},
-					params.ModuleSignatureLevel: {Name: params.ModuleSignatureLevel, Type: params.Enum, Value: uint32(0), Enum: signature.Levels},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.ModulePath, params.String, params.Str("C:\\Windows\\system32\\kernel32.dll")),
+					event.NewParam(params.ProcessName, params.String, params.Str("csrss.exe")),
+					event.NewParam(params.ProcessID, params.PID, params.U32(uint32(676))),
+					event.NewParam(params.ModuleBase, params.Address, params.U64(uint64(0xfffb313833a3))),
+					event.NewParam(params.ModuleSignatureType, params.Enum, params.U32(uint32(0)), event.WithEnum(signature.Types)),
+					event.NewParam(params.ModuleSignatureLevel, params.Enum, params.U32(uint32(0)), event.WithEnum(signature.Levels)),
+				),
 			},
 			func() *ps.SnapshotterMock {
 				psnap := new(ps.SnapshotterMock)

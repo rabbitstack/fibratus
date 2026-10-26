@@ -24,6 +24,7 @@ import (
 	"reflect"
 	"time"
 
+	errs "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
@@ -39,7 +40,7 @@ var (
 // from the non-params constructs such as process' state.
 type Accessor interface {
 	// Get fetches the parameter value for the specified filter field.
-	Get(f Field, evt *event.Event) (params.Value, error)
+	Get(f Field, evt *event.Event) (any, error)
 	// SetFields sets all fields declared in the expression.
 	SetFields(fields []Field)
 	// SetSegments sets all segments utilized in the function predicate expression.
@@ -65,7 +66,7 @@ func newEventAccessor() Accessor {
 const timeFmt = "15:04:05"
 const dateFmt = "2006-01-02"
 
-func (*evtAccessor) get(f Field, evt *event.Event) (params.Value, error) {
+func (*evtAccessor) get(f Field, evt *event.Event) (any, error) {
 	switch f.Name {
 	case fields.EvtSeq, fields.KevtSeq:
 		return evt.Seq, nil
@@ -118,27 +119,38 @@ func (*evtAccessor) get(f Field, evt *event.Event) (params.Value, error) {
 		// expressed as evt.arg[cmdline] where the string
 		// inside brackets represents the parameter name
 		name := f.Arg
-		par, err := evt.Params.Get(name)
-		if err != nil {
-			return nil, err
+		idx := evt.Params.Index(name)
+		if !evt.Params.Has(idx) {
+			return nil, &errs.ErrParamNotFound{Name: name}
 		}
 
-		switch par.Type {
+		switch evt.Params.Type(idx) {
 		case params.Uint8:
-			return evt.Params.GetUint8(name)
+			return evt.Params.GetUint8(idx), nil
 		case params.Uint16, params.Port:
-			return evt.Params.GetUint16(name)
+			return evt.Params.GetUint16(idx), nil
 		case params.Uint32, params.PID, params.TID:
-			return evt.Params.GetUint32(name)
+			return evt.Params.GetUint32(idx), nil
 		case params.Uint64:
-			return evt.Params.GetUint64(name)
+			return evt.Params.GetUint64(idx), nil
 		case params.Time:
-			return evt.Params.GetTime(name)
+			return evt.Params.GetTime(idx), nil
 		default:
-			return evt.GetParamAsString(name), nil
+			return evt.Params.Format(idx), nil
 		}
 	}
 	return nil, nil
+}
+
+// param returns the value of the named event parameter extracted by the getter. The
+// ErrParamNotFound error is returned if the event doesn't carry the parameter, so the
+// filter can fall back to the default value of the field.
+func param[T any](e *event.Event, name string, get func(event.Params, string) T) (T, error) {
+	if !e.Params.Contains(name) {
+		var zero T
+		return zero, &errs.ErrParamNotFound{Name: name}
+	}
+	return get(e.Params, name), nil
 }
 
 // narrowAccessors dynamically disables filter accessors by walking
@@ -176,7 +188,7 @@ func defaultAccessorValue(field Field) any {
 	switch field.Name.Type() {
 	case params.Uint8, params.Int64, params.Int8, params.Int32, params.Int16,
 		params.Uint16, params.Port, params.Uint32, params.Uint64, params.PID,
-		params.TID, params.Flags, params.Flags64:
+		params.TID, params.Flags32, params.Flags64:
 		return 0
 	case params.Float, params.Double:
 		return 0.0

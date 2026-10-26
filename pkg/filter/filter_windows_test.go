@@ -181,19 +181,19 @@ func TestProcFilter(t *testing.T) {
 
 	evt := &event.Event{
 		Type: event.CreateProcess,
-		Params: event.Params{
-			params.Cmdline:                    {Name: params.Cmdline, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\svchost.exe -k DcomLaunch -p -s LSM"},
-			params.ProcessName:                {Name: params.ProcessName, Type: params.AnsiString, Value: "svchost.exe"},
-			params.ProcessID:                  {Name: params.ProcessID, Type: params.PID, Value: uint32(1234)},
-			params.ProcessParentID:            {Name: params.ProcessParentID, Type: params.PID, Value: uint32(345)},
-			params.UserSID:                    {Name: params.UserSID, Type: params.WbemSID, Value: []byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0}},
-			params.Username:                   {Name: params.Username, Type: params.UnicodeString, Value: "SYSTEM"},
-			params.Domain:                     {Name: params.Domain, Type: params.UnicodeString, Value: "NT AUTHORITY"},
-			params.ProcessFlags:               {Name: params.ProcessFlags, Type: params.Flags, Value: uint32(0x000000E)},
-			params.ProcessTokenIntegrityLevel: {Name: params.ProcessTokenIntegrityLevel, Type: params.AnsiString, Value: "SYSTEM"},
-			params.ProcessTokenIsElevated:     {Name: params.ProcessTokenIsElevated, Type: params.Bool, Value: true},
-			params.ProcessTokenElevationType:  {Name: params.ProcessTokenElevationType, Type: params.AnsiString, Value: "DEFAULT"},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.Cmdline, params.String, params.Str("C:\\Windows\\system32\\svchost.exe -k DcomLaunch -p -s LSM")),
+			event.NewParam(params.ProcessName, params.String, params.Str("svchost.exe")),
+			event.NewParam(params.ProcessID, params.PID, params.U32(uint32(1234))),
+			event.NewParam(params.ProcessParentID, params.PID, params.U32(uint32(345))),
+			event.NewParam(params.UserSID, params.WbemSID, params.Bin([]byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0})),
+			event.NewParam(params.Username, params.String, params.Str("SYSTEM")),
+			event.NewParam(params.Domain, params.String, params.Str("NT AUTHORITY")),
+			event.NewParam(params.ProcessFlags, params.Flags, params.U32(uint32(0x000000E))),
+			event.NewParam(params.ProcessTokenIntegrityLevel, params.String, params.Str("SYSTEM")),
+			event.NewParam(params.ProcessTokenIsElevated, params.Bool, params.Boolean(true)),
+			event.NewParam(params.ProcessTokenElevationType, params.String, params.Str("DEFAULT")),
+		),
 		PID: 1234,
 		PS: &pstypes.PS{
 			Name:     "svchost.exe",
@@ -230,9 +230,9 @@ func TestProcFilter(t *testing.T) {
 
 	evt1 := &event.Event{
 		Type: event.OpenProcess,
-		Params: event.Params{
-			params.DesiredAccess: {Name: params.DesiredAccess, Type: params.Flags, Value: uint32(0x1400), Flags: event.PsAccessRightFlags},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.DesiredAccess, params.Flags, params.U32(uint32(0x1400)), event.WithFlags(event.PsAccessRightFlags)),
+		),
 		PID: 1023,
 		PS: &pstypes.PS{
 			Name:   "svchost.exe",
@@ -248,9 +248,9 @@ func TestProcFilter(t *testing.T) {
 
 	evt2 := &event.Event{
 		Type: event.OpenProcess,
-		Params: event.Params{
-			params.DesiredAccess: {Name: params.DesiredAccess, Type: params.Flags, Value: uint32(0x1400), Flags: event.PsAccessRightFlags},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.DesiredAccess, params.Flags, params.U32(uint32(0x1400)), event.WithFlags(event.PsAccessRightFlags)),
+		),
 		PID: 1023,
 	}
 
@@ -407,21 +407,21 @@ func TestProcFilter(t *testing.T) {
 }
 
 func TestThreadFilter(t *testing.T) {
-	pars := event.Params{
-		params.ProcessID:          {Name: params.ProcessID, Type: params.PID, Value: uint32(os.Getpid())},
-		params.ThreadID:           {Name: params.ThreadID, Type: params.TID, Value: uint32(3453)},
-		params.BasePrio:           {Name: params.BasePrio, Type: params.Uint8, Value: uint8(13)},
-		params.StartAddress:       {Name: params.StartAddress, Type: params.Address, Value: uint64(140729524944768)},
-		params.TEB:                {Name: params.TEB, Type: params.Address, Value: uint64(614994620416)},
-		params.IOPrio:             {Name: params.IOPrio, Type: params.Uint8, Value: uint8(2)},
-		params.KstackBase:         {Name: params.KstackBase, Type: params.Address, Value: uint64(18446677035730165760)},
-		params.KstackLimit:        {Name: params.KstackLimit, Type: params.Address, Value: uint64(18446677035730137088)},
-		params.PagePrio:           {Name: params.PagePrio, Type: params.Uint8, Value: uint8(5)},
-		params.UstackBase:         {Name: params.UstackBase, Type: params.Address, Value: uint64(86376448)},
-		params.UstackLimit:        {Name: params.UstackLimit, Type: params.Address, Value: uint64(86372352)},
-		params.StartAddressSymbol: {Name: params.StartAddressSymbol, Type: params.UnicodeString, Value: "LoadModule"},
-		params.StartAddressModule: {Name: params.StartAddressModule, Type: params.UnicodeString, Value: "C:\\Windows\\System32\\kernel32.dll"},
-	}
+	pars := event.ParamsOf(
+		event.NewParam(params.ProcessID, params.PID, params.U32(uint32(os.Getpid()))),
+		event.NewParam(params.ThreadID, params.TID, params.U32(uint32(3453))),
+		event.NewParam(params.BasePrio, params.Uint8, params.U8(uint8(13))),
+		event.NewParam(params.StartAddress, params.Address, params.U64(uint64(140729524944768))),
+		event.NewParam(params.TEB, params.Address, params.U64(uint64(614994620416))),
+		event.NewParam(params.IOPrio, params.Uint8, params.U8(uint8(2))),
+		event.NewParam(params.KstackBase, params.Address, params.U64(uint64(18446677035730165760))),
+		event.NewParam(params.KstackLimit, params.Address, params.U64(uint64(18446677035730137088))),
+		event.NewParam(params.PagePrio, params.Uint8, params.U8(uint8(5))),
+		event.NewParam(params.UstackBase, params.Address, params.U64(uint64(86376448))),
+		event.NewParam(params.UstackLimit, params.Address, params.U64(uint64(86372352))),
+		event.NewParam(params.StartAddressSymbol, params.String, params.Str("LoadModule")),
+		event.NewParam(params.StartAddressModule, params.String, params.Str("C:\\Windows\\System32\\kernel32.dll")),
+	)
 	evt := &event.Event{
 		Type:   event.CreateThread,
 		Params: pars,
@@ -618,13 +618,13 @@ func TestFileFilter(t *testing.T) {
 		CPU:  1,
 		Seq:  2,
 		Host: "archrabbit",
-		Params: event.Params{
-			params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
-			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
-			params.FileType:      {Name: params.FileType, Type: params.AnsiString, Value: "file"},
-			params.FileOperation: {Name: params.FileOperation, Type: params.AnsiString, Value: "open"},
-			params.FileShareMask: {Name: params.FileShareMask, Type: params.Flags, Value: uint32(1), Flags: event.FileShareModeFlags},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.FileObject, params.Uint64, params.U64(uint64(12456738026482168384))),
+			event.NewParam(params.FilePath, params.String, params.Str("C:\\Windows\\system32\\user32.dll")),
+			event.NewParam(params.FileType, params.String, params.Str("file")),
+			event.NewParam(params.FileOperation, params.String, params.Str("open")),
+			event.NewParam(params.FileShareMask, params.Flags, params.U32(uint32(1)), event.WithFlags(event.FileShareModeFlags)),
+		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
@@ -700,9 +700,9 @@ func TestFileInfoFilter(t *testing.T) {
 			`file.info_class = 'Allocation'`,
 			&event.Event{
 				Type: event.SetFileInformation,
-				Params: event.Params{
-					params.FileInfoClass: {Name: params.FileInfoClass, Type: params.Enum, Value: fs.AllocationClass, Enum: fs.FileInfoClasses},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.FileInfoClass, params.Enum, params.U32(fs.AllocationClass), event.WithEnum(fs.FileInfoClasses)),
+				),
 			},
 			true,
 		},
@@ -710,10 +710,10 @@ func TestFileInfoFilter(t *testing.T) {
 			`file.info.allocation_size = 64500`,
 			&event.Event{
 				Type: event.SetFileInformation,
-				Params: event.Params{
-					params.FileInfoClass: {Name: params.FileInfoClass, Type: params.Enum, Value: fs.AllocationClass, Enum: fs.FileInfoClasses},
-					params.FileExtraInfo: {Name: params.FileExtraInfo, Type: params.Uint64, Value: uint64(64500)},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.FileInfoClass, params.Enum, params.U32(fs.AllocationClass), event.WithEnum(fs.FileInfoClasses)),
+					event.NewParam(params.FileExtraInfo, params.Uint64, params.U64(uint64(64500))),
+				),
 			},
 			true,
 		},
@@ -721,10 +721,10 @@ func TestFileInfoFilter(t *testing.T) {
 			`file.info.eof_size = 64500`,
 			&event.Event{
 				Type: event.SetFileInformation,
-				Params: event.Params{
-					params.FileInfoClass: {Name: params.FileInfoClass, Type: params.Enum, Value: fs.EOFClass, Enum: fs.FileInfoClasses},
-					params.FileExtraInfo: {Name: params.FileExtraInfo, Type: params.Uint64, Value: uint64(64500)},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.FileInfoClass, params.Enum, params.U32(fs.EOFClass), event.WithEnum(fs.FileInfoClasses)),
+					event.NewParam(params.FileExtraInfo, params.Uint64, params.U64(uint64(64500))),
+				),
 			},
 			true,
 		},
@@ -732,10 +732,10 @@ func TestFileInfoFilter(t *testing.T) {
 			`file.info.eof_size = 64500`,
 			&event.Event{
 				Type: event.SetFileInformation,
-				Params: event.Params{
-					params.FileInfoClass: {Name: params.FileInfoClass, Type: params.Enum, Value: fs.DispositionClass, Enum: fs.FileInfoClasses},
-					params.FileExtraInfo: {Name: params.FileExtraInfo, Type: params.Uint64, Value: uint64(1)},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.FileInfoClass, params.Enum, params.U32(fs.DispositionClass), event.WithEnum(fs.FileInfoClasses)),
+					event.NewParam(params.FileExtraInfo, params.Uint64, params.U64(uint64(1))),
+				),
 			},
 			false,
 		},
@@ -743,10 +743,10 @@ func TestFileInfoFilter(t *testing.T) {
 			`file.info.is_disposition_delete_file = true`,
 			&event.Event{
 				Type: event.DeleteFile,
-				Params: event.Params{
-					params.FileInfoClass: {Name: params.FileInfoClass, Type: params.Enum, Value: fs.DispositionClass, Enum: fs.FileInfoClasses},
-					params.FileExtraInfo: {Name: params.FileExtraInfo, Type: params.Uint64, Value: uint64(1)},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.FileInfoClass, params.Enum, params.U32(fs.DispositionClass), event.WithEnum(fs.FileInfoClasses)),
+					event.NewParam(params.FileExtraInfo, params.Uint64, params.U64(uint64(1))),
+				),
 			},
 			true,
 		},
@@ -773,13 +773,13 @@ func TestEventFilter(t *testing.T) {
 		Seq:      2,
 		Host:     "archrabbit",
 		Evasions: uint32(evasion.IndirectSyscall),
-		Params: event.Params{
-			params.ProcessID:     {Name: params.ProcessID, Type: params.PID, Value: uint32(3434)},
-			params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
-			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
-			params.FileType:      {Name: params.FileType, Type: params.AnsiString, Value: "file"},
-			params.FileOperation: {Name: params.FileOperation, Type: params.AnsiString, Value: "open"},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.ProcessID, params.PID, params.U32(uint32(3434))),
+			event.NewParam(params.FileObject, params.Uint64, params.U64(uint64(12456738026482168384))),
+			event.NewParam(params.FilePath, params.String, params.Str("\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll")),
+			event.NewParam(params.FileType, params.String, params.Str("file")),
+			event.NewParam(params.FileOperation, params.String, params.Str("open")),
+		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barz"},
 	}
 
@@ -847,12 +847,12 @@ func TestNetFilter(t *testing.T) {
 		PS: &pstypes.PS{
 			Name: "cmd.exe",
 		},
-		Params: event.Params{
-			params.NetDport: {Name: params.NetDport, Type: params.Uint16, Value: uint16(443)},
-			params.NetSport: {Name: params.NetSport, Type: params.Uint16, Value: uint16(43123)},
-			params.NetSIP:   {Name: params.NetSIP, Type: params.IPv4, Value: net.ParseIP("127.0.0.1")},
-			params.NetDIP:   {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("216.58.201.174")},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.NetDport, params.Uint16, params.U16(uint16(443))),
+			event.NewParam(params.NetSport, params.Uint16, params.U16(uint16(43123))),
+			event.NewParam(params.NetSIP, params.IPv4, params.IPAddr(net.ParseIP("127.0.0.1"))),
+			event.NewParam(params.NetDIP, params.IPv4, params.IPAddr(net.ParseIP("216.58.201.174"))),
+		),
 	}
 
 	var tests = []struct {
@@ -897,12 +897,12 @@ func TestNetFilter(t *testing.T) {
 		PS: &pstypes.PS{
 			Name: "cmd.exe",
 		},
-		Params: event.Params{
-			params.NetDport: {Name: params.NetDport, Type: params.Uint16, Value: uint16(53)},
-			params.NetSport: {Name: params.NetSport, Type: params.Uint16, Value: uint16(43123)},
-			params.NetSIP:   {Name: params.NetSIP, Type: params.IPv4, Value: net.ParseIP("127.0.0.1")},
-			params.NetDIP:   {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("8.8.8.8")},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.NetDport, params.Uint16, params.U16(uint16(53))),
+			event.NewParam(params.NetSport, params.Uint16, params.U16(uint16(43123))),
+			event.NewParam(params.NetSIP, params.IPv4, params.IPAddr(net.ParseIP("127.0.0.1"))),
+			event.NewParam(params.NetDIP, params.IPv4, params.IPAddr(net.ParseIP("8.8.8.8"))),
+		),
 	}
 
 	var tests1 = []struct {
@@ -932,13 +932,13 @@ func TestRegistryFilter(t *testing.T) {
 		Type: event.RegSetValue,
 		Tid:  2484,
 		PID:  859,
-		Params: event.Params{
-			params.RegPath:      {Name: params.RegPath, Type: params.UnicodeString, Value: `HKEY_LOCAL_MACHINE\SYSTEM\Setup\Pid`},
-			params.RegData:      {Name: params.RegData, Type: params.Uint32, Value: uint32(10234)},
-			params.RegValueType: {Name: params.RegValueType, Type: params.AnsiString, Value: "DWORD"},
-			params.NTStatus:     {Name: params.NTStatus, Type: params.AnsiString, Value: "success"},
-			params.RegKCB:       {Name: params.RegKCB, Type: params.Address, Value: uint64(18446666033449935464)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.RegPath, params.String, params.Str(`HKEY_LOCAL_MACHINE\SYSTEM\Setup\Pid`)),
+			event.NewParam(params.RegData, params.Uint32, params.U32(uint32(10234))),
+			event.NewParam(params.RegValueType, params.String, params.Str("DWORD")),
+			event.NewParam(params.NTStatus, params.String, params.Str("success")),
+			event.NewParam(params.RegKCB, params.Address, params.U64(uint64(18446666033449935464))),
+		),
 	}
 
 	var tests = []struct {
@@ -973,17 +973,17 @@ func TestModuleFilter(t *testing.T) {
 
 	e1 := &event.Event{
 		Type: event.LoadModule,
-		Params: event.Params{
-			params.ModulePath:           {Name: params.ModulePath, Type: params.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll")},
-			params.ProcessID:            {Name: params.ProcessID, Type: params.PID, Value: uint32(1023)},
-			params.ModuleCheckSum:       {Name: params.ModuleCheckSum, Type: params.Uint32, Value: uint32(2323432)},
-			params.ModuleBase:           {Name: params.ModuleBase, Type: params.Address, Value: uint64(0x7ffb313833a3)},
-			params.ModuleSize:           {Name: params.ModuleSize, Type: params.Uint64, Value: uint64(0x72342)},
-			params.ModuleTimeDateStamp:  {Name: params.ModuleTimeDateStamp, Type: params.Uint32, Value: uint32(12322567)},
-			params.ModuleSignatureType:  {Name: params.ModuleSignatureType, Type: params.Enum, Value: uint32(1), Enum: signature.Types},
-			params.ModuleSignatureLevel: {Name: params.ModuleSignatureLevel, Type: params.Enum, Value: uint32(4), Enum: signature.Levels},
-			params.FileIsDotnet:         {Name: params.FileIsDotnet, Type: params.Bool, Value: false},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.ModulePath, params.String, params.Str(filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll"))),
+			event.NewParam(params.ProcessID, params.PID, params.U32(uint32(1023))),
+			event.NewParam(params.ModuleCheckSum, params.Uint32, params.U32(uint32(2323432))),
+			event.NewParam(params.ModuleBase, params.Address, params.U64(uint64(0x7ffb313833a3))),
+			event.NewParam(params.ModuleSize, params.Uint64, params.U64(uint64(0x72342))),
+			event.NewParam(params.ModuleTimeDateStamp, params.Uint32, params.U32(uint32(12322567))),
+			event.NewParam(params.ModuleSignatureType, params.Enum, params.U32(uint32(1)), event.WithEnum(signature.Types)),
+			event.NewParam(params.ModuleSignatureLevel, params.Enum, params.U32(uint32(4)), event.WithEnum(signature.Levels)),
+			event.NewParam(params.FileIsDotnet, params.Bool, params.Boolean(false)),
+		),
 	}
 
 	var tests = []struct {
@@ -1043,15 +1043,15 @@ func TestModuleFilter(t *testing.T) {
 	// now exercise unsigned/unchecked signature
 	e2 := &event.Event{
 		Type: event.LoadModule,
-		Params: event.Params{
-			params.ModulePath:           {Name: params.ModulePath, Type: params.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll")},
-			params.ProcessID:            {Name: params.ProcessID, Type: params.PID, Value: uint32(1023)},
-			params.ModuleCheckSum:       {Name: params.ModuleCheckSum, Type: params.Uint32, Value: uint32(2323432)},
-			params.ModuleBase:           {Name: params.ModuleBase, Type: params.Address, Value: uint64(0x7ccb313833a3)},
-			params.ModuleSignatureType:  {Name: params.ModuleSignatureType, Type: params.Enum, Value: uint32(0), Enum: signature.Types},
-			params.ModuleSignatureLevel: {Name: params.ModuleSignatureLevel, Type: params.Enum, Value: uint32(0), Enum: signature.Levels},
-			params.FileIsDotnet:         {Name: params.FileIsDotnet, Type: params.Bool, Value: false},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.ModulePath, params.String, params.Str(filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll"))),
+			event.NewParam(params.ProcessID, params.PID, params.U32(uint32(1023))),
+			event.NewParam(params.ModuleCheckSum, params.Uint32, params.U32(uint32(2323432))),
+			event.NewParam(params.ModuleBase, params.Address, params.U64(uint64(0x7ccb313833a3))),
+			event.NewParam(params.ModuleSignatureType, params.Enum, params.U32(uint32(0)), event.WithEnum(signature.Types)),
+			event.NewParam(params.ModuleSignatureLevel, params.Enum, params.U32(uint32(0)), event.WithEnum(signature.Levels)),
+			event.NewParam(params.FileIsDotnet, params.Bool, params.Boolean(false)),
+		),
 	}
 
 	var tests1 = []struct {
@@ -1096,15 +1096,15 @@ func TestModuleFilter(t *testing.T) {
 
 	e3 := &event.Event{
 		Type: event.LoadModule,
-		Params: event.Params{
-			params.ModulePath:           {Name: params.ModulePath, Type: params.UnicodeString, Value: "..\\pe\\_fixtures\\mscorlib.dll"},
-			params.ProcessID:            {Name: params.ProcessID, Type: params.PID, Value: uint32(1023)},
-			params.ModuleCheckSum:       {Name: params.ModuleCheckSum, Type: params.Uint32, Value: uint32(2323432)},
-			params.ModuleBase:           {Name: params.ModuleBase, Type: params.Address, Value: uint64(0xfff313833a3)},
-			params.ModuleSignatureType:  {Name: params.ModuleSignatureType, Type: params.Enum, Value: uint32(0), Enum: signature.Types},
-			params.ModuleSignatureLevel: {Name: params.ModuleSignatureLevel, Type: params.Enum, Value: uint32(0), Enum: signature.Levels},
-			params.FileIsDotnet:         {Name: params.FileIsDotnet, Type: params.Bool, Value: true},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.ModulePath, params.String, params.Str("..\\pe\\_fixtures\\mscorlib.dll")),
+			event.NewParam(params.ProcessID, params.PID, params.U32(uint32(1023))),
+			event.NewParam(params.ModuleCheckSum, params.Uint32, params.U32(uint32(2323432))),
+			event.NewParam(params.ModuleBase, params.Address, params.U64(uint64(0xfff313833a3))),
+			event.NewParam(params.ModuleSignatureType, params.Enum, params.U32(uint32(0)), event.WithEnum(signature.Types)),
+			event.NewParam(params.ModuleSignatureLevel, params.Enum, params.U32(uint32(0)), event.WithEnum(signature.Levels)),
+			event.NewParam(params.FileIsDotnet, params.Bool, params.Boolean(true)),
+		),
 	}
 
 	var tests2 = []struct {
@@ -1198,10 +1198,10 @@ func TestLazyPEFilter(t *testing.T) {
 			PID: 2312,
 			Exe: filepath.Join(os.Getenv("windir"), "notepad.exe"),
 		},
-		Params: event.Params{
-			params.FileIsDLL: {Name: params.FileIsDLL, Type: params.Bool, Value: true},
-			params.FilePath:  {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.FileIsDLL, params.Bool, params.Boolean(true)),
+			event.NewParam(params.FilePath, params.String, params.Str("C:\\Windows\\system32\\user32.dll")),
+		),
 	}
 
 	var tests = []struct {
@@ -1237,15 +1237,15 @@ func TestLazyPEFilter(t *testing.T) {
 }
 
 func TestMemFilter(t *testing.T) {
-	pars := event.Params{
-		params.MemRegionSize:  {Name: params.MemRegionSize, Type: params.Uint64, Value: uint64(8192)},
-		params.MemBaseAddress: {Name: params.MemBaseAddress, Type: params.Address, Value: uint64(1311246336000)},
-		params.MemAllocType:   {Name: params.MemAllocType, Type: params.Flags, Value: uint32(0x00001000 | 0x00002000), Flags: event.MemAllocationFlags},
-		params.ProcessID:      {Name: params.ProcessID, Type: params.Uint32, Value: uint32(345)},
-		params.MemProtect:     {Name: params.MemProtect, Type: params.Flags, Value: uint32(0x40), Flags: event.MemProtectionFlags},
-		params.MemProtectMask: {Name: params.MemProtectMask, Type: params.AnsiString, Value: "RWX"},
-		params.MemPageType:    {Name: params.MemPageType, Type: params.Enum, Value: uint32(0x1000000), Enum: processors.MemPageTypes},
-	}
+	pars := event.ParamsOf(
+		event.NewParam(params.MemRegionSize, params.Uint64, params.U64(uint64(8192))),
+		event.NewParam(params.MemBaseAddress, params.Address, params.U64(uint64(1311246336000))),
+		event.NewParam(params.MemAllocType, params.Flags, params.U32(uint32(0x00001000|0x00002000)), event.WithFlags(event.MemAllocationFlags)),
+		event.NewParam(params.ProcessID, params.Uint32, params.U32(uint32(345))),
+		event.NewParam(params.MemProtect, params.Flags, params.U32(uint32(0x40)), event.WithFlags(event.MemProtectionFlags)),
+		event.NewParam(params.MemProtectMask, params.String, params.Str("RWX")),
+		event.NewParam(params.MemPageType, params.Enum, params.U32(uint32(0x1000000)), event.WithEnum(processors.MemPageTypes)),
+	)
 
 	evt := &event.Event{
 		Type:   event.VirtualAlloc,
@@ -1291,13 +1291,13 @@ func TestDNSFilter(t *testing.T) {
 		PS: &pstypes.PS{
 			Name: "cmd.exe",
 		},
-		Params: event.Params{
-			params.DNSName:    {Name: params.DNSName, Type: params.UnicodeString, Value: "r3.o.lencr.org"},
-			params.DNSRR:      {Name: params.DNSRR, Type: params.Enum, Value: uint32(0x0001), Enum: event.DNSRecordTypes},
-			params.DNSOpts:    {Name: params.DNSOpts, Type: params.Flags64, Value: uint64(0x00006000), Flags: event.DNSOptsFlags},
-			params.DNSRcode:   {Name: params.DNSRcode, Type: params.Enum, Value: uint32(0), Enum: event.DNSResponseCodes},
-			params.DNSAnswers: {Name: params.DNSAnswers, Type: params.Slice, Value: []string{"incoming.telemetry.mozilla.org", "a1887.dscq.akamai.net"}},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.DNSName, params.String, params.Str("r3.o.lencr.org")),
+			event.NewParam(params.DNSRR, params.Enum, params.U32(uint32(0x0001)), event.WithEnum(event.DNSRecordTypes)),
+			event.NewParam(params.DNSOpts, params.Flags64, params.U64(uint64(0x00006000)), event.WithFlags(event.DNSOptsFlags)),
+			event.NewParam(params.DNSRcode, params.Enum, params.U32(uint32(0)), event.WithEnum(event.DNSResponseCodes)),
+			event.NewParam(params.DNSAnswers, params.Slice, params.StrSlice([]string{"incoming.telemetry.mozilla.org", "a1887.dscq.akamai.net"})),
+		),
 	}
 
 	var tests = []struct {
@@ -1343,9 +1343,9 @@ func TestInterpolateFields(t *testing.T) {
 						Ppid: 345,
 						SID:  "LOCAL\\tor",
 					},
-					Params: event.Params{
-						params.Cmdline: {Name: params.Cmdline, Type: params.UnicodeString, Value: `VaultCmd.exe /listcreds:Windows Credentials /all`},
-					},
+					Params: event.ParamsOf(
+						event.NewParam(params.Cmdline, params.String, params.Str(`VaultCmd.exe /listcreds:Windows Credentials /all`)),
+					),
 				},
 			},
 		},
@@ -1366,9 +1366,9 @@ func TestInterpolateFields(t *testing.T) {
 				{
 					Type: event.CreateThread,
 					PID:  1023,
-					Params: event.Params{
-						params.StartAddressModule: {Name: params.StartAddressModule, Type: params.UnicodeString, Value: "C:\\Windows\\System32\\vault.dll"},
-					},
+					Params: event.ParamsOf(
+						event.NewParam(params.StartAddressModule, params.String, params.Str("C:\\Windows\\System32\\vault.dll")),
+					),
 				},
 			},
 		},
@@ -1393,9 +1393,9 @@ eo\Temp\lsass.dump</code> dump file to the disk device`,
 				{
 					Type: event.WriteFile,
 					PID:  1023,
-					Params: event.Params{
-						params.FilePath: {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Users\neo\\Temp\\lsass.dump"},
-					},
+					Params: event.ParamsOf(
+						event.NewParam(params.FilePath, params.String, params.Str("C:\\Users\neo\\Temp\\lsass.dump")),
+					),
 					PS: &pstypes.PS{
 						Name: "taskmgr.exe",
 						Ppid: 345,
@@ -1425,9 +1425,9 @@ eo\Temp\lsass.dump</code> dump file to the disk device`,
 				{
 					Type: event.WriteFile,
 					PID:  1023,
-					Params: event.Params{
-						params.FilePath: {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Users\neo\\Temp\\lsass.dump"},
-					},
+					Params: event.ParamsOf(
+						event.NewParam(params.FilePath, params.String, params.Str("C:\\Users\neo\\Temp\\lsass.dump")),
+					),
 					PS: &pstypes.PS{
 						Name: "taskmgr.exe",
 						Ppid: 345,
@@ -1451,12 +1451,12 @@ func BenchmarkFilterRun(b *testing.B) {
 	f := New(`ps.name = 'mimikatz.exe' or ps.name contains 'svc'`, cfg)
 	require.NoError(b, f.Compile())
 
-	pars := event.Params{
-		params.Cmdline:         {Name: params.Cmdline, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\svchost.exe -k RPCSS"},
-		params.ProcessName:     {Name: params.ProcessName, Type: params.AnsiString, Value: "svchost.exe"},
-		params.ProcessID:       {Name: params.ProcessID, Type: params.Uint32, Value: uint32(1234)},
-		params.ProcessParentID: {Name: params.ProcessParentID, Type: params.Uint32, Value: uint32(345)},
-	}
+	pars := event.ParamsOf(
+		event.NewParam(params.Cmdline, params.String, params.Str("C:\\Windows\\system32\\svchost.exe -k RPCSS")),
+		event.NewParam(params.ProcessName, params.String, params.Str("svchost.exe")),
+		event.NewParam(params.ProcessID, params.Uint32, params.U32(uint32(1234))),
+		event.NewParam(params.ProcessParentID, params.Uint32, params.U32(uint32(345))),
+	)
 
 	evt := &event.Event{
 		Type:   event.CreateProcess,

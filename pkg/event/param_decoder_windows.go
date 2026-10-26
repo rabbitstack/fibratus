@@ -20,23 +20,337 @@ package event
 
 import (
 	"encoding/binary"
+	"errors"
+	"fmt"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/rabbitstack/fibratus/pkg/event/params"
-	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/network"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/rabbitstack/fibratus/pkg/util/filetime"
-	"github.com/rabbitstack/fibratus/pkg/util/key"
-	"github.com/rabbitstack/fibratus/pkg/util/signature"
 	"github.com/rabbitstack/fibratus/pkg/util/utf16"
+	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 )
 
+// ErrShortBuffer is reported when a read would go past the end of the
+// event buffer. It is sticky. Once set, every subsequent read is a no-op
+// that returns the zero value, so callers can check Err() once at the end.
+var ErrShortBuffer = errors.New("event buffer too short")
+
+// RecordReader is the set of offset-based primitives the cursor needs.
+type RecordReader interface {
+	ReadByte(off uint16) uint8
+	ReadUint16(off uint16) uint16
+	ReadUint32(off uint16) uint32
+	ReadUint64(off uint16) uint64
+	ReadAnsiString(off uint16) (string, uint16)
+	ReadUTF16String(off uint16) (string, uint16)
+	ReadNTUnicodeString(off uint16) (string, uint16)
+	ReadSID(off uint16, tokenUser bool) ([]byte, uint16)
+	ReadBytes(off uint16, count uint16) []byte
+}
+
+// Cursor tracks the read position inside a raw event buffer and advances
+// it as fields are consumed. It wraps the existing Reader so the offset-based
+// primitives (ReadUint32, ReadUTF16String, and so on) stay the single source
+// of truth for how bytes are interpreted.
+type Cursor struct {
+	r    RecordReader
+	off  uint16
+	size uint16 // total length of the user data buffer
+	err  error
+
+	v6 bool // address family of the current record
+}
+
+// NewCursor returns a cursor positioned at offset 0.
+// size is the length of the event's user data.
+func NewCursor(r RecordReader, size uint16) *Cursor {
+	return &Cursor{r: r, size: size}
+}
+
+// Reset rewinds the cursor and rebinds it to a new reader so a single
+// Cursor can be pooled and reused across events without allocating.
+func (c *Cursor) Reset(r RecordReader, size uint16) {
+	c.r, c.off, c.size, c.err, c.v6 = r, 0, size, nil, false
+}
+
+// Offset returns the current position.
+func (c *Cursor) Offset() uint16 { return c.off }
+
+// Remaining returns how many bytes are left in the buffer.
+func (c *Cursor) Remaining() uint16 { return c.size - c.off }
+
+// Err returns the first error encountered, if any.
+func (c *Cursor) Err() error { return c.err }
+
+// Seek moves the cursor to an absolute offset.
+func (c *Cursor) Seek(off uint16) {
+	if off > c.size {
+		c.fail()
+		return
+	}
+	c.off = off
+}
+
+// need reports whether n more bytes are available, flagging the cursor
+// as failed otherwise.
+func (c *Cursor) need(n uint16) bool {
+	if c.err != nil {
+		return false
+	}
+	if c.off+n > c.size {
+		c.err = ErrShortBuffer
+		return false
+	}
+	return true
+}
+
+func (c *Cursor) fail() {
+	if c.err == nil {
+		c.err = ErrShortBuffer
+	}
+}
+
+// Skip advances over n bytes (reserved fields, padding).
+func (c *Cursor) Skip(n uint16) {
+	if c.need(n) {
+		c.off += n
+	}
+}
+
+// Align advances to the next multiple of n (n must be a power of two).
+func (c *Cursor) Align(n uint16) {
+	if n <= 1 {
+		return
+	}
+	c.Skip((n - c.off&(n-1)) & (n - 1))
+}
+
+func (c *Cursor) U8() uint8 {
+	if !c.need(1) {
+		return 0
+	}
+	v := c.r.ReadByte(c.off)
+	c.off++
+	return v
+}
+
+func (c *Cursor) U16() uint16 {
+	if !c.need(2) {
+		return 0
+	}
+	v := c.r.ReadUint16(c.off)
+	c.off += 2
+	return v
+}
+
+func (c *Cursor) U32() uint32 {
+	if !c.need(4) {
+		return 0
+	}
+	v := c.r.ReadUint32(c.off)
+	c.off += 4
+	return v
+}
+
+func (c *Cursor) U64() uint64 {
+	if !c.need(8) {
+		return 0
+	}
+	v := c.r.ReadUint64(c.off)
+	c.off += 8
+	return v
+}
+
+// Ansi reads a NUL-terminated ANSI string.
+func (c *Cursor) Ansi() string {
+	if !c.need(1) {
+		return ""
+	}
+	s, next := c.r.ReadAnsiString(c.off)
+	return c.advanceTo(next, s)
+}
+
+// UTF16 reads a NUL-terminated UTF-16 string.
+func (c *Cursor) UTF16() string {
+	if !c.need(2) {
+		return ""
+	}
+	s, next := c.r.ReadUTF16String(c.off)
+	return c.advanceTo(next, s)
+}
+
+// NTUnicode reads a UTF-16 string for NT native APIs.
+func (c *Cursor) NTUnicode() string {
+	if !c.need(2) {
+		return ""
+	}
+	s, next := c.r.ReadNTUnicodeString(c.off)
+	return c.advanceTo(next, s)
+}
+
+// SID reads a variable length SID (TOKEN_USER prefixed when tokenUser is true).
+func (c *Cursor) SID(tokenUser bool) []byte {
+	if !c.need(1) {
+		return nil
+	}
+	sid, next := c.r.ReadSID(c.off, tokenUser)
+	if next < c.off || next > c.size {
+		c.fail()
+		return nil
+	}
+	c.off = next
+	return sid
+}
+
+// Bytes reads the next n bytes. The result is a copy, so it stays valid
+// after the callback returns.
+func (c *Cursor) Bytes(n uint16) []byte {
+	if !c.need(n) {
+		return nil
+	}
+	b := make([]byte, n)
+	copy(b, c.r.ReadBytes(c.off, n))
+	c.off += n
+	return b
+}
+
+// BytesU16 reads a uint16 length followed by that many bytes.
+// The result is a copy, so it is safe to keep after the callback returns.
+func (c *Cursor) BytesU16() []byte {
+	n := c.U16()
+	if c.err != nil || n == 0 {
+		return nil
+	}
+	return c.Bytes(n)
+}
+
+func (c *Cursor) advanceTo(next uint16, s string) string {
+	if next < c.off || next > c.size {
+		c.fail()
+		return ""
+	}
+	c.off = next
+	return s
+}
+
+// Release drops the reference to the record so a pooled cursor does not
+// keep the event buffer alive.
+func (c *Cursor) Release() {
+	c.r, c.off, c.size, c.err = nil, 0, 0, nil
+}
+
 // ParamDecoder parses parameters from the event buffer.
-type ParamDecoder struct{}
+type ParamDecoder struct {
+	cur Cursor
+}
+
+var decoderPool = sync.Pool{
+	New: func() any { return new(ParamDecoder) },
+}
+
+// AcquireDecoder borrows a decoder from the pool.
+func AcquireDecoder() *ParamDecoder {
+	return decoderPool.Get().(*ParamDecoder)
+}
+
+// Release resets the cursor state.
+func (d *ParamDecoder) Release() { d.cur.Release() }
+
+// ReleaseDecoder returns a decoder to the pool. The decoder must not be
+// used afterwards.
+func ReleaseDecoder(d *ParamDecoder) {
+	d.Release()
+	decoderPool.Put(d)
+}
+
+// Decode reads the event parameter schema and drives the encoding
+// with the cursor-based buffer position tracking.
+func (d *ParamDecoder) Decode(r *etw.EventRecord, e *Event) error {
+	if e.Type == Unknown || int(e.Type) >= len(table) {
+		return errors.New("invalid event type")
+	}
+
+	info := table[e.Type]
+	if len(info.Params) == 0 {
+		return fmt.Errorf("parameters schema not defined for event type %s", e.Type)
+	}
+
+	d.cur.Reset(r, r.BufferLen)
+	d.cur.v6 = isIPv6(r.Header.EventDescriptor.Opcode)
+
+	for i, p := range info.Params {
+		switch p.WireFormat {
+		case params.WireNone:
+			if p.FromRecord != nil {
+				e.Params.Set(i, p.FromRecord(r))
+			}
+			continue
+		case params.WireSkip:
+			d.cur.Skip(p.Size)
+		case params.WireU8:
+			e.Params.Set(i, params.U32(uint32(d.cur.U8())))
+		case params.WireU16:
+			e.Params.Set(i, params.U32(uint32(d.cur.U16())))
+		case params.WireU32:
+			n := d.cur.U32()
+			if p.BitField != nil {
+				n = p.BitField.Extract(n)
+			}
+			e.Params.Set(i, params.U32(n))
+		case params.WireU64:
+			e.Params.Set(i, params.U64(d.cur.U64()))
+		case params.WireU32Bool:
+			e.Params.Set(i, params.Boolean(d.cur.U32() > 0))
+		case params.WireAnsi:
+			e.Params.Set(i, params.Str(d.cur.Ansi()))
+		case params.WireUTF16:
+			e.Params.Set(i, params.Str(d.cur.UTF16()))
+		case params.WireNTUnicode:
+			e.Params.Set(i, params.Str(d.cur.NTUnicode()))
+		case params.WireSID, params.WireWbemSID:
+			e.Params.Set(i, params.Bin(d.cur.SID(p.WireFormat == params.WireWbemSID)))
+		case params.WireBytes:
+			e.Params.Set(i, params.Bin(d.cur.Bytes(p.Size)))
+		case params.WireBytesU16:
+			buf := d.cur.BytesU16()
+			e.SetParam(p.Name, params.Bin(buf))
+			if p.Interpret == nil || p.Into == "" {
+				break
+			}
+			v := p.Interpret(e.GetParamAsUint32(p.Selector), buf)
+			e.SetParam(p.Into, v)
+		case params.WireIP:
+			if d.cur.v6 {
+				e.Params.Set(i, params.IP6(d.cur.Bytes(16)))
+				break
+			}
+			e.Params.Set(i, params.IPv4LE(d.cur.U32()))
+		case params.WirePort:
+			e.Params.Set(i, params.U16(windows.Ntohs(d.cur.U16())))
+		case params.WireFileTime:
+			ft := windows.NsecToFiletime(int64(d.cur.U64()))
+			e.Params.Set(i, params.Timestamp(filetime.ToEpoch(uint64(ft.Nanoseconds()))))
+		case params.WireAddrs:
+			addrs := r.ReadCallstackInto(d.cur.off, va.GetCallstack())
+			e.Params.Set(i, params.Addresses(addrs))
+		}
+		if d.cur.Err() != nil {
+			return d.cur.Err()
+		}
+	}
+	return nil
+}
+
+func isIPv6(opcode uint8) bool {
+	return opcode == AcceptTCPv6ID || opcode == ConnectTCPv6ID || opcode == ReconnectTCPv6ID || opcode == RetransmitTCPv6ID ||
+		opcode == DisconnectTCPv6ID || opcode == SendV6ID || opcode == RecvV6ID
+}
 
 // DecodeRegistry parses registry events such as key creation,
 // key/value access, or value mutation.
@@ -53,10 +367,10 @@ func (d *ParamDecoder) DecodeRegistry(r *etw.EventRecord, e *Event) {
 	//	} WMI_REGISTRY, *PWMI_REGISTRY;
 
 	// skip InitialTime (uint64)
-	e.AppendParam(params.NTStatus, params.Status, r.ReadUint32(8))
+	e.SetParam(params.NTStatus, params.U32(r.ReadUint32(8)))
 	// skip Index/InfoClass (uint32)
-	e.AppendParam(params.RegKCB, params.Address, r.ReadUint64(16))
-	e.AppendParam(params.RegPath, params.Key, r.ConsumeUTF16String(24))
+	e.SetParam(params.RegKCB, params.U64(r.ReadUint64(16)))
+	e.SetParam(params.RegPath, params.Str(r.ConsumeUTF16String(24)))
 }
 
 // DecodeRegSetValueInternal decodes the payload for the registry set value
@@ -94,10 +408,10 @@ func (d *ParamDecoder) DecodeRegSetValueInternal(r *etw.EventRecord, e *Event) {
 	b := make([]byte, capturedSize)
 	copy(b, capturedData)
 
-	e.AppendParam(params.RegKeyHandle, params.Address, r.ReadUint64(0))
-	e.AppendParam(params.NTStatus, params.Status, r.ReadUint32(8))
-	e.AppendParam(params.RegPath, params.Key, filepath.Join(keyName, valueName))
-	e.AppendEnum(params.RegValueType, valueType, key.RegistryValueTypes)
+	e.SetParam(params.RegKeyHandle, params.U64(r.ReadUint64(0)))
+	e.SetParam(params.NTStatus, params.U32(r.ReadUint32(8)))
+	e.SetParam(params.RegPath, params.Str(filepath.Join(keyName, valueName)))
+	e.SetParam(params.RegValueType, params.U32(valueType))
 
 	if len(b) == 0 {
 		return
@@ -106,9 +420,9 @@ func (d *ParamDecoder) DecodeRegSetValueInternal(r *etw.EventRecord, e *Event) {
 	// populate value data depending on its type
 	switch valueType {
 	case registry.SZ, registry.MULTI_SZ, registry.EXPAND_SZ:
-		e.AppendParam(params.RegData, params.UnicodeString, utf16.BytesToString(b, binary.LittleEndian))
+		e.SetParam(params.RegData, params.Str(utf16.BytesToString(b, binary.LittleEndian)))
 	case registry.BINARY:
-		e.AppendParam(params.RegData, params.Binary, b)
+		e.SetParam(params.RegData, params.Bin(b))
 	case registry.DWORD:
 		var v uint32
 		switch len(b) {
@@ -119,7 +433,7 @@ func (d *ParamDecoder) DecodeRegSetValueInternal(r *etw.EventRecord, e *Event) {
 		case 1:
 			v = uint32(b[0])
 		}
-		e.AppendParam(params.RegData, params.Uint32, v)
+		e.SetParam(params.RegData, params.U32(v))
 	case registry.DWORD_BIG_ENDIAN:
 		var v uint32
 		switch len(b) {
@@ -130,7 +444,7 @@ func (d *ParamDecoder) DecodeRegSetValueInternal(r *etw.EventRecord, e *Event) {
 		case 1:
 			v = uint32(b[0])
 		}
-		e.AppendParam(params.RegData, params.Uint32, v)
+		e.SetParam(params.RegData, params.U32(v))
 	case registry.QWORD:
 		var v uint64
 		switch len(b) {
@@ -143,7 +457,7 @@ func (d *ParamDecoder) DecodeRegSetValueInternal(r *etw.EventRecord, e *Event) {
 		case 1:
 			v = uint64(b[0])
 		}
-		e.AppendParam(params.RegData, params.Uint64, v)
+		e.SetParam(params.RegData, params.U64(v))
 	}
 }
 
@@ -161,36 +475,36 @@ func (d *ParamDecoder) DecodeFile(r *etw.EventRecord, e *Event) {
 		//     ULONG ShareAccess;
 		//     WCHAR OpenPath[1];
 		// } PERFINFO_FILE_CREATE, *PPERFINFO_FILE_CREATE;
-		e.AppendParam(params.FileIrpPtr, params.Address, r.ReadUint64(0))
-		e.AppendParam(params.FileObject, params.Address, r.ReadUint64(8))
-		e.AppendParam(params.ThreadID, params.TID, r.ReadUint32(16))
-		e.AppendParam(params.FileCreateOptions, params.Flags, r.ReadUint32(20), WithFlags(FileCreateOptionsFlags))
-		e.AppendParam(params.FileAttributes, params.Flags, r.ReadUint32(24), WithFlags(FileAttributeFlags))
-		e.AppendParam(params.FileShareMask, params.Flags, r.ReadUint32(28), WithFlags(FileShareModeFlags))
-		e.AppendParam(params.FilePath, params.DOSPath, r.ConsumeUTF16String(32))
+		e.SetParam(params.FileIrpPtr, params.U64(r.ReadUint64(0)))
+		e.SetParam(params.FileObject, params.U64(r.ReadUint64(8)))
+		e.SetParam(params.ThreadID, params.U32(r.ReadUint32(16)))
+		e.SetParam(params.FileCreateOptions, params.U32(r.ReadUint32(20)))
+		e.SetParam(params.FileAttributes, params.U32(r.ReadUint32(24)))
+		e.SetParam(params.FileShareMask, params.U32(r.ReadUint32(28)))
+		e.SetParam(params.FilePath, params.Str(r.ConsumeUTF16String(32)))
 
 		// read create disposition, status, and callstack from extended data items
 		disposition, status := r.ReadEventHeaderFileExtendedDataItems()
-		e.AppendParam(params.NTStatus, params.Status, status)
-		e.AppendEnum(params.FileOperation, disposition, fs.FileCreateDispositions)
-		e.AppendParam(params.Callstack, params.Slice, r.ReadEventHeaderFileExtendedDataItemsCallstack())
+		e.SetParam(params.NTStatus, params.U32(status))
+		e.SetParam(params.FileOperation, params.U32(disposition))
+		//e.SetParam(params.Callstack, Addresses(r.ReadEventHeaderFileExtendedDataItemsCallstack()))
 	case FileOpEnd:
 		// typedef struct _PERFINFO_FILE_OPERATION_END {
 		//     ULONG_PTR Irp;
 		//     ULONG_PTR ExtraInformation;
 		//     NTSTATUS Status;
 		// } PERFINFO_FILE_OPERATION_END, *PPERFINFO_FILE_OPERATION_END;
-		e.AppendParam(params.FileIrpPtr, params.Address, r.ReadUint64(0))
-		e.AppendParam(params.FileExtraInfo, params.Address, r.ReadUint64(8))
-		e.AppendParam(params.NTStatus, params.Status, r.ReadUint32(16))
+		e.SetParam(params.FileIrpPtr, params.U64(r.ReadUint64(0)))
+		e.SetParam(params.FileExtraInfo, params.U64(r.ReadUint64(8)))
+		e.SetParam(params.NTStatus, params.U32(r.ReadUint32(16)))
 	case MapViewOfSection, UnmapViewOfSection, MapViewSectionRundown:
-		e.AppendParam(params.FileViewBase, params.Address, r.ReadUint64(0))
-		e.AppendParam(params.FileKey, params.Address, r.ReadUint64(8))
-		e.AppendParam(params.MemProtect, params.Flags, uint32(r.ReadUint64(16)>>32), WithFlags(ViewProtectionFlags))
-		e.AppendParam(params.FileViewSectionType, params.Enum, uint32(r.ReadUint64(16)>>52), WithEnum(ViewSectionTypes))
-		e.AppendParam(params.FileViewSize, params.Uint64, r.ReadUint64(24))
-		e.AppendParam(params.FileOffset, params.Uint64, r.ReadUint64(32))
-		e.AppendParam(params.ProcessID, params.PID, r.ReadUint32(40))
+		e.SetParam(params.FileViewBase, params.U64(r.ReadUint64(0)))
+		e.SetParam(params.FileKey, params.U64(r.ReadUint64(8)))
+		e.SetParam(params.MemProtect, params.U32(uint32(r.ReadUint64(16)>>32)))
+		e.SetParam(params.FileViewSectionType, params.U32(uint32(r.ReadUint64(16)>>52)))
+		e.SetParam(params.FileViewSize, params.U64(r.ReadUint64(24)))
+		e.SetParam(params.FileOffset, params.U64(r.ReadUint64(32)))
+		e.SetParam(params.ProcessID, params.U32(r.ReadUint32(40)))
 	case SetFileInformation, DeleteFile, RenameFile:
 		// DeleteFile, RenameFile, and SetFileInformation share the same layout
 		// typedef struct _PERFINFO_FILE_INFORMATION {
@@ -201,12 +515,12 @@ func (d *ParamDecoder) DecodeFile(r *etw.EventRecord, e *Event) {
 		//     ULONG IssuingThreadId;
 		//     ULONG InfoClass;
 		// } PERFINFO_FILE_INFORMATION, *PPERFINFO_FILE_INFORMATION;
-		e.AppendParam(params.FileIrpPtr, params.Address, r.ReadUint64(0))
-		e.AppendParam(params.FileObject, params.Address, r.ReadUint64(8))
-		e.AppendParam(params.FileKey, params.Address, r.ReadUint64(16))
-		e.AppendParam(params.FileExtraInfo, params.Uint64, r.ReadUint64(24))
-		e.AppendParam(params.ThreadID, params.TID, r.ReadUint32(32))
-		e.AppendParam(params.FileInfoClass, params.Enum, r.ReadUint32(36), WithEnum(fs.FileInfoClasses))
+		e.SetParam(params.FileIrpPtr, params.U64(r.ReadUint64(0)))
+		e.SetParam(params.FileObject, params.U64(r.ReadUint64(8)))
+		e.SetParam(params.FileKey, params.U64(r.ReadUint64(16)))
+		e.SetParam(params.FileExtraInfo, params.U64(r.ReadUint64(24)))
+		e.SetParam(params.ThreadID, params.U32(r.ReadUint32(32)))
+		e.SetParam(params.FileInfoClass, params.U32(r.ReadUint32(36)))
 	case ReleaseFile, CloseFile:
 		// typedef struct _PERFINFO_FILE_SIMPLE_OPERATION {
 		//     ULONG_PTR Irp;
@@ -214,10 +528,10 @@ func (d *ParamDecoder) DecodeFile(r *etw.EventRecord, e *Event) {
 		//     ULONG_PTR FileKey;
 		//     ULONG IssuingThreadId;
 		// } PERFINFO_FILE_SIMPLE_OPERATION, *PPERFINFO_FILE_SIMPLE_OPERATION;
-		e.AppendParam(params.FileIrpPtr, params.Address, r.ReadUint64(0))
-		e.AppendParam(params.FileObject, params.Address, r.ReadUint64(8))
-		e.AppendParam(params.FileKey, params.Address, r.ReadUint64(16))
-		e.AppendParam(params.ThreadID, params.TID, r.ReadUint32(24))
+		e.SetParam(params.FileIrpPtr, params.U64(r.ReadUint64(0)))
+		e.SetParam(params.FileObject, params.U64(r.ReadUint64(8)))
+		e.SetParam(params.FileKey, params.U64(r.ReadUint64(16)))
+		e.SetParam(params.ThreadID, params.U32(r.ReadUint32(24)))
 	case ReadFile, WriteFile:
 		// typedef struct _PERFINFO_FILE_READ_WRITE {
 		//     ULONGLONG Offset;
@@ -229,12 +543,12 @@ func (d *ParamDecoder) DecodeFile(r *etw.EventRecord, e *Event) {
 		//     ULONG Flags;
 		//     ULONG ExtraFlags;
 		// } PERFINFO_FILE_READ_WRITE, *PPERFINFO_FILE_READ_WRITE;
-		e.AppendParam(params.FileOffset, params.Uint64, r.ReadUint64(0))
-		e.AppendParam(params.FileIrpPtr, params.Address, r.ReadUint64(8))
-		e.AppendParam(params.FileObject, params.Address, r.ReadUint64(16))
-		e.AppendParam(params.FileKey, params.Address, r.ReadUint64(24))
-		e.AppendParam(params.ThreadID, params.TID, r.ReadUint32(32))
-		e.AppendParam(params.FileIoSize, params.Uint32, r.ReadUint32(34))
+		e.SetParam(params.FileOffset, params.U64(r.ReadUint64(0)))
+		e.SetParam(params.FileIrpPtr, params.U64(r.ReadUint64(8)))
+		e.SetParam(params.FileObject, params.U64(r.ReadUint64(16)))
+		e.SetParam(params.FileKey, params.U64(r.ReadUint64(24)))
+		e.SetParam(params.ThreadID, params.U32(r.ReadUint32(32)))
+		e.SetParam(params.FileIoSize, params.U32(r.ReadUint32(36)))
 	case EnumDirectory:
 		// typedef struct _PERFINFO_FILE_DIRENUM {
 		//     ULONG_PTR Irp;
@@ -246,17 +560,17 @@ func (d *ParamDecoder) DecodeFile(r *etw.EventRecord, e *Event) {
 		//     ULONG FileIndex;
 		//     WCHAR FileName[1];
 		// } PERFINFO_FILE_DIRENUM, *PPERFINFO_FILE_DIRENUM;
-		e.AppendParam(params.FileIrpPtr, params.Address, r.ReadUint64(0))
-		e.AppendParam(params.FileObject, params.Address, r.ReadUint64(8))
-		e.AppendParam(params.FileKey, params.Address, r.ReadUint64(16))
-		e.AppendParam(params.ThreadID, params.TID, r.ReadUint32(24))
+		e.SetParam(params.FileIrpPtr, params.U64(r.ReadUint64(0)))
+		e.SetParam(params.FileObject, params.U64(r.ReadUint64(8)))
+		e.SetParam(params.FileKey, params.U64(r.ReadUint64(16)))
+		e.SetParam(params.ThreadID, params.U32(r.ReadUint32(24)))
 		// skip Length (uint32)
-		e.AppendParam(params.FileInfoClass, params.Enum, r.ReadUint32(32), WithEnum(fs.FileInfoClasses))
+		e.SetParam(params.FileInfoClass, params.U32(r.ReadUint32(32)))
 		// skip FileIndex (uint32)
-		e.AppendParam(params.FilePath, params.UnicodeString, r.ConsumeUTF16String(40))
+		e.SetParam(params.FilePath, params.Str(r.ConsumeUTF16String(40)))
 	case FileRundown:
-		e.AppendParam(params.FileObject, params.Address, r.ReadUint64(0))
-		e.AppendParam(params.FilePath, params.DOSPath, r.ConsumeUTF16String(8))
+		e.SetParam(params.FileObject, params.U64(r.ReadUint64(0)))
+		e.SetParam(params.FilePath, params.Str(r.ConsumeUTF16String(8)))
 	}
 }
 
@@ -282,17 +596,17 @@ func (d *ParamDecoder) DecodeProcess(r *etw.EventRecord, e *Event) {
 	name, noffset := r.ReadAnsiString(soffset)
 	cmdline, _ := r.ReadUTF16String(noffset)
 
-	e.AppendParam(params.ProcessObject, params.Address, r.ReadUint64(0))
-	e.AppendParam(params.ProcessID, params.PID, r.ReadUint32(8))
-	e.AppendParam(params.ProcessParentID, params.PID, r.ReadUint32(12))
-	e.AppendParam(params.SessionID, params.Uint32, r.ReadUint32(16))
-	e.AppendParam(params.ExitStatus, params.Status, r.ReadUint32(20))
-	e.AppendParam(params.DTB, params.Address, r.ReadUint64(24))
-	e.AppendParam(params.ProcessFlags, params.Flags, r.ReadUint32(32), WithFlags(PsCreationFlags))
-	e.AppendParam(params.UserSID, params.WbemSID, sid)
-	e.AppendParam(params.ProcessName, params.AnsiString, name)
-	e.AppendParam(params.Cmdline, params.UnicodeString, cmdline)
-	e.AppendParam(params.ProcessRealParentID, params.PID, r.Header.ProcessID)
+	e.SetParam(params.ProcessObject, params.U64(r.ReadUint64(0)))
+	e.SetParam(params.ProcessID, params.U32(r.ReadUint32(8)))
+	e.SetParam(params.ProcessParentID, params.U32(r.ReadUint32(12)))
+	e.SetParam(params.SessionID, params.U32(r.ReadUint32(16)))
+	e.SetParam(params.ExitStatus, params.U32(r.ReadUint32(20)))
+	e.SetParam(params.DTB, params.U64(r.ReadUint64(24)))
+	e.SetParam(params.ProcessFlags, params.U32(r.ReadUint32(32)))
+	e.SetParam(params.UserSID, params.Bin(sid))
+	e.SetParam(params.ProcessName, params.Str(name))
+	e.SetParam(params.Cmdline, params.Str(cmdline))
+	e.SetParam(params.ProcessRealParentID, params.U32(r.Header.ProcessID))
 }
 
 // DecodeProcessInternal decodes process creation/rundown event payloads
@@ -317,24 +631,24 @@ func (d *ParamDecoder) DecodeProcessInternal(r *etw.EventRecord, e *Event) {
 	//    <data name="PackageRelativeAppId" inType="win:UnicodeString" />
 	//    <data name="SecurityMitigations" inType="win:UInt32" />
 	// </template>
-	e.AppendParam(params.ProcessID, params.PID, r.ReadUint32(0))
-	e.AppendParam(params.ProcessObject, params.Address, r.ReadUint64(4))
+	e.SetParam(params.ProcessID, params.U32(r.ReadUint32(0)))
+	e.SetParam(params.ProcessObject, params.U64(r.ReadUint64(4)))
 
 	createTime := windows.NsecToFiletime(int64(r.ReadUint64(12)))
-	e.AppendParam(params.StartTime, params.Time, filetime.ToEpoch(uint64(createTime.Nanoseconds())))
+	e.SetParam(params.StartTime, params.Timestamp(filetime.ToEpoch(uint64(createTime.Nanoseconds()))))
 
-	e.AppendParam(params.ProcessParentID, params.PID, r.ReadUint32(20))
+	e.SetParam(params.ProcessParentID, params.U32(r.ReadUint32(20)))
 	// skip ParentProcessSequenceNumber (uint64)
-	e.AppendParam(params.SessionID, params.Uint32, r.ReadUint32(32))
-	e.AppendParam(params.ProcessFlags, params.Flags, r.ReadUint32(36), WithFlags(PsCreationFlags))
-	e.AppendParam(params.ProcessTokenElevationType, params.Enum, r.ReadUint32(40), WithEnum(PsTokenElevationTypes))
-	e.AppendParam(params.ProcessTokenIsElevated, params.Bool, r.ReadUint32(44) > 0)
+	e.SetParam(params.SessionID, params.U32(r.ReadUint32(32)))
+	e.SetParam(params.ProcessFlags, params.U32(r.ReadUint32(36)))
+	e.SetParam(params.ProcessTokenElevationType, params.U32(r.ReadUint32(40)))
+	e.SetParam(params.ProcessTokenIsElevated, params.Boolean(r.ReadUint32(44) > 0))
 
 	tokenMandatoryLabel, _ := r.ReadSID(48, false) // integrity level SID size is 12 bytes
-	e.AppendParam(params.ProcessTokenIntegrityLevel, params.SID, tokenMandatoryLabel)
+	e.SetParam(params.ProcessTokenIntegrityLevel, params.Bin(tokenMandatoryLabel))
 
 	exe, _ := r.ReadNTUnicodeString(60)
-	e.AppendParam(params.Exe, params.DOSPath, exe)
+	e.SetParam(params.Exe, params.Str(exe))
 }
 
 // DecodeModule decodes module load/unload/rundown event payloads.
@@ -355,18 +669,18 @@ func (d *ParamDecoder) DecodeModule(r *etw.EventRecord, e *Event) {
 	//     ULONG Reserved4;
 	//     WCHAR FileName[1];
 	// } WMI_IMAGELOAD_INFORMATION64, *PWMI_IMAGELOAD_INFORMATION64;
-	e.AppendParam(params.ModuleBase, params.Address, r.ReadUint64(0))
-	e.AppendParam(params.ModuleSize, params.Uint64, r.ReadUint64(8))
-	e.AppendParam(params.ProcessID, params.PID, r.ReadUint32(16))
-	e.AppendParam(params.ModuleCheckSum, params.Uint32, r.ReadUint32(20))
-	e.AppendParam(params.ModuleTimeDateStamp, params.Uint32, r.ReadUint32(24))
-	e.AppendParam(params.ModuleSignatureLevel, params.Enum, uint32(r.ReadByte(28)), WithEnum(signature.Levels))
-	e.AppendParam(params.ModuleSignatureType, params.Enum, uint32(r.ReadByte(29)), WithEnum(signature.Types))
+	e.SetParam(params.ModuleBase, params.U64(r.ReadUint64(0)))
+	e.SetParam(params.ModuleSize, params.U64(r.ReadUint64(8)))
+	e.SetParam(params.ProcessID, params.U32(r.ReadUint32(16)))
+	e.SetParam(params.ModuleCheckSum, params.U32(r.ReadUint32(20)))
+	e.SetParam(params.ModuleTimeDateStamp, params.U32(r.ReadUint32(24)))
+	e.SetParam(params.ModuleSignatureLevel, params.U32(uint32(r.ReadByte(28))))
+	e.SetParam(params.ModuleSignatureType, params.U32(uint32(r.ReadByte(29))))
 	// skip Reserved0 (uint8)
-	e.AppendParam(params.ModuleDefaultBase, params.Address, r.ReadUint64(32))
+	e.SetParam(params.ModuleDefaultBase, params.U64(r.ReadUint64(32)))
 	// skip Reserved1-Reserved4 (uint32 * 4)
 	const offset = 56
-	e.AppendParam(params.ModulePath, params.DOSPath, r.ConsumeUTF16String(offset))
+	e.SetParam(params.ModulePath, params.Str(r.ConsumeUTF16String(offset)))
 }
 
 // DecodeModuleInternal decodes module load event payload for internal events
@@ -383,21 +697,13 @@ func (d *ParamDecoder) DecodeModuleInternal(r *etw.EventRecord, e *Event) {
 	//    <data name="DefaultBase" inType="win:Pointer" />
 	//    <data name="ImageName" inType="win:UnicodeString" />
 	// </template>
-	e.AppendParam(params.ModuleBase, params.Address, r.ReadUint64(0))
-	e.AppendParam(params.ModuleSize, params.Uint64, r.ReadUint64(8))
-	e.AppendParam(params.ProcessID, params.PID, r.ReadUint32(16))
-	e.AppendParam(params.ModuleCheckSum, params.Uint32, r.ReadUint32(20))
+	e.SetParam(params.ModuleBase, params.U64(r.ReadUint64(0)))
+	e.SetParam(params.ModuleSize, params.U64(r.ReadUint64(8)))
+	e.SetParam(params.ProcessID, params.U32(r.ReadUint32(16)))
+	e.SetParam(params.ModuleCheckSum, params.U32(r.ReadUint32(20)))
 	// skip TimeDateStamp (uint32)
-	e.AppendParam(params.ModuleDefaultBase, params.Address, r.ReadUint64(28))
-	e.AppendParam(params.ModulePath, params.DOSPath, r.ConsumeUTF16String(36))
-}
-
-// DecodeOpenProcess parses the event payload for OpenProcess events.
-func (d *ParamDecoder) DecodeOpenProcess(r *etw.EventRecord, e *Event) {
-	e.AppendParam(params.ProcessID, params.PID, r.ReadUint32(0))
-	e.AppendParam(params.DesiredAccess, params.Flags, r.ReadUint32(4), WithFlags(PsAccessRightFlags))
-	e.AppendParam(params.NTStatus, params.Status, r.ReadUint32(8))
-	e.AppendParam(params.Callstack, params.Slice, r.Callstack())
+	e.SetParam(params.ModuleDefaultBase, params.U64(r.ReadUint64(28)))
+	e.SetParam(params.ModulePath, params.Str(r.ConsumeUTF16String(36)))
 }
 
 // DecodeThread decodes the event payload for thread creation/termination
@@ -422,45 +728,45 @@ func (d *ParamDecoder) DecodeThread(r *etw.EventRecord, e *Event) {
 	//     UCHAR IoPriority;
 	//     UCHAR Flags;
 	// } WMI_EXTENDED_THREAD_INFORMATION64, *PWMI_EXTENDED_THREAD_INFORMATION64;
-	e.AppendParam(params.ProcessID, params.PID, r.ReadUint32(0))
-	e.AppendParam(params.ThreadID, params.TID, r.ReadUint32(4))
-	e.AppendParam(params.KstackBase, params.Address, r.ReadUint64(8))
-	e.AppendParam(params.KstackLimit, params.Address, r.ReadUint64(16))
-	e.AppendParam(params.UstackBase, params.Address, r.ReadUint64(24))
-	e.AppendParam(params.UstackLimit, params.Address, r.ReadUint64(32))
+	e.SetParam(params.ProcessID, params.U32(r.ReadUint32(0)))
+	e.SetParam(params.ThreadID, params.U32(r.ReadUint32(4)))
+	e.SetParam(params.KstackBase, params.U64(r.ReadUint64(8)))
+	e.SetParam(params.KstackLimit, params.U64(r.ReadUint64(16)))
+	e.SetParam(params.UstackBase, params.U64(r.ReadUint64(24)))
+	e.SetParam(params.UstackLimit, params.U64(r.ReadUint64(32)))
 	// skip StartAddr64 (uint64)
-	e.AppendParam(params.StartAddress, params.Address, r.ReadUint64(48))
-	e.AppendParam(params.TEB, params.Address, r.ReadUint64(56))
+	e.SetParam(params.StartAddress, params.U64(r.ReadUint64(48)))
+	e.SetParam(params.TEB, params.U64(r.ReadUint64(56)))
 	// skip SubProcessTag (uint32)
-	e.AppendParam(params.BasePrio, params.Uint8, r.ReadByte(68))
-	e.AppendParam(params.PagePrio, params.Uint8, r.ReadByte(69))
-	e.AppendParam(params.IOPrio, params.Uint8, r.ReadByte(70))
+	e.SetParam(params.BasePrio, params.U8(r.ReadByte(68)))
+	e.SetParam(params.PagePrio, params.U8(r.ReadByte(69)))
+	e.SetParam(params.IOPrio, params.U8(r.ReadByte(70)))
 }
 
 // DecodeOpenThread decodes the payload for the OpenThread event.
 func (d *ParamDecoder) DecodeOpenThread(r *etw.EventRecord, e *Event) {
-	e.AppendParam(params.ProcessID, params.PID, r.ReadUint32(0))
-	e.AppendParam(params.ThreadID, params.TID, r.ReadUint32(4))
-	e.AppendParam(params.DesiredAccess, params.Flags, r.ReadUint32(8), WithFlags(ThreadAccessRightFlags))
-	e.AppendParam(params.NTStatus, params.Status, r.ReadUint32(12))
-	e.AppendParam(params.Callstack, params.Slice, r.Callstack())
+	e.SetParam(params.ProcessID, params.U32(r.ReadUint32(0)))
+	e.SetParam(params.ThreadID, params.U32(r.ReadUint32(4)))
+	e.SetParam(params.DesiredAccess, params.U32(r.ReadUint32(8)))
+	e.SetParam(params.NTStatus, params.U32(r.ReadUint32(12)))
+	//e.SetParam(params.Callstack, Addresses(r.Callstack()))
 }
 
 // DecodeSetThreadContext decodes the payload for the SetThreadContext event.
 func (d *ParamDecoder) DecodeSetThreadContext(r *etw.EventRecord, e *Event) {
-	e.AppendParam(params.NTStatus, params.Status, r.ReadUint32(0))
-	e.AppendParam(params.Callstack, params.Slice, r.Callstack())
+	e.SetParam(params.NTStatus, params.U32(r.ReadUint32(0)))
+	//e.SetParam(params.Callstack, Addresses(r.Callstack()))
 }
 
 // DecodeCreateSymbolicLinkObject decodes the payload for the CreateSymbolicLinkObject event.
 func (d *ParamDecoder) DecodeCreateSymbolicLinkObject(r *etw.EventRecord, e *Event) {
 	source, offset := r.ReadUTF16String(0)
 	target, offset := r.ReadUTF16String(offset)
-	e.AppendParam(params.LinkSource, params.UnicodeString, source)
-	e.AppendParam(params.LinkTarget, params.UnicodeString, target)
-	e.AppendParam(params.DesiredAccess, params.Flags, r.ReadUint32(offset), WithFlags(AccessMaskFlags))
-	e.AppendParam(params.NTStatus, params.Status, r.ReadUint32(offset+4))
-	e.AppendParam(params.Callstack, params.Slice, r.Callstack())
+	e.SetParam(params.LinkSource, params.Str(source))
+	e.SetParam(params.LinkTarget, params.Str(target))
+	e.SetParam(params.DesiredAccess, params.U32(r.ReadUint32(offset)))
+	e.SetParam(params.NTStatus, params.U32(r.ReadUint32(offset+4)))
+	//e.SetParam(params.Callstack, Addresses(r.Callstack()))
 }
 
 // DecodeStackwalk decodes stackwalk event parameters including frame return addresses.
@@ -471,10 +777,10 @@ func (d *ParamDecoder) DecodeStackwalk(r *etw.EventRecord, e *Event) {
 	//         ULONG       ThreadId;
 	//         PVOID       Addresses[1]; // Address of captured Stack address
 	// } STACK_WALK_EVENT_DATA, *PSTACK_WALK_EVENT_DATA;
-	e.AppendParam(params.CallstackTimestamp, params.Uint64, r.ReadUint64(0))
-	e.AppendParam(params.ProcessID, params.PID, r.ReadUint32(8))
-	e.AppendParam(params.ThreadID, params.TID, r.ReadUint32(12))
-	e.AppendParam(params.Callstack, params.Slice, r.ReadCallstack(16))
+	e.SetParam(params.CallstackTimestamp, params.U64(r.ReadUint64(0)))
+	e.SetParam(params.ProcessID, params.U32(r.ReadUint32(8)))
+	e.SetParam(params.ThreadID, params.U32(r.ReadUint32(12)))
+	//e.SetParam(params.Callstack, Addresses(r.ReadCallstack(16)))
 }
 
 // DecodeMemory decodes memory event payloads.
@@ -485,10 +791,10 @@ func (d *ParamDecoder) DecodeMemory(r *etw.EventRecord, e *Event) {
 	//     ULONG ProcessId;
 	//     ULONG Flags;
 	// } PERFINFO_VIRTUAL_ALLOC, *PPERFINFO_VIRTUAL_ALLOC;
-	e.AppendParam(params.MemBaseAddress, params.Address, r.ReadUint64(0))
-	e.AppendParam(params.MemRegionSize, params.Uint64, r.ReadUint64(8))
-	e.AppendParam(params.ProcessID, params.PID, r.ReadUint32(16))
-	e.AppendParam(params.MemAllocType, params.Flags, r.ReadUint32(20), WithFlags(MemAllocationFlags))
+	e.SetParam(params.MemBaseAddress, params.U64(r.ReadUint64(0)))
+	e.SetParam(params.MemRegionSize, params.U64(r.ReadUint64(8)))
+	e.SetParam(params.ProcessID, params.U32(r.ReadUint32(16)))
+	e.SetParam(params.MemAllocType, params.U32(r.ReadUint32(20)))
 }
 
 // DecodeNetwork decodes TCP/UDP network events. All network event
@@ -512,41 +818,41 @@ func (d *ParamDecoder) DecodeNetwork(r *etw.EventRecord, e *Event) {
 	//     USHORT DestPort;
 	//     USHORT SrcPort;
 	// }WMI_UDP, *PWMI_UDP;
-	e.AppendParam(params.ProcessID, params.PID, r.ReadUint32(0))
-	e.AppendParam(params.NetSize, params.Uint32, r.ReadUint32(4))
+	e.SetParam(params.ProcessID, params.U32(r.ReadUint32(0)))
+	e.SetParam(params.NetSize, params.U32(r.ReadUint32(4)))
 
 	switch r.Header.EventDescriptor.Opcode {
 	case AcceptTCPv6ID, ConnectTCPv6ID, ReconnectTCPv6ID, RetransmitTCPv6ID,
 		DisconnectTCPv6ID, SendV6ID, RecvV6ID:
-		e.AppendParam(params.NetDIP, params.IPv6, r.ReadBytes(8, 16))
-		e.AppendParam(params.NetSIP, params.IPv6, r.ReadBytes(24, 16))
-		e.AppendParam(params.NetDport, params.Port, r.ReadUint16(40))
-		e.AppendParam(params.NetSport, params.Port, r.ReadUint16(42))
+		e.SetParam(params.NetDIP, params.IP6(r.ReadBytes(8, 16)))
+		e.SetParam(params.NetSIP, params.IP6(r.ReadBytes(24, 16)))
+		e.SetParam(params.NetDport, params.U16(windows.Ntohs(r.ReadUint16(40))))
+		e.SetParam(params.NetSport, params.U16(windows.Ntohs(r.ReadUint16(42))))
 	default:
-		e.AppendParam(params.NetDIP, params.IPv4, r.ReadUint32(8))
-		e.AppendParam(params.NetSIP, params.IPv4, r.ReadUint32(12))
-		e.AppendParam(params.NetDport, params.Port, r.ReadUint16(16))
-		e.AppendParam(params.NetSport, params.Port, r.ReadUint16(18))
+		e.SetParam(params.NetDIP, params.IPv4LE(r.ReadUint32(8)))
+		e.SetParam(params.NetSIP, params.IPv4LE(r.ReadUint32(12)))
+		e.SetParam(params.NetDport, params.U16(windows.Ntohs(r.ReadUint16(16))))
+		e.SetParam(params.NetSport, params.U16(windows.Ntohs(r.ReadUint16(18))))
 	}
 
 	if r.Header.ProviderID == NetworkTCPEventGUID {
-		e.AppendEnum(params.NetL4Proto, uint32(network.TCP), network.ProtoNames)
+		e.SetParam(params.NetL4Proto, params.U32(uint32(network.TCP)))
 	} else {
-		e.AppendEnum(params.NetL4Proto, uint32(network.UDP), network.ProtoNames)
+		e.SetParam(params.NetL4Proto, params.U32(uint32(network.UDP)))
 	}
 }
 
 // DecodeDNS decodes DNS query/reply event payloads.
 func (d *ParamDecoder) DecodeDNS(r *etw.EventRecord, e *Event) {
 	name, offset := r.ReadUTF16String(0)
-	e.AppendParam(params.DNSName, params.UnicodeString, name)
-	e.AppendParam(params.DNSRR, params.Enum, r.ReadUint32(offset), WithEnum(DNSRecordTypes))
-	e.AppendParam(params.DNSOpts, params.Flags64, r.ReadUint64(offset+4), WithFlags(DNSOptsFlags))
+	e.SetParam(params.DNSName, params.Str(name))
+	e.SetParam(params.DNSRR, params.U32(r.ReadUint32(offset)))
+	e.SetParam(params.DNSOpts, params.U64(r.ReadUint64(offset+4)))
 
 	if r.Header.EventDescriptor.ID == ReplyDNSID {
-		e.AppendParam(params.DNSRcode, params.Enum, r.ReadUint32(offset+12), WithEnum(DNSResponseCodes))
+		e.SetParam(params.DNSRcode, params.U32(r.ReadUint32(offset+12)))
 		answers := strings.Split(sanitizeDNSAnswers(r.ConsumeUTF16String(offset+16)), ";")
-		e.AppendParam(params.DNSAnswers, params.Slice, answers)
+		e.SetParam(params.DNSAnswers, params.StrSlice(answers))
 	}
 }
 

@@ -21,110 +21,81 @@
 package event
 
 import (
-	"fmt"
-	"net"
 	"strconv"
-	"strings"
-	"time"
 
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/util/colorizer"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 )
 
-// NewParam creates a new event parameter.
-func NewParam(name string, typ params.Type, value params.Value, options ...ParamOption) *Param {
-	var opts paramOpts
-	for _, opt := range options {
-		opt(&opts)
-	}
-	return &Param{Name: name, Type: typ, Value: value, Flags: opts.flags, Enum: opts.enum}
-}
+// defaultStringType is the type assigned to the string parameters that are not described by the schema.
+const defaultStringType = params.String
 
-func (p *Param) String() string {
-	if p.Value == nil {
+// String returns the string representation of the parameter. The parameter
+// value is resolved according to the parameter type.
+func (p Param) String() string {
+	v := p.Value
+	if v.IsNull() {
 		return ""
 	}
-	switch p.Type {
+	switch p.Type() {
 	case params.String, params.Path:
-		return p.Value.(string)
+		return v.Str()
 	case params.Address:
-		v, ok := p.Value.(uint64)
-		if !ok {
+		if v.Kind() != params.KindUint {
 			return ""
 		}
-		return va.Address(v).String()
-	case params.Int8:
-		return strconv.Itoa(int(p.Value.(int8)))
-	case params.Uint8:
-		return strconv.Itoa(int(p.Value.(uint8)))
-	case params.Int16:
-		return strconv.Itoa(int(p.Value.(int16)))
-	case params.Uint16, params.Port:
-		return strconv.Itoa(int(p.Value.(uint16)))
-	case params.Uint32:
-		return strconv.FormatUint(uint64(p.Value.(uint32)), 10)
-	case params.PID, params.TID:
-		return strconv.FormatUint(uint64(p.Value.(uint32)), 10)
-	case params.Int32:
-		return strconv.Itoa(int(p.Value.(int32)))
-	case params.Uint64:
-		return strconv.FormatUint(p.Value.(uint64), 10)
-	case params.Int64:
-		return strconv.FormatInt(p.Value.(int64), 10)
-	case params.IPv4, params.IPv6:
-		return p.Value.(net.IP).String()
-	case params.Bool:
-		return strconv.FormatBool(p.Value.(bool))
-	case params.Float:
-		return strconv.FormatFloat(float64(p.Value.(float32)), 'f', 6, 32)
-	case params.Double:
-		return strconv.FormatFloat(p.Value.(float64), 'f', 6, 64)
-	case params.Time:
-		return p.Value.(time.Time).String()
+		return va.Address(v.Uint64()).String()
+	case params.Int8, params.Int16, params.Int32, params.Int64:
+		return strconv.FormatInt(v.Int64(), 10)
+	case params.Uint8, params.Uint16, params.Uint32, params.Uint64, params.Port, params.PID, params.TID:
+		return strconv.FormatUint(v.Uint64(), 10)
+	case params.IP, params.IPv4, params.IPv6:
+		return v.IP().String()
 	case params.Enum:
-		if p.Enum == nil {
+		enum := p.Enum()
+		if enum == nil || v.Kind() != params.KindUint {
 			return ""
 		}
-		v, ok := p.Value.(uint32)
-		if !ok {
-			return ""
-		}
-		return p.Enum[v]
+		return enum[v.Uint32()]
 	case params.Flags, params.Flags64:
-		if p.Flags == nil {
+		flags := p.Flags()
+		if flags == nil || v.Kind() != params.KindUint {
 			return ""
 		}
-		switch v := p.Value.(type) {
-		case uint32:
-			return p.Flags.String(uint64(v))
-		case uint64:
-			return p.Flags.String(v)
-		default:
-			return ""
-		}
-	case params.Slice:
-		switch slice := p.Value.(type) {
-		case []string:
-			return strings.Join(slice, ",")
-		default:
-			return fmt.Sprintf("%v", slice)
-		}
-	case params.Binary:
-		return string(p.Value.([]byte))
+		return flags.String(v.Uint64())
 	default:
-		return fmt.Sprintf("%v", p.Value)
+		return formatValue(v)
 	}
 }
 
+// CaptureType returns the type of the parameter saved inside the capture.
 func (p Param) CaptureType() params.Type {
-	return p.Type
+	switch p.Type() {
+	case params.IP, params.IPv4, params.IPv6:
+		if p.Value.IsIPv4() {
+			return params.IPv4
+		}
+		return params.IPv6
+	default:
+		return p.Type()
+	}
+}
+
+// setFromCapture sets the parameter restored from the capture state.
+func (pars *Params) setFromCapture(name string, typ params.Type, v params.Value) {
+	i := pars.Index(name)
+	if i < 0 {
+		*pars = append(*pars, Param{Value: v, info: &ParamInfo{Name: name, Type: typ}})
+		return
+	}
+	(*pars)[i].Value = v
 }
 
 // color applies a semantic colour to a single parameter value based
 // on its type and for string types its content.
-func (p *Param) color() string {
-	switch p.Type {
+func (p Param) color() string {
+	switch p.Type() {
 	case params.String:
 		return colorizer.Span(colorizer.White, p.String())
 	case params.Status:
@@ -139,15 +110,14 @@ func (p *Param) color() string {
 		params.Float, params.Double:
 		return colorizer.Span(colorizer.Yellow, p.String())
 	case params.Bool:
-		b, ok := p.Value.(bool)
-		if !ok {
+		if p.Value.Kind() != params.KindBool {
 			return colorizer.Span(colorizer.Coral, p.String())
 		}
-		if b {
+		if p.Value.Bool() {
 			return colorizer.Span(colorizer.Green, p.String())
 		}
 		return colorizer.Span(colorizer.Coral, p.String())
-	case params.IPv4, params.IPv6:
+	case params.IP, params.IPv4, params.IPv6:
 		return colorizer.Span(colorizer.Blue, p.String())
 	case params.Port:
 		return colorizer.Span(colorizer.Cyan, p.String())
@@ -158,64 +128,11 @@ func (p *Param) color() string {
 	}
 }
 
-// NewParamFromCapture builds a parameter from restored capture state.
-func NewParamFromCapture(name string, typ params.Type, value params.Value, _ Type) *Param {
-	return &Param{Name: name, Type: typ, Value: value}
-}
-
 // GetPid returns the process identifier.
-func (pars Params) GetPid() (uint32, error) {
-	return pars.getID(params.ProcessID, params.PID)
-}
-
-// MustGetPid returns the process identifier or panics.
-func (pars Params) MustGetPid() uint32 {
-	id, err := pars.GetPid()
-	if err != nil {
-		panic(err)
-	}
-	return id
-}
+func (pars Params) GetPid() uint32 { return pars.GetUint32ByName(params.ProcessID) }
 
 // GetPpid returns the parent process identifier.
-func (pars Params) GetPpid() (uint32, error) {
-	return pars.getID(params.ProcessParentID, params.PID)
-}
-
-// MustGetPpid returns the parent process identifier or panics.
-func (pars Params) MustGetPpid() uint32 {
-	id, err := pars.GetPpid()
-	if err != nil {
-		panic(err)
-	}
-	return id
-}
+func (pars Params) GetPpid() uint32 { return pars.GetUint32ByName(params.ProcessParentID) }
 
 // GetTid returns the thread identifier.
-func (pars Params) GetTid() (uint32, error) {
-	return pars.getID(params.ThreadID, params.TID)
-}
-
-// MustGetTid returns the thread identifier or panics.
-func (pars Params) MustGetTid() uint32 {
-	id, err := pars.GetTid()
-	if err != nil {
-		panic(err)
-	}
-	return id
-}
-
-func (pars Params) getID(name string, typ params.Type) (uint32, error) {
-	param, err := pars.findParam(name)
-	if err != nil {
-		return 0, err
-	}
-	if param.Type != typ {
-		return 0, fmt.Errorf("%q parameter has unexpected identifier type", name)
-	}
-	value, ok := param.Value.(uint32)
-	if !ok {
-		return 0, fmt.Errorf("unable to type cast %q parameter to uint32 identifier", name)
-	}
-	return value, nil
-}
+func (pars Params) GetTid() uint32 { return pars.GetUint32ByName(params.ThreadID) }

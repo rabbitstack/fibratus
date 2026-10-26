@@ -1,8 +1,5 @@
-//go:build windows
-// +build windows
-
 /*
- * Copyright 2019-2020 by Nedim Sabic Sabic
+ * Copyright 2026 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -19,19 +16,8 @@
  * limitations under the License.
  */
 
-package ip
+package params
 
-import (
-	"github.com/stretchr/testify/assert"
-	"testing"
-)
-
-func TestToIPv4(t *testing.T) {
-	ip := ToIPv4(16777343)
-	assert.Equal(t, "127.0.0.1", ip.String())
-}
-
-func TestToIPv6(t *testing.T) {
-	ip := ToIPv6([]byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1})
-	assert.Equal(t, "::1", ip.String())
-}
+// Enumeration defines the type for the event parameter enumeration values. Enums
+// are a direct mapping from the parameter integer value to some symbolical name
+type Enumeration map[uint32]string

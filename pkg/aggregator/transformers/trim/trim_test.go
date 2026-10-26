@@ -37,17 +37,17 @@ func TestTransform(t *testing.T) {
 		CPU:  1,
 		Seq:  2,
 		Host: "archrabbit",
-		Params: event.Params{
-			params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
-			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
-			params.FileType:      {Name: params.FileType, Type: params.AnsiString, Value: "file"},
-			params.FileOperation: {Name: params.FileOperation, Type: params.AnsiString, Value: "overwriteif"},
-			params.BasePrio:      {Name: params.BasePrio, Type: params.Int8, Value: int8(2)},
-			params.PagePrio:      {Name: params.PagePrio, Type: params.Uint8, Value: uint8(2)},
-			params.KstackLimit:   {Name: params.KstackLimit, Type: params.Address, Value: uint64(18884888488889)},
-			params.StartTime:     {Name: params.StartTime, Type: params.Time, Value: time.Now()},
-			params.ProcessID:     {Name: params.ProcessID, Type: params.PID, Value: uint32(1204)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.FileObject, params.Uint64, params.U64(uint64(12456738026482168384))),
+			event.NewParam(params.FilePath, params.String, params.Str("\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll")),
+			event.NewParam(params.FileType, params.String, params.Str("file")),
+			event.NewParam(params.FileOperation, params.String, params.Str("overwriteif")),
+			event.NewParam(params.BasePrio, params.Int8, params.I8(int8(2))),
+			event.NewParam(params.PagePrio, params.Uint8, params.U8(uint8(2))),
+			event.NewParam(params.KstackLimit, params.Address, params.U64(uint64(18884888488889))),
+			event.NewParam(params.StartTime, params.Time, params.Timestamp(time.Now())),
+			event.NewParam(params.ProcessID, params.PID, params.U32(uint32(1204))),
+		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barz"},
 	}
 
@@ -55,8 +55,8 @@ func TestTransform(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, transf.Transform(evt))
-	filename, _ := evt.Params.GetString(params.FilePath)
-	dispo, _ := evt.Params.GetString(params.FileOperation)
+	filename := evt.Params.GetStringByName(params.FilePath)
+	dispo := evt.Params.GetStringByName(params.FileOperation)
 
 	assert.Equal(t, "\\HarddiskVolume2\\Windows\\system32\\user32.dll", filename)
 	assert.Equal(t, "overwrite", dispo)

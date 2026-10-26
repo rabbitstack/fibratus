@@ -132,10 +132,10 @@ var htmlTemplate = `
                           <tr>
                             <td colspan="2">
                               <table style="width: 100%; margin: 16px 0 16px 0;" width="100%" cellpadding="0" cellspacing="0">
-                                {{- range $key, $par := .Params }}
+                                {{- range $par := .Params.Present }}
                                 <tr>
                                   <td style="padding: 5px 5px;">
-                                    <span style="font-size: 13px; color: #626567;">{{ regexReplaceAll "_" $key " " | title }}</span>
+                                    <span style="font-size: 13px; color: #626567;">{{ regexReplaceAll "_" $par.Name " " | title }}</span>
                                   </td>
                                   <td style="padding: 5px 5px;">
                                     {{ $paramValue := $par.String }}

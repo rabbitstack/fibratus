@@ -50,12 +50,12 @@ func TestEventlogSender(t *testing.T) {
 				Seq:       2,
 				Timestamp: time.Now(),
 				Host:      "archrabbit",
-				Params: event.Params{
-					params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
-					params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
-					params.FileType:      {Name: params.FileType, Type: params.AnsiString, Value: "file"},
-					params.FileOperation: {Name: params.FileOperation, Type: params.Enum, Value: uint32(1)},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.FileObject, params.Uint64, params.U64(uint64(12456738026482168384))),
+					event.NewParam(params.FilePath, params.String, params.Str("C:\\Windows\\system32\\user32.dll")),
+					event.NewParam(params.FileType, params.String, params.Str("file")),
+					event.NewParam(params.FileOperation, params.Enum, params.U32(uint32(1))),
+				),
 				Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 				PS: &pstypes.PS{
 					PID:  2436,
@@ -142,11 +142,11 @@ func TestEventlogSender(t *testing.T) {
 				Seq:       3,
 				Timestamp: time.Now(),
 				Host:      "archrabbit",
-				Params: event.Params{
-					params.Cmdline: {Name: params.Cmdline, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\svchost.exe -k RPCSS"},
-					params.Exe:     {Name: params.Exe, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\svchost.exe"},
-					params.UserSID: {Name: params.UserSID, Type: params.UnicodeString, Value: "admin\\SYSTEM"},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.Cmdline, params.String, params.Str("C:\\Windows\\system32\\svchost.exe -k RPCSS")),
+					event.NewParam(params.Exe, params.String, params.Str("C:\\Windows\\system32\\svchost.exe")),
+					event.NewParam(params.UserSID, params.String, params.Str("admin\\SYSTEM")),
+				),
 				Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 				PS: &pstypes.PS{
 					PID:  2436,
