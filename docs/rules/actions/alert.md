@@ -129,6 +129,10 @@ Represents the emoji icon surrounded in `:` characters for the Slack bot.
 
 The `systray` alert sender sends alerts to the systray notification area. Alert sender configuration is located in the `alertsenders.systray` section.
 
+The Fibratus Windows service runs in the isolated session 0, so it can't display balloon notifications on the interactive desktop. Instead of launching a process inside the user session on behalf of the service, Fibratus serves a named pipe (`\\.\pipe\fibratus-systray`) and the `fibratus systray` command connects to it from the user session and renders the notifications. The pipe is only writable by `LocalSystem` and `Administrators`; interactive users can only read from it, and the client refuses to connect to a pipe that isn't owned by one of those principals.
+
+The MSI installer registers `fibratus systray` to start when a user logs on, so each logged-on user (including RDP sessions) receives the notifications. Users that were already logged on during the installation have to sign out and back in, or run `fibratus systray` once. When Fibratus runs in the foreground (`fibratus run`), the helper is started automatically and stops with the process. The `fibratus systray` helper reconnects if the service is restarted.
+
 #### `enabled`
 
 Indicates whether the `systray` alert sender is enabled.

@@ -79,11 +79,18 @@ package sys
 //sys DefWindowProc(hwnd uintptr, msg uint32, wparam uintptr, lparam uintptr) (result uintptr) = user32.DefWindowProcW
 //sys LoadImage(inst windows.Handle, name *uint16, typ uint, cx int, cy int, flags uint) (handle windows.Handle, err error) [failretval==0] = user32.LoadImageW
 //sys DestroyIcon(icon Hicon) = user32.DestroyIcon
+//sys GetMessage(msg *WndMsg, hwnd Hwnd, filterMin uint32, filterMax uint32) (ret int32) = user32.GetMessageW
+//sys TranslateMessage(msg *WndMsg) (ok bool) = user32.TranslateMessage
+//sys DispatchMessage(msg *WndMsg) (result uintptr) = user32.DispatchMessageW
+//sys PostMessage(hwnd Hwnd, msg uint32, wparam uintptr, lparam uintptr) (err error) [failretval==0] = user32.PostMessageW
+//sys PostQuitMessage(exitCode int32) = user32.PostQuitMessage
+//sys RegisterWindowMessage(name *uint16) (msg uint32, err error) [failretval==0] = user32.RegisterWindowMessageW
 
 // Shell functions
 //sys ShellNotifyIcon(msg NotifyIconMessage, data *NotifyIconData) (err error) [failretval==0]  = shell32.Shell_NotifyIconW
 //sys SHGetStockIconInfo(id int32, flags uint32, icon *ShStockIcon) (err error) [failretval!=0] = shell32.SHGetStockIconInfo
 //sys FreeConsole() = kernel32.FreeConsole
+//sys GetConsoleProcessList(pids *uint32, count uint32) (n uint32) = kernel32.GetConsoleProcessList
 
 // Memory functions
 //sys QueryWorkingSet(handle windows.Handle, ws *MemoryWorkingSetExInformation, size uint32) (err error) = psapi.QueryWorkingSetEx
