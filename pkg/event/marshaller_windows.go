@@ -22,8 +22,6 @@ import (
 	"expvar"
 	"fmt"
 	"math"
-	"net"
-	"sort"
 	"time"
 	"unsafe"
 
@@ -35,7 +33,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	ptypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/util/bytes"
-	"github.com/rabbitstack/fibratus/pkg/util/ip"
 )
 
 var (
@@ -79,78 +76,24 @@ func (e *Event) MarshalRaw() []byte {
 	b = append(b, bytes.WriteUint16(uint16(len(timestamp)))...)
 	b = append(b, timestamp...)
 
-	// write the number of event parameters followed by each parameter
-	b = append(b, bytes.WriteUint16(uint16(len(e.Params)))...)
-	for _, par := range e.Params {
-		// append the type, parameter size and name
-		b = append(b, bytes.WriteUint16(uint16(par.CaptureType()))...)
-		b = append(b, bytes.WriteUint16(uint16(len(par.Name)))...)
-		b = append(b, par.Name...)
-		switch par.Type {
-		case params.AnsiString, params.UnicodeString:
-			b = append(b, bytes.WriteUint16(uint16(len(par.Value.(string))))...)
-			b = append(b, par.Value.(string)...)
-		case params.Key, params.Path, params.DOSPath, params.HandleType:
-			v := e.GetParamAsString(par.Name)
-			b = append(b, bytes.WriteUint16(uint16(len(v)))...)
-			b = append(b, v...)
-		case params.Uint8:
-			b = append(b, par.Value.(uint8))
-		case params.Int8:
-			b = append(b, byte(par.Value.(int8)))
-		case params.Uint16, params.Port:
-			b = append(b, bytes.WriteUint16(par.Value.(uint16))...)
-		case params.Int16:
-			b = append(b, bytes.WriteUint16(uint16(par.Value.(int16)))...)
-		case params.Uint32, params.Status, params.Enum, params.Flags:
-			b = append(b, bytes.WriteUint32(par.Value.(uint32))...)
-		case params.Int32:
-			b = append(b, bytes.WriteUint32(uint32(par.Value.(int32)))...)
-		case params.Uint64, params.Address, params.Flags64:
-			b = append(b, bytes.WriteUint64(par.Value.(uint64))...)
-		case params.Int64:
-			b = append(b, bytes.WriteUint64(uint64(par.Value.(int64)))...)
-		case params.Double:
-			b = append(b, bytes.WriteUint32(math.Float32bits(par.Value.(float32)))...)
-		case params.Float:
-			b = append(b, bytes.WriteUint64(math.Float64bits(par.Value.(float64)))...)
-		case params.IPv4:
-			b = append(b, par.Value.(net.IP).To4()...)
-		case params.IPv6:
-			b = append(b, par.Value.(net.IP).To16()...)
-		case params.PID, params.TID:
-			b = append(b, bytes.WriteUint32(par.Value.(uint32))...)
-		case params.Bool:
-			b = append(b, convert.Btoi(par.Value.(bool)))
-		case params.Time:
-			v := par.Value.(time.Time)
-			ts := make([]byte, 0)
-			ts = v.AppendFormat(ts, time.RFC3339Nano)
-			b = append(b, bytes.WriteUint16(uint16(len(ts)))...)
-			b = append(b, ts...)
-		case params.Slice:
-			switch slice := par.Value.(type) {
-			case []string:
-				// append the type for slice elements
-				b = append(b, uint8('s'))
-				b = append(b, bytes.WriteUint16(uint16(len(slice)))...)
-				for _, s := range slice {
-					b = append(b, bytes.WriteUint16(uint16(len(s)))...)
-					b = append(b, s...)
-				}
-			case []va.Address:
-				// 8 byte integers
-				b = append(b, uint8('8'))
-				b = append(b, bytes.WriteUint16(uint16(len(slice)))...)
-				for _, v := range slice {
-					b = append(b, bytes.WriteUint64(v.Uint64())...)
-				}
-			}
-		case params.Binary, params.SID, params.WbemSID:
-			b = append(b, bytes.WriteUint32(uint32(len(par.Value.([]byte))))...)
-			b = append(b, par.Value.([]byte)...)
+	// write the number of event parameters followed by each parameter. Parameters are
+	// serialized in schema order, and the ones lacking a value are skipped
+	var (
+		nparams uint16
+		pb      []byte
+	)
+	for i := range e.Params {
+		par := e.Params[i]
+		if par.IsNull() {
+			continue
+		}
+		var ok bool
+		if pb, ok = appendCaptureParam(pb, par); ok {
+			nparams++
 		}
 	}
+	b = append(b, bytes.WriteUint16(nparams)...)
+	b = append(b, pb...)
 
 	// write metadata key/value pairs
 	b = append(b, bytes.WriteUint16(uint16(len(e.Metadata)))...)
@@ -174,6 +117,110 @@ func (e *Event) MarshalRaw() []byte {
 	}
 
 	return b
+}
+
+// appendCaptureParam serializes the parameter in the capture file format.
+// It returns false if the parameter can't be represented in the capture, in
+// which case the buffer is returned unchanged.
+func appendCaptureParam(b []byte, par Param) ([]byte, bool) {
+	typ := par.CaptureType()
+	v := par.Value
+	name := par.Name()
+
+	// append the type, parameter size and name
+	hdr := make([]byte, 0, 4+len(name))
+	hdr = append(hdr, bytes.WriteUint16(uint16(typ))...)
+	hdr = append(hdr, bytes.WriteUint16(uint16(len(name)))...)
+	hdr = append(hdr, name...)
+
+	switch typ {
+	case params.String, params.Path:
+		var str string
+		switch par.Type() {
+		case params.Key, params.DOSPath, params.HandleType:
+			// store the resolved string, e.g. the DOS path with the
+			// drive letter replaced by the mapped device name
+			str = par.String()
+		default:
+			str = v.Str()
+		}
+		b = append(b, hdr...)
+		b = append(b, bytes.WriteUint16(uint16(len(str)))...)
+		b = append(b, str...)
+	case params.Uint8, params.Int8:
+		b = append(b, hdr...)
+		b = append(b, byte(v.Uint64()))
+	case params.Uint16, params.Port, params.Int16:
+		b = append(b, hdr...)
+		b = append(b, bytes.WriteUint16(v.Uint16())...)
+	case params.Uint32, params.Status, params.Enum, params.Flags32, params.Int32, params.PID, params.TID:
+		b = append(b, hdr...)
+		b = append(b, bytes.WriteUint32(v.Uint32())...)
+	case params.Uint64, params.Address, params.Flags64, params.Int64:
+		b = append(b, hdr...)
+		b = append(b, bytes.WriteUint64(v.Uint64())...)
+	case params.Float:
+		b = append(b, hdr...)
+		b = append(b, bytes.WriteUint32(math.Float32bits(v.Float32()))...)
+	case params.Double:
+		b = append(b, hdr...)
+		b = append(b, bytes.WriteUint64(math.Float64bits(v.Float64()))...)
+	case params.IPv4:
+		ip4 := v.IP().To4()
+		if ip4 == nil {
+			return b, false
+		}
+		b = append(b, hdr...)
+		b = append(b, ip4...)
+	case params.IPv6:
+		ip6 := v.IP().To16()
+		if ip6 == nil {
+			return b, false
+		}
+		b = append(b, hdr...)
+		b = append(b, ip6...)
+	case params.Bool:
+		b = append(b, hdr...)
+		b = append(b, convert.Btoi(v.Bool()))
+	case params.Time:
+		ts := make([]byte, 0, 32)
+		ts = v.Time().AppendFormat(ts, time.RFC3339Nano)
+		b = append(b, hdr...)
+		b = append(b, bytes.WriteUint16(uint16(len(ts)))...)
+		b = append(b, ts...)
+	case params.Slice:
+		switch v.Kind() {
+		case params.KindStringSlice:
+			slice := v.StrSlice()
+			b = append(b, hdr...)
+			// append the type for slice elements
+			b = append(b, uint8('s'))
+			b = append(b, bytes.WriteUint16(uint16(len(slice)))...)
+			for _, s := range slice {
+				b = append(b, bytes.WriteUint16(uint16(len(s)))...)
+				b = append(b, s...)
+			}
+		case params.KindUintSlice:
+			slice := v.U64Slice()
+			b = append(b, hdr...)
+			// 8 byte integers
+			b = append(b, uint8('8'))
+			b = append(b, bytes.WriteUint16(uint16(len(slice)))...)
+			for _, n := range slice {
+				b = append(b, bytes.WriteUint64(n)...)
+			}
+		default:
+			return b, false
+		}
+	case params.Binary, params.SID, params.WbemSID, params.TokenIntegrityLevel:
+		bin := v.Bytes()
+		b = append(b, hdr...)
+		b = append(b, bytes.WriteUint32(uint32(len(bin)))...)
+		b = append(b, bin...)
+	default:
+		return b, false
+	}
+	return b, true
 }
 
 func inc(idx, inc uint32) uint32 {
@@ -204,6 +251,7 @@ func (e *Event) UnmarshalRaw(b []byte, ver capver.Version) error {
 	}
 
 	e.Type = Type(bytes.ReadUint16(b[16:idx]))
+	e.Params = NewParams(e.Type)
 	e.CPU = b[idx : idx+1][0]
 
 	idx++ // increment index
@@ -238,82 +286,79 @@ func (e *Event) UnmarshalRaw(b []byte, ver capver.Version) error {
 		// read param name
 		paramNameLength := uint32(bytes.ReadUint16(b[inc(idx, 8)+offset+poffset:]))
 		buf = b[inc(idx, 10)+offset+poffset:]
-		kparamName := string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:paramNameLength:paramNameLength])
+		paramName := string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:paramNameLength:paramNameLength])
 
 		pi := inc(idx, 10) // parameter index
 
 		var val params.Value
 		switch params.Type(typ) {
-		case params.AnsiString, params.UnicodeString, params.Path:
+		case params.String, params.Path:
 			// read string parameter
 			l := bytes.ReadUint16(b[pi+offset+paramNameLength+poffset:])
 			buf = b[inc(idx, 12)+offset+paramNameLength+poffset:]
 			if len(buf) > 0 {
-				val = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
+				val = params.Str(string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l]))
 			}
 			// increment parameter offset by string by type length + name length bytes + length of
 			// the string parameter + string parameter size
 			poffset += paramNameLength + 6 + uint32(l)
 		case params.Uint64, params.Address, params.Flags64:
-			val = bytes.ReadUint64(b[pi+offset+paramNameLength+poffset:])
+			val = params.U64(bytes.ReadUint64(b[pi+offset+paramNameLength+poffset:]))
 			// increment parameter offset by type length + name length sizes + size of uint64
 			poffset += paramNameLength + 4 + 8
 		case params.Int64:
-			val = int64(bytes.ReadUint64(b[pi+offset+paramNameLength+poffset:]))
+			val = params.I64(int64(bytes.ReadUint64(b[pi+offset+paramNameLength+poffset:])))
 			// increment parameter offset by type length + name length sizes + size of int64
 			poffset += paramNameLength + 4 + 8
 		case params.Double:
-			val = float64(bytes.ReadUint64(b[pi+offset+paramNameLength+poffset:]))
+			val = params.F64(math.Float64frombits(bytes.ReadUint64(b[pi+offset+paramNameLength+poffset:])))
 			poffset += paramNameLength + 4 + 8
 		case params.Float:
-			val = float32(bytes.ReadUint32(b[pi+offset+paramNameLength+poffset:]))
+			val = params.F32(math.Float32frombits(bytes.ReadUint32(b[pi+offset+paramNameLength+poffset:])))
 			poffset += paramNameLength + 4 + 4
 		case params.IPv4:
-			val = ip.ToIPv4(bytes.ReadUint32(b[pi+offset+paramNameLength+poffset:]))
+			val = params.IPv4LE(bytes.ReadUint32(b[pi+offset+paramNameLength+poffset:]))
 			// // increment by IPv4 length
 			poffset += paramNameLength + 4 + 4
 		case params.IPv6:
-			val = ip.ToIPv6(b[pi+offset+paramNameLength+poffset : pi+offset+paramNameLength+poffset+16])
+			val = params.IP6(b[pi+offset+paramNameLength+poffset : pi+offset+paramNameLength+poffset+16])
 			// increment by IPv6 length
 			poffset += paramNameLength + 4 + 16
 		case params.PID, params.TID:
-			val = bytes.ReadUint32(b[pi+offset+paramNameLength+poffset:])
+			val = params.U32(bytes.ReadUint32(b[pi+offset+paramNameLength+poffset:]))
 			poffset += paramNameLength + 4 + 4
 		case params.Int32:
-			val = int32(bytes.ReadUint32(b[pi+offset+paramNameLength+poffset:]))
+			val = params.I32(int32(bytes.ReadUint32(b[pi+offset+paramNameLength+poffset:])))
 			poffset += paramNameLength + 4 + 4
-		case params.Uint32, params.Enum, params.Flags, params.Status:
-			val = bytes.ReadUint32(b[pi+offset+paramNameLength+poffset:])
+		case params.Uint32, params.Enum, params.Flags32, params.Status:
+			val = params.U32(bytes.ReadUint32(b[pi+offset+paramNameLength+poffset:]))
 			poffset += paramNameLength + 4 + 4
 		case params.Uint16, params.Port:
-			val = bytes.ReadUint16(b[pi+offset+paramNameLength+poffset:])
+			val = params.U16(bytes.ReadUint16(b[pi+offset+paramNameLength+poffset:]))
 			poffset += paramNameLength + 4 + 2
 		case params.Int16:
-			val = int16(bytes.ReadUint16(b[pi+offset+paramNameLength+poffset:]))
+			val = params.I16(int16(bytes.ReadUint16(b[pi+offset+paramNameLength+poffset:])))
 			poffset += paramNameLength + 4 + 2
 		case params.Uint8:
-			val = b[pi+offset+paramNameLength+poffset : pi+offset+paramNameLength+poffset+1][0]
+			val = params.U8(b[pi+offset+paramNameLength+poffset : pi+offset+paramNameLength+poffset+1][0])
 			poffset += paramNameLength + 4 + 1
 		case params.Int8:
-			val = int8(b[pi+offset+paramNameLength+poffset : pi+offset+paramNameLength+poffset+1][0])
+			val = params.I8(int8(b[pi+offset+paramNameLength+poffset : pi+offset+paramNameLength+poffset+1][0]))
 			poffset += paramNameLength + 4 + 1
 		case params.Bool:
 			v := b[pi+offset+paramNameLength+poffset : pi+offset+paramNameLength+poffset+1][0]
-			if v == 1 {
-				val = true
-			} else {
-				val = false
-			}
+			val = params.Boolean(v == 1)
 			poffset += paramNameLength + 4 + 1
 		case params.Time:
 			// read ts length
 			l := bytes.ReadUint16(b[pi+offset+paramNameLength+poffset:])
 			buf = b[inc(idx, 12)+offset+paramNameLength+poffset:]
 			if len(buf) > 0 {
-				var err error
-				val, err = time.Parse(time.RFC3339Nano, string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l]))
+				t, err := time.Parse(time.RFC3339Nano, string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l]))
 				if err != nil {
 					unmarshalTimestampErrors.Add(1)
+				} else {
+					val = params.Timestamp(t)
 				}
 			}
 			poffset += paramNameLength + 6 + uint32(l)
@@ -328,31 +373,36 @@ func (e *Event) UnmarshalRaw(b []byte, ver capver.Version) error {
 				s := make([]string, l)
 				for i := 0; i < int(l); i++ {
 					size := bytes.ReadUint16(b[inc(idx, 13)+offset+paramNameLength+poffset+off:])
-					buf := b[inc(idx, 15)+offset+paramNameLength+poffset+off:]
-					s[i] = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:size:size])
+					if size > 0 {
+						buf := b[inc(idx, 15)+offset+paramNameLength+poffset+off:]
+						s[i] = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:size:size])
+					}
 					off += 2 + uint32(size)
 				}
-				val = s
+				val = params.StrSlice(s)
 			case '8':
 				v := make([]uint64, l)
 				for i := 0; i < int(l); i++ {
-					bytes.ReadUint64(b[inc(idx, 16)+offset+paramNameLength+poffset+off:])
+					v[i] = bytes.ReadUint64(b[inc(idx, 13)+offset+paramNameLength+poffset+off:])
 					off += 8
 				}
-				val = v
+				val = params.U64Slice(v)
 			}
 			poffset += paramNameLength + 4 + 1 + 2 + off
-		case params.Binary, params.SID, params.WbemSID:
+		case params.Binary, params.SID, params.WbemSID, params.TokenIntegrityLevel:
 			l := bytes.ReadUint32(b[pi+offset+paramNameLength+poffset:])
 			buf = b[inc(idx, 12)+offset+paramNameLength+poffset:]
 			if len(buf) > 0 {
-				val = buf[:l]
+				// copy the buffer, since it is owned by the capture reader
+				bin := make([]byte, l)
+				copy(bin, buf[:l])
+				val = params.Bin(bin)
 			}
 			poffset += paramNameLength + 8 + l
 		}
 
-		if val != nil {
-			e.Params.AppendFromCapture(kparamName, params.Type(typ), val, e.Type)
+		if !val.IsNull() {
+			e.Params.setFromCapture(paramName, params.Type(typ), val)
 		}
 	}
 
@@ -426,47 +476,45 @@ func (e *Event) MarshalJSON() []byte {
 	js.writeObjectField("params")
 	js.writeObjectStart()
 
-	pars := make([]*Param, 0, len(e.Params))
-	for _, par := range e.Params {
-		pars = append(pars, par)
-	}
-	sort.Slice(pars, func(i, j int) bool { return pars[i].Name < pars[j].Name })
-
-	for i, par := range pars {
-		writeMore := js.shouldWriteMore(i, len(pars))
-		js.writeObjectField(par.Name)
-		switch par.Type {
+	idxs := e.Params.sortedPresent(nil)
+	for i, idx := range idxs {
+		par := e.Params[idx]
+		v := par.Value
+		writeMore := js.shouldWriteMore(i, len(idxs))
+		js.writeObjectField(par.Name())
+		switch par.Type() {
 		case params.Int64:
-			js.writeInt64(par.Value.(int64))
+			js.writeInt64(v.Int64())
 		case params.Uint64:
-			js.writeUint64(par.Value.(uint64))
+			js.writeUint64(v.Uint64())
 		case params.Int32:
-			js.writeInt32(par.Value.(int32))
+			js.writeInt32(v.Int32())
 		case params.Uint32:
-			js.writeUint32(par.Value.(uint32))
+			js.writeUint32(v.Uint32())
 		case params.Int16:
-			js.writeInt16(par.Value.(int16))
+			js.writeInt16(v.Int16())
 		case params.Uint16, params.Port:
-			js.writeUint16(par.Value.(uint16))
+			js.writeUint16(v.Uint16())
 		case params.Int8:
-			js.writeInt8(par.Value.(int8))
+			js.writeInt8(v.Int8())
 		case params.Uint8:
-			js.writeUint8(par.Value.(uint8))
+			js.writeUint8(v.Uint8())
 		case params.Float:
-			js.writeFloat32(par.Value.(float32))
+			js.writeFloat32(v.Float32())
 		case params.Double:
-			js.writeFloat64(par.Value.(float64))
+			js.writeFloat64(v.Float64())
 		case params.PID, params.TID:
-			js.writeUint32(par.Value.(uint32))
-		case params.IPv4, params.IPv6:
-			js.writeString(par.Value.(net.IP).String())
+			js.writeUint32(v.Uint32())
+		case params.IPv4, params.IPv6, params.IP:
+			js.writeString(v.IP().String())
 		case params.Bool:
-			js.writeBool(par.Value.(bool))
+			js.writeBool(v.Bool())
 		case params.Time:
-			js.writeString(par.Value.(time.Time).String())
-		case params.Slice:
-			switch slice := par.Value.(type) {
-			case []string:
+			js.writeString(v.Time().String())
+		case params.Slice, params.Variant:
+			switch v.Kind() {
+			case params.KindStringSlice:
+				slice := v.StrSlice()
 				js.writeArrayStart()
 				for i, s := range slice {
 					writeMore := js.shouldWriteMore(i, len(slice))
@@ -476,9 +524,22 @@ func (e *Event) MarshalJSON() []byte {
 					}
 				}
 				js.writeArrayEnd()
+			case params.KindUintSlice:
+				slice := v.U64Slice()
+				js.writeArrayStart()
+				for i, a := range slice {
+					writeMore := js.shouldWriteMore(i, len(slice))
+					js.writeString(va.Address(a).String())
+					if writeMore {
+						js.writeMore()
+					}
+				}
+				js.writeArrayEnd()
+			default:
+				js.writeEscapeString(par.String())
 			}
 		default:
-			js.writeEscapeString(e.GetParamAsString(par.Name))
+			js.writeEscapeString(par.String())
 		}
 		if writeMore {
 			js.writeMore()

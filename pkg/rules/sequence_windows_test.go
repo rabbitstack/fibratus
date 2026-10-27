@@ -75,10 +75,10 @@ func TestSequenceState(t *testing.T) {
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
 		},
-		Params: event.Params{
-			params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: uint32(4143)},
-			params.ProcessName: {Name: params.ProcessName, Type: params.AnsiString, Value: "powershell.exe"},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.ProcessID, params.PID, params.U32(uint32(4143))),
+			event.NewParam(params.ProcessName, params.String, params.Str("powershell.exe")),
+		),
 	}
 
 	e2 := &event.Event{
@@ -90,9 +90,9 @@ func TestSequenceState(t *testing.T) {
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
 		},
-		Params: event.Params{
-			params.FilePath: {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Temp\\dropper"},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.FilePath, params.String, params.Str("C:\\Temp\\dropper")),
+		),
 	}
 
 	require.True(t, ss.next(0))
@@ -111,9 +111,9 @@ func TestSequenceState(t *testing.T) {
 		Timestamp: time.Now().Add(time.Second * 10),
 		Tid:       2484,
 		PID:       4143,
-		Params: event.Params{
-			params.Exe: {Name: params.Exe, Type: params.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.Exe, params.String, params.Str("C:\\Temp\\dropper.exe")),
+		),
 	}
 
 	// can't go to the next transitions as the expr hasn't matched
@@ -176,10 +176,10 @@ func TestSequenceState(t *testing.T) {
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
 		},
-		Params: event.Params{
-			params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: uint32(4143)},
-			params.ProcessName: {Name: params.ProcessName, Type: params.AnsiString, Value: "powershell.exe"},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.ProcessID, params.PID, params.U32(uint32(4143))),
+			event.NewParam(params.ProcessName, params.String, params.Str("powershell.exe")),
+		),
 	}
 	require.True(t, ss.expire(e4))
 	require.True(t, ss.inExpired.Load())
@@ -217,9 +217,9 @@ func TestSimpleSequence(t *testing.T) {
 				Name: "cmd.exe",
 				Exe:  "C:\\Windows\\system32\\svchost-temp.exe",
 			},
-			Params: event.Params{
-				params.ProcessID: {Name: params.ProcessID, Type: params.Uint32, Value: uint32(4143)},
-			},
+			Params: event.ParamsOf(
+				event.NewParam(params.ProcessID, params.Uint32, params.U32(uint32(4143))),
+			),
 			Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 		}, {
 			Type:      event.CreateFile,
@@ -229,9 +229,9 @@ func TestSimpleSequence(t *testing.T) {
 			PS: &pstypes.PS{
 				Name: "cmd.exe",
 			},
-			Params: event.Params{
-				params.FilePath: {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\svchost-temp.exe"},
-			},
+			Params: event.ParamsOf(
+				event.NewParam(params.FilePath, params.String, params.Str("C:\\Windows\\system32\\svchost-temp.exe")),
+			),
 			Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"}}}, []bool{false, true}},
 		{[]*event.Event{{
 			Type:      event.CreateProcess,
@@ -242,9 +242,9 @@ func TestSimpleSequence(t *testing.T) {
 				Name: "cmd.exe",
 				Exe:  "C:\\Windows\\system32\\cmd.exe",
 			},
-			Params: event.Params{
-				params.ProcessID: {Name: params.ProcessID, Type: params.Uint32, Value: uint32(4143)},
-			},
+			Params: event.ParamsOf(
+				event.NewParam(params.ProcessID, params.Uint32, params.U32(uint32(4143))),
+			),
 			Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 		}, {
 			Type:      event.CreateFile,
@@ -254,9 +254,9 @@ func TestSimpleSequence(t *testing.T) {
 			PS: &pstypes.PS{
 				Name: "cmd.exe",
 			},
-			Params: event.Params{
-				params.FilePath: {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\svchost-temp.exe"},
-			},
+			Params: event.ParamsOf(
+				event.NewParam(params.FilePath, params.String, params.Str("C:\\Windows\\system32\\svchost-temp.exe")),
+			),
 			Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"}}}, []bool{false, false}},
 	}
 
@@ -295,9 +295,9 @@ func TestSimpleSequenceMultiplePartials(t *testing.T) {
 				Name: "cmd.exe",
 				Exe:  "C:\\Windows\\system32\\cmd.exe",
 			},
-			Params: event.Params{
-				params.ProcessID: {Name: params.ProcessID, Type: params.PID, Value: pid % 2},
-			},
+			Params: event.ParamsOf(
+				event.NewParam(params.ProcessID, params.PID, params.U32(pid%2)),
+			),
 			Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 		}
 		e2 := &event.Event{
@@ -309,9 +309,9 @@ func TestSimpleSequenceMultiplePartials(t *testing.T) {
 				Name: "cmd.exe",
 				Exe:  "C:\\Windows\\system32\\cmd.exe",
 			},
-			Params: event.Params{
-				params.FilePath: {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\svchost-temp.exe"},
-			},
+			Params: event.ParamsOf(
+				event.NewParam(params.FilePath, params.String, params.Str("C:\\Windows\\system32\\svchost-temp.exe")),
+			),
 			Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 		}
 		require.False(t, runSequence(ss, e1))
@@ -336,9 +336,9 @@ func TestSimpleSequenceMultiplePartials(t *testing.T) {
 				Name: "WmiPrvSE.exe",
 			},
 		},
-		Params: event.Params{
-			params.ProcessID: {Name: params.ProcessID, Type: params.PID, Value: uint32(859)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.ProcessID, params.PID, params.U32(uint32(859))),
+		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 	e2 := &event.Event{
@@ -352,9 +352,9 @@ func TestSimpleSequenceMultiplePartials(t *testing.T) {
 			Exe:  "C:\\Windows\\system32\\cmd.exe",
 			PID:  859,
 		},
-		Params: event.Params{
-			params.FilePath: {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Temp\\file.tmp"},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.FilePath, params.String, params.Str("C:\\Temp\\file.tmp")),
+		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
@@ -400,9 +400,9 @@ func TestUnconstrainedSequenceMatches(t *testing.T) {
 				Name: "WmiPrvSE.exe",
 			},
 		},
-		Params: event.Params{
-			params.ProcessID: {Name: params.ProcessID, Type: params.PID, Value: uint32(859)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.ProcessID, params.PID, params.U32(uint32(859))),
+		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 	e2 := &event.Event{
@@ -419,9 +419,9 @@ func TestUnconstrainedSequenceMatches(t *testing.T) {
 				Name: "svchost.exe",
 			},
 		},
-		Params: event.Params{
-			params.ProcessID: {Name: params.ProcessID, Type: params.PID, Value: uint32(859)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.ProcessID, params.PID, params.U32(uint32(859))),
+		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 	e3 := &event.Event{
@@ -435,9 +435,9 @@ func TestUnconstrainedSequenceMatches(t *testing.T) {
 			Exe:  "C:\\Windows\\system32\\cmd.exe",
 			PID:  3859,
 		},
-		Params: event.Params{
-			params.FilePath: {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Temp\\file.tmp"},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.FilePath, params.String, params.Str("C:\\Temp\\file.tmp")),
+		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
@@ -478,9 +478,9 @@ func TestSimpleSequenceDeadline(t *testing.T) {
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost-temp.exe",
 		},
-		Params: event.Params{
-			params.ProcessID: {Name: params.ProcessID, Type: params.Uint32, Value: uint32(4143)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.ProcessID, params.Uint32, params.U32(uint32(4143))),
+		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
@@ -495,9 +495,9 @@ func TestSimpleSequenceDeadline(t *testing.T) {
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
 		},
-		Params: event.Params{
-			params.FilePath: {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\svchost-temp.exe"},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.FilePath, params.String, params.Str("C:\\Windows\\system32\\svchost-temp.exe")),
+		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
@@ -547,9 +547,9 @@ func TestSequenceMultiLinks(t *testing.T) {
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost-temp.exe",
 		},
-		Params: event.Params{
-			params.ProcessID: {Name: params.ProcessID, Type: params.Uint32, Value: uint32(4143)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.ProcessID, params.Uint32, params.U32(uint32(4143))),
+		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
@@ -564,9 +564,9 @@ func TestSequenceMultiLinks(t *testing.T) {
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
 		},
-		Params: event.Params{
-			params.FilePath: {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\svchost-temp.exe"},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.FilePath, params.String, params.Str("C:\\Windows\\system32\\svchost-temp.exe")),
+		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
@@ -598,10 +598,10 @@ func TestComplexSequence(t *testing.T) {
 			Name: "firefox.exe",
 			Exe:  "C:\\Program Files\\Firefox\\firefox.exe",
 		},
-		Params: event.Params{
-			params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: uint32(2243)},
-			params.ProcessName: {Name: params.ProcessName, Type: params.UnicodeString, Value: "firefox.exe"},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.ProcessID, params.PID, params.U32(uint32(2243))),
+			event.NewParam(params.ProcessName, params.String, params.Str("firefox.exe")),
+		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
@@ -618,10 +618,10 @@ func TestComplexSequence(t *testing.T) {
 			Exe:     "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
 			Cmdline: "C:\\Program Files\\Mozilla Firefox\\firefox.exe\" -contentproc --channel=\"10464.7.539748228\\1366525930\" -childID 6 -isF",
 		},
-		Params: event.Params{
-			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
-			params.FileOperation: {Name: params.FileOperation, Type: params.Enum, Value: uint32(2), Enum: fs.FileCreateDispositions},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.FilePath, params.String, params.Str("C:\\Temp\\dropper.exe")),
+			event.NewParam(params.FileOperation, params.Enum, params.U32(uint32(2)), event.WithEnum(fs.FileCreateDispositions)),
+		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
@@ -641,9 +641,9 @@ func TestComplexSequence(t *testing.T) {
 			Exe:     "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
 			Cmdline: "C:\\Program Files\\Mozilla Firefox\\firefox.exe\" -contentproc --channel=\"10464.7.539748228\\1366525930\" -childID 6 -isF",
 		},
-		Params: event.Params{
-			params.NetDIP: {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("10.0.2.3")},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.NetDIP, params.IPv4, params.IPAddr(net.ParseIP("10.0.2.3"))),
+		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
@@ -686,10 +686,10 @@ func TestSequenceOOO(t *testing.T) {
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\rundll32.exe",
 		},
-		Params: event.Params{
-			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\temp\\lsass.dmp"},
-			params.FileOperation: {Name: params.FileOperation, Type: params.UnicodeString, Value: "CREATE"},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.FilePath, params.String, params.Str("C:\\temp\\lsass.dmp")),
+			event.NewParam(params.FileOperation, params.String, params.Str("CREATE")),
+		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
@@ -706,11 +706,11 @@ func TestSequenceOOO(t *testing.T) {
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\rundll32.exe",
 		},
-		Params: event.Params{
-			params.Exe:           {Name: params.Exe, Type: params.UnicodeString, Value: "C:\\Windows\\System32\\lsass.exe"},
-			params.ProcessID:     {Name: params.ProcessID, Type: params.PID, Value: uint32(2243)},
-			params.DesiredAccess: {Name: params.DesiredAccess, Type: params.Flags, Value: uint32(0x1400), Flags: event.PsAccessRightFlags},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.Exe, params.String, params.Str("C:\\Windows\\System32\\lsass.exe")),
+			event.NewParam(params.ProcessID, params.PID, params.U32(uint32(2243))),
+			event.NewParam(params.DesiredAccess, params.Flags, params.U32(uint32(0x1400)), event.WithFlags(event.PsAccessRightFlags)),
+		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
@@ -744,11 +744,11 @@ func TestSequenceGC(t *testing.T) {
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\rundll32.exe",
 		},
-		Params: event.Params{
-			params.Exe:           {Name: params.Exe, Type: params.UnicodeString, Value: "C:\\Windows\\System32\\lsass.exe"},
-			params.ProcessID:     {Name: params.ProcessID, Type: params.PID, Value: uint32(2243)},
-			params.DesiredAccess: {Name: params.DesiredAccess, Type: params.Flags, Value: uint32(0x1400), Flags: event.PsAccessRightFlags},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.Exe, params.String, params.Str("C:\\Windows\\System32\\lsass.exe")),
+			event.NewParam(params.ProcessID, params.PID, params.U32(uint32(2243))),
+			event.NewParam(params.DesiredAccess, params.Flags, params.U32(uint32(0x1400)), event.WithFlags(event.PsAccessRightFlags)),
+		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
@@ -788,11 +788,11 @@ func TestSequenceExpire(t *testing.T) {
 						Name: "cmd.exe",
 						Exe:  "C:\\Windows\\system32\\rundll32.exe",
 					},
-					Params: event.Params{
-						params.Exe:           {Name: params.Exe, Type: params.UnicodeString, Value: "C:\\Windows\\System32\\lsass.exe"},
-						params.ProcessID:     {Name: params.ProcessID, Type: params.PID, Value: uint32(2243)},
-						params.DesiredAccess: {Name: params.DesiredAccess, Type: params.Flags, Value: uint32(0x1400), Flags: event.PsAccessRightFlags},
-					},
+					Params: event.ParamsOf(
+						event.NewParam(params.Exe, params.String, params.Str("C:\\Windows\\System32\\lsass.exe")),
+						event.NewParam(params.ProcessID, params.PID, params.U32(uint32(2243))),
+						event.NewParam(params.DesiredAccess, params.Flags, params.U32(uint32(0x1400)), event.WithFlags(event.PsAccessRightFlags)),
+					),
 					Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 				},
 				{
@@ -803,10 +803,10 @@ func TestSequenceExpire(t *testing.T) {
 						Name: "cmd.exe",
 						Exe:  "C:\\Windows\\system32\\svchost.exe",
 					},
-					Params: event.Params{
-						params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: uint32(4143)},
-						params.ProcessName: {Name: params.ProcessName, Type: params.AnsiString, Value: "powershell.exe"},
-					},
+					Params: event.ParamsOf(
+						event.NewParam(params.ProcessID, params.PID, params.U32(uint32(4143))),
+						event.NewParam(params.ProcessName, params.String, params.Str("powershell.exe")),
+					),
 				},
 			},
 			true,
@@ -829,10 +829,10 @@ func TestSequenceExpire(t *testing.T) {
 						Name: "rundll32.exe",
 						Exe:  "C:\\Windows\\system32\\rundll32.exe",
 					},
-					Params: event.Params{
-						params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: uint32(2243)},
-						params.ProcessName: {Name: params.ProcessName, Type: params.UnicodeString, Value: "rundll32.exe"},
-					},
+					Params: event.ParamsOf(
+						event.NewParam(params.ProcessID, params.PID, params.U32(uint32(2243))),
+						event.NewParam(params.ProcessName, params.String, params.Str("rundll32.exe")),
+					),
 					Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 				},
 				{
@@ -849,10 +849,10 @@ func TestSequenceExpire(t *testing.T) {
 							PID:  2243,
 						},
 					},
-					Params: event.Params{
-						params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: uint32(12243)},
-						params.ProcessName: {Name: params.ProcessName, Type: params.UnicodeString, Value: "connhost.exe"},
-					},
+					Params: event.ParamsOf(
+						event.NewParam(params.ProcessID, params.PID, params.U32(uint32(12243))),
+						event.NewParam(params.ProcessName, params.String, params.Str("connhost.exe")),
+					),
 					Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 				},
 				{
@@ -863,10 +863,10 @@ func TestSequenceExpire(t *testing.T) {
 						Name: "cmd.exe",
 						Exe:  "C:\\Windows\\system32\\svchost.exe",
 					},
-					Params: event.Params{
-						params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: uint32(12243)},
-						params.ProcessName: {Name: params.ProcessName, Type: params.AnsiString, Value: "powershell.exe"},
-					},
+					Params: event.ParamsOf(
+						event.NewParam(params.ProcessID, params.PID, params.U32(uint32(12243))),
+						event.NewParam(params.ProcessName, params.String, params.Str("powershell.exe")),
+					),
 				},
 			},
 			false,
@@ -922,9 +922,9 @@ func TestSequenceBoundFields(t *testing.T) {
 			Exe:  "C:\\Windows\\system32\\svchost-temp.exe",
 			SID:  "zinet",
 		},
-		Params: event.Params{
-			params.ProcessID: {Name: params.ProcessID, Type: params.Uint32, Value: uint32(4143)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.ProcessID, params.Uint32, params.U32(uint32(4143))),
+		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
@@ -938,9 +938,9 @@ func TestSequenceBoundFields(t *testing.T) {
 			Exe:  "C:\\Windows\\system32\\svchost-temp.exe",
 			SID:  "nusret",
 		},
-		Params: event.Params{
-			params.ProcessID: {Name: params.ProcessID, Type: params.Uint32, Value: uint32(4143)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.ProcessID, params.Uint32, params.U32(uint32(4143))),
+		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
@@ -954,9 +954,9 @@ func TestSequenceBoundFields(t *testing.T) {
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
 			SID:  "nusret",
 		},
-		Params: event.Params{
-			params.FilePath: {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\svchost-temp.exe"},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.FilePath, params.String, params.Str("C:\\Windows\\system32\\svchost-temp.exe")),
+		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
@@ -970,10 +970,10 @@ func TestSequenceBoundFields(t *testing.T) {
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
 			SID:  "zinet",
 		},
-		Params: event.Params{
-			params.NetDport: {Name: params.NetDport, Type: params.Uint16, Value: uint16(80)},
-			params.NetDIP:   {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("172.1.2.3")},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.NetDport, params.Uint16, params.U16(uint16(80))),
+			event.NewParam(params.NetDIP, params.IPv4, params.IPAddr(net.ParseIP("172.1.2.3"))),
+		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
@@ -1010,9 +1010,9 @@ func TestSequenceBoundFieldsWithFunctions(t *testing.T) {
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\cmd.exe",
 		},
-		Params: event.Params{
-			params.FilePath: {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\System32\\passwdflt.dll"},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.FilePath, params.String, params.Str("C:\\Windows\\System32\\passwdflt.dll")),
+		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
@@ -1025,9 +1025,9 @@ func TestSequenceBoundFieldsWithFunctions(t *testing.T) {
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\cmd.exe",
 		},
-		Params: event.Params{
-			params.RegPath: {Name: params.RegPath, Type: params.UnicodeString, Value: "HKEY_CURRENT_USER\\Volatile Environment\\Notification Packages"},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.RegPath, params.String, params.Str("HKEY_CURRENT_USER\\Volatile Environment\\Notification Packages")),
+		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
@@ -1067,9 +1067,9 @@ func TestIsExpressionEvaluable(t *testing.T) {
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
 		},
-		Params: event.Params{
-			params.ProcessID: {Name: params.ProcessID, Type: params.Uint32, Value: uint32(4143)},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.ProcessID, params.Uint32, params.U32(uint32(4143))),
+		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
@@ -1081,9 +1081,9 @@ func TestIsExpressionEvaluable(t *testing.T) {
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
 		},
-		Params: event.Params{
-			params.FilePath: {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Temp\\dropper"},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.FilePath, params.String, params.Str("C:\\Temp\\dropper")),
+		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 

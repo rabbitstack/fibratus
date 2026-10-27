@@ -418,7 +418,7 @@ func TestEventSourceAllEvents(t *testing.T) {
 				return nil
 			},
 			func(e *event.Event) bool {
-				return e.IsCreateProcess() && e.Params.MustGetUint32(params.ProcessParentID) == uint32(os.Getpid()) &&
+				return e.IsCreateProcess() && e.Params.GetUint32ByName(params.ProcessParentID) == uint32(os.Getpid()) &&
 					strings.EqualFold(e.GetParamAsString(params.ProcessName), "notepad.exe")
 			},
 			false,
@@ -583,7 +583,7 @@ func TestEventSourceAllEvents(t *testing.T) {
 			func(e *event.Event) bool {
 				return e.CurrentPid() && e.Type == event.UnmapViewOfSection &&
 					e.GetParamAsString(params.MemProtect) == "READONLY" &&
-					e.Params.MustGetUint64(params.FileViewBase) == uint64(viewBase)
+					e.Params.GetUint64ByName(params.FileViewBase) == uint64(viewBase)
 			},
 			false,
 		},
@@ -617,7 +617,7 @@ func TestEventSourceAllEvents(t *testing.T) {
 			},
 			func(e *event.Event) bool {
 				return e.CurrentPid() && e.Type == event.VirtualFree &&
-					e.GetParamAsString(params.MemAllocType) == "DECOMMIT" && e.Params.MustGetUint64(params.MemBaseAddress) == uint64(freeAddress)
+					e.GetParamAsString(params.MemAllocType) == "DECOMMIT" && e.Params.GetUint64ByName(params.MemBaseAddress) == uint64(freeAddress)
 			},
 			false,
 		},
@@ -796,7 +796,7 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 				return nil
 			},
 			func(e *event.Event) bool {
-				if e.IsCreateProcess() && e.Params.MustGetUint32(params.ProcessParentID) == uint32(os.Getpid()) &&
+				if e.IsCreateProcess() && e.Params.GetUint32ByName(params.ProcessParentID) == uint32(os.Getpid()) &&
 					strings.EqualFold(e.GetParamAsString(params.ProcessName), "notepad.exe") {
 					callstack := e.Callstack.String()
 					log.Infof("create process event %s: %s", e.String(), callstack)

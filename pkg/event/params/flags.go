@@ -16,25 +16,25 @@
  * limitations under the License.
  */
 
-package event
+package params
 
 import "strings"
 
-// ParamFlag defines the mapping between a flag value and its symbolic name.
-type ParamFlag struct {
+// Flag defines the mapping between a flag value and its symbolic name.
+type Flag struct {
 	Name  string
 	Value uint64
 }
 
-func (f ParamFlag) eval(v uint64) bool {
+func (f Flag) eval(v uint64) bool {
 	return (v == 0 && f.Value == 0) || (f.Value != 0 && (v&f.Value) == f.Value && v != 0)
 }
 
-// ParamFlags maps parameter bit flags to symbolic names.
-type ParamFlags []ParamFlag
+// Flags maps parameter bit flags to symbolic names.
+type Flags []Flag
 
 // String returns the names of all flags in the bitmask, separated by pipes.
-func (flags ParamFlags) String(value uint64) string {
+func (flags Flags) String(value uint64) string {
 	if value == 0 {
 		return ""
 	}

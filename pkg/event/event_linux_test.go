@@ -30,13 +30,12 @@ import (
 )
 
 func TestParamBasics(t *testing.T) {
-	p := NewParam(params.ProcessID, params.PID, uint64(42))
-	require.NotNil(t, p)
+	p := NewParam(params.ProcessID, params.PID, params.U32(42))
 	assert.Equal(t, "42", p.String())
 
 	pars := Params{}
-	pars.Append(params.ProcessName, params.String, "bash")
-	assert.Equal(t, "bash", pars.MustGetString(params.ProcessName))
+	pars.Append(params.ProcessName, params.String, params.Str("bash"))
+	assert.Equal(t, "bash", pars.GetStringByName(params.ProcessName))
 }
 
 func TestEventTypeHelpers(t *testing.T) {
@@ -46,12 +45,12 @@ func TestEventTypeHelpers(t *testing.T) {
 	assert.Equal(t, Execve, e.Type)
 
 	processClone := &Event{Type: Clone, Params: Params{}}
-	processClone.Params.Append(params.CloneFlags, params.Uint64, uint64(0))
+	processClone.Params.Append(params.CloneFlags, params.Uint64, params.U64(uint64(0)))
 	assert.True(t, processClone.IsCreateProcess())
 	assert.False(t, processClone.IsCreateThread())
 
 	threadClone := &Event{Type: Clone, Params: Params{}}
-	threadClone.Params.Append(params.CloneFlags, params.Uint64, unix.CLONE_THREAD)
+	threadClone.Params.Append(params.CloneFlags, params.Uint64, params.U64(unix.CLONE_THREAD))
 	assert.False(t, threadClone.IsCreateProcess())
 	assert.True(t, threadClone.IsCreateThread())
 }

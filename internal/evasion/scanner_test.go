@@ -43,12 +43,12 @@ func TestScannerProcessEvent(t *testing.T) {
 			Seq:       2,
 			Timestamp: time.Now(),
 			Metadata:  event.Metadata{},
-			Params: event.Params{
-				params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
-				params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
-				params.FileType:      {Name: params.FileType, Type: params.AnsiString, Value: "file"},
-				params.FileOperation: {Name: params.FileOperation, Type: params.Enum, Value: uint32(2), Enum: fs.FileCreateDispositions},
-			},
+			Params: event.ParamsOf(
+				event.NewParam(params.FileObject, params.Uint64, params.U64(uint64(12456738026482168384))),
+				event.NewParam(params.FilePath, params.String, params.Str("C:\\Windows\\system32\\user32.dll")),
+				event.NewParam(params.FileType, params.String, params.Str("file")),
+				event.NewParam(params.FileOperation, params.Enum, params.U32(uint32(2)), event.WithEnum(fs.FileCreateDispositions)),
+			),
 			Callstack: callstackFromFrames(
 				callstack.Frame{Addr: 0xf259de, Module: "unbacked", Symbol: "?"},
 				callstack.Frame{Addr: 0x7ffe4fda6e3b, Module: "C:\\Windows\\System32\\KernelBase.dll", Symbol: "SetThreadContext"},

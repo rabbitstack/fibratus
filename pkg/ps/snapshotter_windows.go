@@ -159,14 +159,8 @@ func (s *snapshotter) WriteFromCapture(e *event.Event) error {
 		if proc == nil {
 			return nil
 		}
-		pid, err := e.Params.GetPid()
-		if err != nil {
-			return err
-		}
-		ppid, err := e.Params.GetPpid()
-		if err != nil {
-			return err
-		}
+		pid := e.Params.GetPid()
+		ppid := e.Params.GetPpid()
 		if proc.PID == proc.Ppid ||
 			(e.IsProcessRundown() && pid == sys.InvalidProcessID) {
 			return nil
@@ -174,6 +168,7 @@ func (s *snapshotter) WriteFromCapture(e *event.Event) error {
 		if e.IsProcessRundown() {
 			proc.Parent = s.procs[ppid]
 		} else {
+			var err error
 			proc, err = s.newProcState(pid, ppid, e)
 			if err != nil {
 				return err
@@ -193,14 +188,8 @@ func (s *snapshotter) Write(e *event.Event) error {
 	defer s.mu.Unlock()
 	processCount.Add(1)
 
-	pid, err := e.Params.GetPid()
-	if err != nil {
-		return err
-	}
-	ppid, err := e.Params.GetPpid()
-	if err != nil {
-		return err
-	}
+	pid := e.Params.GetPid()
+	ppid := e.Params.GetPpid()
 
 	proc, err := s.newProcState(pid, ppid, e)
 	if ps := s.procs[pid]; ps == nil && (e.IsCreateProcessInternal() || e.IsProcessRundownInternal()) {
@@ -227,7 +216,7 @@ func (s *snapshotter) Write(e *event.Event) error {
 		if strings.EqualFold(proc.Name, filepath.Base(ps.Exe)) && len(ps.Exe) > len(proc.Exe) {
 			// prefer full executable path
 			proc.Exe = ps.Exe
-			e.AppendParam(params.Exe, params.Path, ps.Exe)
+			e.SetParam(params.Exe, params.Str(ps.Exe))
 		}
 
 		// if the process UUID has been initialized when
@@ -235,9 +224,9 @@ func (s *snapshotter) Write(e *event.Event) error {
 		// current process state
 		proc.AssignUUID(ps)
 
-		e.AppendParam(params.ProcessTokenIntegrityLevel, params.AnsiString, ps.TokenIntegrityLevel)
-		e.AppendParam(params.ProcessTokenElevationType, params.AnsiString, ps.TokenElevationType)
-		e.AppendParam(params.ProcessTokenIsElevated, params.Bool, ps.IsTokenElevated)
+		e.SetParam(params.ProcessTokenIntegrityLevel, params.Str(ps.TokenIntegrityLevel))
+		e.SetParam(params.ProcessTokenElevationType, params.Str(ps.TokenElevationType))
+		e.SetParam(params.ProcessTokenIsElevated, params.Boolean(ps.IsTokenElevated))
 
 		s.procs[pid] = proc
 	} else {
@@ -252,10 +241,7 @@ func (s *snapshotter) Write(e *event.Event) error {
 }
 
 func (s *snapshotter) AddThread(e *event.Event) error {
-	pid, err := e.Params.GetPid()
-	if err != nil {
-		return err
-	}
+	pid := e.Params.GetPid()
 	threadCount.Add(1)
 
 	s.mu.Lock()
@@ -266,15 +252,15 @@ func (s *snapshotter) AddThread(e *event.Event) error {
 	}
 
 	thread := pstypes.Thread{}
-	thread.Tid, _ = e.Params.GetTid()
-	thread.UstackBase = e.Params.TryGetAddress(params.UstackBase)
-	thread.UstackLimit = e.Params.TryGetAddress(params.UstackLimit)
-	thread.KstackBase = e.Params.TryGetAddress(params.KstackBase)
-	thread.KstackLimit = e.Params.TryGetAddress(params.KstackLimit)
-	thread.IOPrio, _ = e.Params.GetUint8(params.IOPrio)
-	thread.BasePrio, _ = e.Params.GetUint8(params.BasePrio)
-	thread.PagePrio, _ = e.Params.GetUint8(params.PagePrio)
-	thread.StartAddress = e.Params.TryGetAddress(params.StartAddress)
+	thread.Tid = e.Params.GetTid()
+	thread.UstackBase = e.Params.GetAddressByName(params.UstackBase)
+	thread.UstackLimit = e.Params.GetAddressByName(params.UstackLimit)
+	thread.KstackBase = e.Params.GetAddressByName(params.KstackBase)
+	thread.KstackLimit = e.Params.GetAddressByName(params.KstackLimit)
+	thread.IOPrio = e.Params.GetUint8ByName(params.IOPrio)
+	thread.BasePrio = e.Params.GetUint8ByName(params.BasePrio)
+	thread.PagePrio = e.Params.GetUint8ByName(params.PagePrio)
+	thread.StartAddress = e.Params.GetAddressByName(params.StartAddress)
 
 	proc.AddThread(thread)
 
@@ -282,10 +268,7 @@ func (s *snapshotter) AddThread(e *event.Event) error {
 }
 
 func (s *snapshotter) AddModule(e *event.Event) error {
-	pid, err := e.Params.GetPid()
-	if err != nil {
-		return err
-	}
+	pid := e.Params.GetPid()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -299,12 +282,12 @@ func (s *snapshotter) AddModule(e *event.Event) error {
 	}
 
 	module := pstypes.Module{}
-	module.Size, _ = e.Params.GetUint64(params.ModuleSize)
-	module.Checksum, _ = e.Params.GetUint32(params.ModuleCheckSum)
-	module.TimedateStamp, _ = e.Params.GetUint32(params.ModuleTimeDateStamp)
+	module.Size = e.Params.GetUint64ByName(params.ModuleSize)
+	module.Checksum = e.Params.GetUint32ByName(params.ModuleCheckSum)
+	module.TimedateStamp = e.Params.GetUint32ByName(params.ModuleTimeDateStamp)
 	module.Name = e.GetParamAsString(params.ModulePath)
-	module.BaseAddress = e.Params.TryGetAddress(params.ModuleBase)
-	module.DefaultBaseAddress = e.Params.TryGetAddress(params.ModuleDefaultBase)
+	module.BaseAddress = e.Params.GetAddressByName(params.ModuleBase)
+	module.DefaultBaseAddress = e.Params.GetAddressByName(params.ModuleDefaultBase)
 
 	if e.IsLoadModuleInternal() {
 		proc.AddModule(module)
@@ -313,8 +296,8 @@ func (s *snapshotter) AddModule(e *event.Event) error {
 
 	moduleCount.Add(1)
 
-	module.SignatureLevel, _ = e.Params.GetUint32(params.ModuleSignatureLevel)
-	module.SignatureType, _ = e.Params.GetUint32(params.ModuleSignatureType)
+	module.SignatureLevel = e.Params.GetUint32ByName(params.ModuleSignatureLevel)
+	module.SignatureType = e.Params.GetUint32ByName(params.ModuleSignatureType)
 
 	if strings.EqualFold(proc.Name, filepath.Base(module.Name)) && len(proc.Exe) < len(module.Name) {
 		// if the module is loaded for the process executable, and
@@ -392,9 +375,9 @@ func (s *snapshotter) AddMmap(e *event.Event) error {
 
 	mmap := pstypes.Mmap{}
 	mmap.File = e.GetParamAsString(params.FilePath)
-	mmap.BaseAddress = e.Params.TryGetAddress(params.FileViewBase)
-	mmap.Size, _ = e.Params.GetUint64(params.FileViewSize)
-	mmap.Protection, _ = e.Params.GetUint32(params.MemProtect)
+	mmap.BaseAddress = e.Params.GetAddressByName(params.FileViewBase)
+	mmap.Size = e.Params.GetUint64ByName(params.FileViewSize)
+	mmap.Protection = e.Params.GetUint32ByName(params.MemProtect)
 	mmap.Type = e.GetParamAsString(params.FileViewSectionType)
 
 	proc.AddMmap(mmap)
@@ -428,7 +411,7 @@ func (s *snapshotter) newProcState(pid, ppid uint32, e *event.Event) (*pstypes.P
 			Name:                filepath.Base(e.GetParamAsString(params.Exe)),
 			TokenIntegrityLevel: e.GetParamAsString(params.ProcessTokenIntegrityLevel),
 			TokenElevationType:  e.GetParamAsString(params.ProcessTokenElevationType),
-			IsTokenElevated:     e.Params.TryGetBool(params.ProcessTokenIsElevated),
+			IsTokenElevated:     e.Params.GetBoolByName(params.ProcessTokenIsElevated),
 			Threads:             make(map[uint32]pstypes.Thread),
 			Modules:             make([]pstypes.Module, 0),
 			Handles:             make([]htypes.Handle, 0),
@@ -444,23 +427,23 @@ func (s *snapshotter) newProcState(pid, ppid uint32, e *event.Event) (*pstypes.P
 		e.GetParamAsString(params.ProcessName),
 		e.GetParamAsString(params.Cmdline),
 		e.GetParamAsString(params.Exe),
-		e.Params.MustGetSID(),
-		e.Params.MustGetUint32(params.SessionID),
+		e.Params.GetSID(),
+		e.Params.GetUint32ByName(params.SessionID),
 	)
 
 	proc.Parent = s.procs[ppid]
-	proc.StartTime, _ = e.Params.GetTime(params.StartTime)
-	proc.IsWOW64 = (e.Params.MustGetUint32(params.ProcessFlags) & event.PsWOW64) != 0
-	proc.IsPackaged = (e.Params.MustGetUint32(params.ProcessFlags) & event.PsPackaged) != 0
-	proc.IsProtected = (e.Params.MustGetUint32(params.ProcessFlags) & event.PsProtected) != 0
+	proc.StartTime = e.Params.GetTimeByName(params.StartTime)
+	proc.IsWOW64 = (e.Params.GetUint32ByName(params.ProcessFlags) & event.PsWOW64) != 0
+	proc.IsPackaged = (e.Params.GetUint32ByName(params.ProcessFlags) & event.PsPackaged) != 0
+	proc.IsProtected = (e.Params.GetUint32ByName(params.ProcessFlags) & event.PsProtected) != 0
 	proc.IsCreatedFromSystemLogger = true
 
 	if !s.capture {
 		if proc.Username != "" {
-			e.AppendParam(params.Username, params.UnicodeString, proc.Username)
+			e.SetParam(params.Username, params.Str(proc.Username))
 		}
 		if proc.Domain != "" {
-			e.AppendParam(params.Domain, params.UnicodeString, proc.Domain)
+			e.SetParam(params.Domain, params.Str(proc.Domain))
 		}
 		// retrieve process handles
 		var err error
@@ -517,8 +500,8 @@ func (s *snapshotter) newProcState(pid, ppid uint32, e *event.Event) (*pstypes.P
 		proc.TokenIntegrityLevel = sys.RidToString(tokenMandatoryLabel.Label.Sid)
 		proc.IsTokenElevated = token.IsElevated()
 
-		e.AppendParam(params.ProcessTokenIntegrityLevel, params.AnsiString, proc.TokenIntegrityLevel)
-		e.AppendParam(params.ProcessTokenIsElevated, params.Bool, proc.IsTokenElevated)
+		e.SetParam(params.ProcessTokenIntegrityLevel, params.Str(proc.TokenIntegrityLevel))
+		e.SetParam(params.ProcessTokenIsElevated, params.Boolean(proc.IsTokenElevated))
 	}
 
 readPEB:
@@ -537,10 +520,7 @@ readPEB:
 func (s *snapshotter) Remove(e *event.Event) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	pid, err := e.Params.GetPid()
-	if err != nil {
-		return err
-	}
+	pid := e.Params.GetPid()
 	// remove process from primary map and
 	// move to dirty map. This is required
 	// to prevent dropping process state from

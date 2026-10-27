@@ -39,13 +39,13 @@ func TestNetworkProcessor(t *testing.T) {
 			"send tcpv4",
 			&event.Event{
 				Type: event.Send,
-				Params: event.Params{
-					params.NetDport:   {Name: params.NetDport, Type: params.Uint16, Value: uint16(443)},
-					params.NetSport:   {Name: params.NetSport, Type: params.Uint16, Value: uint16(43123)},
-					params.NetSIP:     {Name: params.NetSIP, Type: params.IPv4, Value: net.ParseIP("127.0.0.1")},
-					params.NetDIP:     {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("8.8.8.8")},
-					params.NetL4Proto: {Name: params.NetL4Proto, Type: params.Enum, Value: uint32(network.TCP), Enum: network.ProtoNames},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.NetDport, params.Uint16, params.U16(uint16(443))),
+					event.NewParam(params.NetSport, params.Uint16, params.U16(uint16(43123))),
+					event.NewParam(params.NetSIP, params.IPv4, params.IPAddr(net.ParseIP("127.0.0.1"))),
+					event.NewParam(params.NetDIP, params.IPv4, params.IPAddr(net.ParseIP("8.8.8.8"))),
+					event.NewParam(params.NetL4Proto, params.Enum, params.U32(uint32(network.TCP)), event.WithEnum(network.ProtoNames)),
+				),
 			},
 			func(e *event.Event, t *testing.T) {
 				assert.Equal(t, "Send", e.Type.String())
@@ -61,13 +61,13 @@ func TestNetworkProcessor(t *testing.T) {
 			"recv udp6",
 			&event.Event{
 				Type: event.Recv,
-				Params: event.Params{
-					params.NetDport:   {Name: params.NetDport, Type: params.Uint16, Value: uint16(53)},
-					params.NetSport:   {Name: params.NetSport, Type: params.Uint16, Value: uint16(43123)},
-					params.NetSIP:     {Name: params.NetSIP, Type: params.IPv4, Value: net.ParseIP("127.0.0.1")},
-					params.NetDIP:     {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("8.8.8.8")},
-					params.NetL4Proto: {Name: params.NetL4Proto, Type: params.Enum, Value: uint32(network.UDP), Enum: network.ProtoNames},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.NetDport, params.Uint16, params.U16(uint16(53))),
+					event.NewParam(params.NetSport, params.Uint16, params.U16(uint16(43123))),
+					event.NewParam(params.NetSIP, params.IPv4, params.IPAddr(net.ParseIP("127.0.0.1"))),
+					event.NewParam(params.NetDIP, params.IPv4, params.IPAddr(net.ParseIP("8.8.8.8"))),
+					event.NewParam(params.NetL4Proto, params.Enum, params.U32(uint32(network.UDP)), event.WithEnum(network.ProtoNames)),
+				),
 			},
 			func(e *event.Event, t *testing.T) {
 				assert.Equal(t, "Recv", e.Type.String())

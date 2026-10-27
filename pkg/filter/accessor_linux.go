@@ -44,7 +44,7 @@ func GetAccessors() []Accessor {
 	}
 }
 
-func (e *evtAccessor) Get(f Field, evt *event.Event) (params.Value, error) {
+func (e *evtAccessor) Get(f Field, evt *event.Event) (any, error) {
 	v, err := e.get(f, evt)
 	if v != nil {
 		return v, err
@@ -52,9 +52,9 @@ func (e *evtAccessor) Get(f Field, evt *event.Event) (params.Value, error) {
 
 	switch f.Name {
 	case fields.EvtRetval:
-		return evt.Params.GetInt64(params.Retval)
+		return param(evt, params.Retval, event.Params.GetInt64ByName)
 	case fields.EvtSyscallID:
-		return evt.Params.GetUint32(params.SyscallID)
+		return param(evt, params.SyscallID, event.Params.GetUint32ByName)
 	}
 
 	return nil, err
@@ -79,7 +79,7 @@ func (psAccessor) IsFieldAccessible(e *event.Event) bool {
 
 func newPSAccessor(psnap ps.Snapshotter) Accessor { return &psAccessor{psnap: psnap} }
 
-func (a *psAccessor) Get(f Field, e *event.Event) (params.Value, error) {
+func (a *psAccessor) Get(f Field, e *event.Event) (any, error) {
 	switch f.Name {
 	case fields.PsPid:
 		return e.PID, nil
@@ -122,12 +122,12 @@ func (a *psAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 		if e.PS != nil {
 			return e.PS.UID, nil
 		}
-		return e.Params.GetUint32(params.UID)
+		return param(e, params.UID, event.Params.GetUint32ByName)
 	case fields.PsGID:
 		if e.PS != nil {
 			return e.PS.GID, nil
 		}
-		return e.Params.GetUint32(params.GID)
+		return param(e, params.GID, event.Params.GetUint32ByName)
 	case fields.PsUUID:
 		if e.PS == nil {
 			return nil, ErrPsNil
@@ -212,19 +212,19 @@ func (a *psAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 		}
 		return envs, nil
 	case fields.PsSignal:
-		sig, err := e.Params.GetInt32(params.Signal)
+		sig, err := param(e, params.Signal, event.Params.GetInt32ByName)
 		if err != nil {
 			return nil, err
 		}
 		return int64(sig), nil
 	case fields.PsTargetPID:
-		return e.Params.GetInt64(params.TargetProcessID)
+		return param(e, params.TargetProcessID, event.Params.GetInt64ByName)
 	case fields.PsPtraceRequest:
-		return e.Params.GetInt64(params.PtraceRequest)
+		return param(e, params.PtraceRequest, event.Params.GetInt64ByName)
 	case fields.PsPrctlOption:
-		return e.Params.GetInt64(params.PrctlOption)
+		return param(e, params.PrctlOption, event.Params.GetInt64ByName)
 	case fields.PsCloneFlags:
-		return e.Params.GetUint64(params.CloneFlags)
+		return param(e, params.CloneFlags, event.Params.GetUint64ByName)
 	default:
 		return nil, nil
 	}
@@ -237,7 +237,7 @@ func (fileAccessor) SetSegments([]fields.Segment)          {}
 func (fileAccessor) IsFieldAccessible(e *event.Event) bool { return e.Category() == event.File }
 func newFileAccessor() Accessor                            { return &fileAccessor{} }
 
-func (*fileAccessor) Get(f Field, e *event.Event) (params.Value, error) {
+func (*fileAccessor) Get(f Field, e *event.Event) (any, error) {
 	switch f.Name {
 	case fields.FilePath:
 		return e.GetParamAsString(params.FilePath), nil
@@ -250,13 +250,13 @@ func (*fileAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 	case fields.FilePathTarget:
 		return e.GetParamAsString(params.FileNewPath), nil
 	case fields.FileDirFD:
-		return e.Params.GetInt64(params.DirFD)
+		return param(e, params.DirFD, event.Params.GetInt64ByName)
 	case fields.FileFD:
-		return e.Params.GetInt64(params.FD)
+		return param(e, params.FD, event.Params.GetInt64ByName)
 	case fields.FileFlags:
-		return e.Params.GetUint64(params.FileFlags)
+		return param(e, params.FileFlags, event.Params.GetUint64ByName)
 	case fields.FileMode:
-		return e.Params.GetUint64(params.FileMode)
+		return param(e, params.FileMode, event.Params.GetUint64ByName)
 	default:
 		return nil, nil
 	}
@@ -269,22 +269,22 @@ func (networkAccessor) SetSegments([]fields.Segment)          {}
 func (networkAccessor) IsFieldAccessible(e *event.Event) bool { return e.Category() == event.Network }
 func newNetworkAccessor() Accessor                            { return &networkAccessor{} }
 
-func (*networkAccessor) Get(f Field, e *event.Event) (params.Value, error) {
+func (*networkAccessor) Get(f Field, e *event.Event) (any, error) {
 	switch f.Name {
 	case fields.NetDIP:
-		return e.Params.GetIP(params.NetDIP)
+		return param(e, params.NetDIP, event.Params.GetIPByName)
 	case fields.NetSIP:
-		return e.Params.GetIP(params.NetSIP)
+		return param(e, params.NetSIP, event.Params.GetIPByName)
 	case fields.NetDport:
-		return e.Params.GetUint16(params.NetDport)
+		return param(e, params.NetDport, event.Params.GetUint16ByName)
 	case fields.NetSport:
-		return e.Params.GetUint16(params.NetSport)
+		return param(e, params.NetSport, event.Params.GetUint16ByName)
 	case fields.NetFamily:
-		return e.Params.GetUint16(params.SockFamily)
+		return param(e, params.SockFamily, event.Params.GetUint16ByName)
 	case fields.NetUnixPath:
 		return e.GetParamAsString(params.SockPath), nil
 	case fields.NetFD:
-		return e.Params.GetInt64(params.FD)
+		return param(e, params.FD, event.Params.GetInt64ByName)
 	default:
 		return nil, nil
 	}
@@ -297,22 +297,22 @@ func (memAccessor) SetSegments([]fields.Segment)          {}
 func (memAccessor) IsFieldAccessible(e *event.Event) bool { return e.Category() == event.Memory }
 func newMemAccessor() Accessor                            { return &memAccessor{} }
 
-func (*memAccessor) Get(f Field, e *event.Event) (params.Value, error) {
+func (*memAccessor) Get(f Field, e *event.Event) (any, error) {
 	switch f.Name {
 	case fields.MemBaseAddress:
-		return e.Params.GetUint64(params.MemBaseAddress)
+		return param(e, params.MemBaseAddress, event.Params.GetUint64ByName)
 	case fields.MemRegionSize:
-		return e.Params.GetUint64(params.MemRegionSize)
+		return param(e, params.MemRegionSize, event.Params.GetUint64ByName)
 	case fields.MemProtection:
-		return e.Params.GetUint32(params.MemProtect)
+		return param(e, params.MemProtect, event.Params.GetUint32ByName)
 	case fields.MemMmapFlags:
-		return e.Params.GetUint64(params.MmapFlags)
+		return param(e, params.MmapFlags, event.Params.GetUint64ByName)
 	case fields.MemMmapFD:
-		return e.Params.GetInt64(params.FD)
+		return param(e, params.FD, event.Params.GetInt64ByName)
 	case fields.MemMmapOffset:
-		return e.Params.GetUint64(params.MmapOffset)
+		return param(e, params.MmapOffset, event.Params.GetUint64ByName)
 	case fields.MemTargetPID:
-		return e.Params.GetInt64(params.TargetProcessID)
+		return param(e, params.TargetProcessID, event.Params.GetInt64ByName)
 	default:
 		return nil, nil
 	}
@@ -327,7 +327,7 @@ func (threadAccessor) IsFieldAccessible(e *event.Event) bool {
 }
 func newThreadAccessor() Accessor { return &threadAccessor{} }
 
-func (*threadAccessor) Get(f Field, e *event.Event) (params.Value, error) {
+func (*threadAccessor) Get(f Field, e *event.Event) (any, error) {
 	switch f.Name {
 	case fields.ThreadTID:
 		return e.Tid, nil

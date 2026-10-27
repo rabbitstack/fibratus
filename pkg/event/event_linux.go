@@ -29,12 +29,12 @@ import (
 
 // IsCreateProcess reports whether clone creates a new process.
 func (e *Event) IsCreateProcess() bool {
-	return e.Type == Clone && e.Params.TryGetUint64(params.CloneFlags)&unix.CLONE_THREAD == 0
+	return e.Type == Clone && e.Params.GetUint64ByName(params.CloneFlags)&unix.CLONE_THREAD == 0
 }
 
 // IsCreateThread reports whether clone creates a thread in the current process.
 func (e *Event) IsCreateThread() bool {
-	return e.Type == Clone && e.Params.TryGetUint64(params.CloneFlags)&unix.CLONE_THREAD != 0
+	return e.Type == Clone && e.Params.GetUint64ByName(params.CloneFlags)&unix.CLONE_THREAD != 0
 }
 
 // IsTerminateProcess reports whether the event exits a process.

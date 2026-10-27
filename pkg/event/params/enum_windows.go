@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package event
+package params
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/util/va"
@@ -24,7 +24,7 @@ import (
 )
 
 // ViewSectionTypes describes possible values for process mapped sections.
-var ViewSectionTypes = ParamEnum{
+var ViewSectionTypes = Enumeration{
 	va.SectionData:           "DATA",
 	va.SectionImage:          "IMAGE",
 	va.SectionImageNoExecute: "IMAGE_NO_EXECUTE",
@@ -32,8 +32,15 @@ var ViewSectionTypes = ParamEnum{
 	va.SectionPhysical:       "PHYSICAL",
 }
 
+// MemPageTypes represents the type of the pages in the allocated region.
+var MemPageTypes = Enumeration{
+	va.MemImage:   "IMAGE",
+	va.MemMapped:  "MAPPED",
+	va.MemPrivate: "PRIVATE",
+}
+
 // DNSRecordTypes describes DNS record type values.
-var DNSRecordTypes = ParamEnum{
+var DNSRecordTypes = Enumeration{
 	windows.DNS_TYPE_A:       "A",
 	windows.DNS_TYPE_NS:      "NS",
 	windows.DNS_TYPE_MD:      "MD",
@@ -95,7 +102,7 @@ var DNSRecordTypes = ParamEnum{
 }
 
 // DNSResponseCodes describes DNS response codes.
-var DNSResponseCodes = ParamEnum{
+var DNSResponseCodes = Enumeration{
 	uint32(windows.DNS_ERROR_RCODE_NO_ERROR):        "NOERROR",
 	uint32(windows.DNS_ERROR_RCODE_FORMAT_ERROR):    "FORMERR",
 	uint32(windows.DNS_ERROR_RCODE_SERVER_FAILURE):  "SERVFAIL",
@@ -122,7 +129,7 @@ const (
 )
 
 // PsTokenElevationTypes describes process token elevation types
-var PsTokenElevationTypes = ParamEnum{
+var PsTokenElevationTypes = Enumeration{
 	TokenElevationTypeDefault: "DEFAULT",
 	TokenElevationTypeFull:    "FULL",
 	TokenElevationTypeLimited: "LIMITED",

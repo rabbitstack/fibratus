@@ -52,8 +52,8 @@ func (f *Formatter) Format(evt *Event) []byte {
 	}
 
 	if f.expandParamsDot {
-		for _, par := range evt.Params {
-			values[".Params."+caser.String(par.Name)] = par.String()
+		for _, par := range evt.Params.Present() {
+			values[".Params."+caser.String(par.Name())] = par.String()
 		}
 	}
 

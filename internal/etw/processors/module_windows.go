@@ -44,8 +44,8 @@ func (m *moduleProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, erro
 	}
 
 	if e.IsUnloadModule() {
-		pid := e.Params.MustGetPid()
-		addr := e.Params.TryGetAddress(params.ModuleBase)
+		pid := e.Params.GetPid()
+		addr := e.Params.GetAddressByName(params.ModuleBase)
 		if pid == 0 {
 			pid = e.PID
 		}
@@ -53,8 +53,8 @@ func (m *moduleProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, erro
 	}
 
 	if e.IsLoadModule() || e.IsModuleRundown() {
-		typ := signature.Type(e.Params.MustGetUint32(params.ModuleSignatureType))
-		lvl := signature.Level(e.Params.MustGetUint32(params.ModuleSignatureLevel))
+		typ := signature.Type(e.Params.GetUint32ByName(params.ModuleSignatureType))
+		lvl := signature.Level(e.Params.GetUint32ByName(params.ModuleSignatureLevel))
 		// Code Integrity successfully validated the file's trust chain.
 		// The signature level WINDOWS and WINDOWS_TCB describes the trust
 		// level assigned after verification.

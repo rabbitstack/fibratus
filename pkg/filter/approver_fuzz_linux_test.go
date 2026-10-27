@@ -66,15 +66,15 @@ func fuzzEvent(typ event.Type, pid uint64, path string, port uint16) *event.Even
 		Name:     typ.String(),
 		PID:      pid,
 		PS:       &pstypes.PS{PID: pid, Name: "fuzz", Exe: "/bin/fuzz"},
-		Params:   event.Params{},
+		Params:   event.NewParams(typ),
 	}
 	switch typ {
 	case event.Openat, event.Unlink, event.Rename:
-		evt.Params[params.FilePath] = &event.Param{Name: params.FilePath, Type: params.Path, Value: path}
+		evt.Params.SetByName(params.FilePath, params.Str(path))
 	case event.Connect:
-		evt.Params[params.NetDport] = &event.Param{Name: params.NetDport, Type: params.Port, Value: port}
+		evt.Params.SetByName(params.NetDport, params.U16(port))
 	case event.Accept:
-		evt.Params[params.NetSport] = &event.Param{Name: params.NetSport, Type: params.Port, Value: port}
+		evt.Params.SetByName(params.NetSport, params.U16(port))
 	}
 	return evt
 }

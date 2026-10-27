@@ -38,12 +38,12 @@ func TestEventSummary(t *testing.T) {
 		Seq:       2,
 		Timestamp: time.Now(),
 		Host:      "archrabbit",
-		Params: Params{
-			params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
-			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
-			params.FileType:      {Name: params.FileType, Type: params.AnsiString, Value: "file"},
-			params.FileOperation: {Name: params.FileOperation, Type: params.Enum, Value: uint32(1), Enum: fs.FileCreateDispositions},
-		},
+		Params: ParamsOf(
+			NewParam(params.FileObject, params.Uint64, params.U64(uint64(12456738026482168384))),
+			NewParam(params.FilePath, params.String, params.Str("C:\\Windows\\system32\\user32.dll")),
+			NewParam(params.FileType, params.String, params.Str("file")),
+			NewParam(params.FileOperation, params.Enum, params.U32(uint32(1)), params.WithEnum(fs.FileCreateDispositions)),
+		),
 		PS: &pstypes.PS{
 			PID:  2436,
 			Ppid: 6304,
@@ -79,19 +79,29 @@ func TestPartialKey(t *testing.T) {
 		key uint64
 	}{
 		{
-			&Event{Type: OpenProcess, PID: 1234, Params: Params{params.ProcessID: {Name: params.ProcessID, Type: params.PID, Value: uint32(1221)}, params.DesiredAccess: {Name: params.DesiredAccess, Type: params.Uint32, Value: uint32(5)}}},
+			&Event{Type: OpenProcess, PID: 1234, Params: ParamsOf(
+				NewParam(params.ProcessID, params.PID, params.U32(uint32(1221))),
+				NewParam(params.DesiredAccess, params.Uint32, params.U32(uint32(5))),
+			)},
 			0x99c,
 		},
 		{
-			&Event{Type: OpenThread, PID: 11234, Params: Params{params.ThreadID: {Name: params.ThreadID, Type: params.TID, Value: uint32(8452)}, params.DesiredAccess: {Name: params.DesiredAccess, Type: params.Uint32, Value: uint32(15)}}},
+			&Event{Type: OpenThread, PID: 11234, Params: ParamsOf(
+				NewParam(params.ThreadID, params.TID, params.U32(uint32(8452))),
+				NewParam(params.DesiredAccess, params.Uint32, params.U32(uint32(15))),
+			)},
 			0x4cf5,
 		},
 		{
-			&Event{Type: CreateFile, PID: 4321, Params: Params{params.FilePath: {Name: params.FilePath, Type: params.DOSPath, Value: "C:\\Windows\\System32\\kernelbase.dll"}}},
+			&Event{Type: CreateFile, PID: 4321, Params: ParamsOf(
+				NewParam(params.FilePath, params.DOSPath, params.Str("C:\\Windows\\System32\\kernelbase.dll")),
+			)},
 			0x7ec254f31df879ec,
 		},
 		{
-			&Event{Type: CreateFile, PID: 4321, Params: Params{params.FilePath: {Name: params.FilePath, Type: params.DOSPath, Value: "C:\\Windows\\System32\\kernel32.dll"}}},
+			&Event{Type: CreateFile, PID: 4321, Params: ParamsOf(
+				NewParam(params.FilePath, params.DOSPath, params.Str("C:\\Windows\\System32\\kernel32.dll")),
+			)},
 			0xb6380d9159ccd174,
 		},
 	}

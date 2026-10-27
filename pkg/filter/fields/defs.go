@@ -926,7 +926,7 @@ var fields = map[Field]FieldInfo{
 	EvtDateWeek:    {EvtDateWeek, "week number within the year on which the event occurred", params.Uint8, []string{"evt.date.week = 2"}, nil, nil},
 	EvtDateWeekday: {EvtDateWeekday, "week day on which the event occurred", params.String, []string{"evt.date.weekday = 'Monday'"}, nil, nil},
 	EvtNparams:     {EvtNparams, "number of parameters", params.Int8, []string{"evt.nparams > 2"}, nil, nil},
-	EvtArg: {EvtArg, "event parameter", params.Object, []string{"evt.arg[cmdline] istartswith 'C:\\Windows'"}, nil, &Argument{Optional: false, Pattern: "[a-z0-9_]+", ValidationFunc: func(s string) bool {
+	EvtArg: {EvtArg, "event parameter", params.Variant, []string{"evt.arg[cmdline] istartswith 'C:\\Windows'"}, nil, &Argument{Optional: false, Pattern: "[a-z0-9_]+", ValidationFunc: func(s string) bool {
 		for _, c := range s {
 			switch {
 			case unicode.IsLower(c):

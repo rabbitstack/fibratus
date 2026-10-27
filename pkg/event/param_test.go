@@ -23,27 +23,26 @@ import (
 
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestParams(t *testing.T) {
-	pars := Params{
-		params.FileObject: {Name: params.FileObject, Type: params.Uint64, Value: uint64(18446738026482168384)},
-		params.ThreadID:   {Name: params.ThreadID, Type: params.Uint32, Value: uint32(1484)},
-		params.FileOffset: {Name: params.FileOffset, Type: params.Uint64, Value: uint64(1223456)},
-		params.FilePath:   {Name: params.FilePath, Type: params.Path, Value: "/usr/bin/bash"},
-		params.ProcessID:  {Name: params.ProcessID, Type: params.Uint32, Value: uint32(5)},
-	}
+	pars := ParamsOf(
+		NewParam(params.FileObject, params.Uint64, params.U64(uint64(18446738026482168384))),
+		NewParam(params.ThreadID, params.Uint32, params.U32(uint32(1484))),
+		NewParam(params.FileOffset, params.Uint64, params.U64(uint64(1223456))),
+		NewParam(params.FilePath, params.Path, params.Str("/usr/bin/bash")),
+		NewParam(params.ProcessID, params.Uint32, params.U32(uint32(5))),
+	)
 
 	assert.True(t, pars.Contains(params.FileObject))
 	assert.False(t, pars.Contains(params.ProcessName))
 
-	filename, err := pars.GetString(params.FilePath)
-	require.NoError(t, err)
-	assert.Equal(t, "/usr/bin/bash", filename)
+	assert.Equal(t, "/usr/bin/bash", pars.GetStringByName(params.FilePath))
 
-	_, err = pars.GetString(params.FileObject)
-	require.Error(t, err)
+	// getters return the zero value for the absent parameters and the mismatching kinds
+	assert.Equal(t, "", pars.GetStringByName(params.FileObject))
+	assert.Equal(t, uint32(0), pars.GetUint32ByName(params.ProcessName))
+	assert.Equal(t, "", pars.GetString(-1))
 
 	assert.Equal(t, 5, pars.Len())
 
@@ -52,10 +51,73 @@ func TestParams(t *testing.T) {
 	assert.False(t, pars.Contains(params.ThreadID))
 	assert.Equal(t, 4, pars.Len())
 
-	require.NoError(t, pars.Set(params.ProcessID, uint32(5), params.Enum))
+	pars.SetByName(params.FilePath, params.Str("/usr/bin/zsh"))
+	assert.Equal(t, "/usr/bin/zsh", pars.GetStringByName(params.FilePath))
+}
 
-	require.NoError(t, pars.SetValue(params.FilePath, "/usr/bin/zsh"))
-	filename1, err := pars.GetString(params.FilePath)
-	require.NoError(t, err)
-	assert.Equal(t, "/usr/bin/zsh", filename1)
+func TestParamsSchemaIntegrity(t *testing.T) {
+	for _, typ := range AllTypes() {
+		info := GetTypeInfo(typ)
+		assert.Equal(t, len(info.Params), info.ParamCount(), typ.String())
+		seen := make(map[string]struct{}, len(info.Params))
+		for _, pi := range info.Params {
+			assert.NotEmptyf(t, pi.Name, "%s declares a parameter without name", typ)
+			_, dup := seen[pi.Name]
+			assert.Falsef(t, dup, "%s declares duplicate parameter %s", typ, pi.Name)
+			seen[pi.Name] = struct{}{}
+		}
+		// freshly created parameters have a slot per schema entry, but no values
+		pars := NewParams(typ)
+		assert.Equal(t, len(info.Params), pars.Size(), typ.String())
+		assert.Equal(t, 0, pars.Len(), typ.String())
+	}
+}
+
+func TestParamsSetAppendRename(t *testing.T) {
+	pars := ParamsOf(
+		NewParam(params.ProcessID, params.PID, params.U32(10)),
+		NewParam(params.FilePath, params.Path, params.Str("/etc/passwd")),
+	)
+
+	// assigning an unknown name appends a parameter and infers its type from the value
+	pars.SetByName("dyn", params.U64(7))
+	assert.Equal(t, 3, pars.Len())
+	assert.Equal(t, params.Uint64, pars.Type(pars.Index("dyn")))
+	assert.Equal(t, uint64(7), pars.GetUint64ByName("dyn"))
+
+	// append overrides the type
+	pars.Append("dyn2", params.Address, params.U64(0xff))
+	assert.Equal(t, params.Address, pars.Type(pars.Index("dyn2")))
+
+	// out-of-range indexes and absent names yield default values
+	assert.Equal(t, uint32(0), pars.GetUint32(100))
+	assert.Equal(t, "", pars.GetStringByName("nope"))
+	assert.False(t, pars.Contains("nope"))
+
+	assert.True(t, pars.Rename(params.FilePath, "path"))
+	assert.False(t, pars.Contains(params.FilePath))
+	assert.Equal(t, "/etc/passwd", pars.GetStringByName("path"))
+
+	pars.Remove("path")
+	assert.False(t, pars.Contains("path"))
+	assert.Equal(t, 3, pars.Len())
+
+	// kind mismatch returns the zero value
+	assert.Equal(t, "", pars.GetStringByName(params.ProcessID))
+	assert.Equal(t, uint32(10), pars.GetUint32ByName(params.ProcessID))
+}
+
+func TestParamsSharedSchemaNotMutated(t *testing.T) {
+	typ := AllTypes()[0]
+	if len(GetTypeInfo(typ).Params) == 0 {
+		t.Skip("no schema")
+	}
+	name := GetTypeInfo(typ).Params[0].Name
+	a := NewParams(typ)
+	a.Rename(name, "renamed")
+	a.Append("extra", params.Uint32, params.U32(1))
+	b := NewParams(typ)
+	assert.Equal(t, name, GetTypeInfo(typ).Params[0].Name)
+	assert.GreaterOrEqual(t, b.Index(name), 0)
+	assert.Equal(t, -1, b.Index("extra"))
 }

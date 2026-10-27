@@ -566,17 +566,17 @@ func (s *sequenceState) expire(e *event.Event) bool {
 		// process spawned by CreateProcess, and it pertains
 		// to the final sequence slot, it is safe to expire
 		// the whole sequence
-		pid := rhs.Params.MustGetPid()
+		pid := rhs.Params.GetPid()
 		if lhs.IsCreateProcess() && isFinalSlot {
-			return lhs.Params.MustGetPid() == pid
+			return lhs.Params.GetPid() == pid
 		}
 		if lhs.IsCreateThread() {
 			// if the pids differ, the thread
 			// is created in a remote process.
 			// Sequence can be expired only if
 			// the remote process terminates
-			if lhs.PID != lhs.Params.MustGetPid() {
-				return lhs.Params.MustGetPid() == pid
+			if lhs.PID != lhs.Params.GetPid() {
+				return lhs.Params.GetPid() == pid
 			}
 		}
 		return lhs.PID == pid
@@ -593,8 +593,8 @@ func (s *sequenceState) expire(e *event.Event) bool {
 			}
 			log.Debugf("removing event originated from %s (%d) "+
 				"in partials pertaining to sequence [%s] and slot [%d]",
-				e.Params.MustGetString(params.ProcessName),
-				e.Params.MustGetPid(),
+				e.Params.GetStringByName(params.ProcessName),
+				e.Params.GetPid(),
 				s.name,
 				idx)
 			// remove partial event from the corresponding slot

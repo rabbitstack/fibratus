@@ -35,17 +35,13 @@ func makeEvent(pid, tid uint32, cpu uint8, ts uint64, typ Type, pars ...Param) *
 		CPU:       cpu,
 		Type:      typ,
 		Timestamp: filetime.ToEpoch(ts),
-		Params:    Params{},
-	}
-
-	for _, par := range pars {
-		e.Params.Append(par.Name, par.Type, par.Value)
+		Params:    ParamsOf(pars...),
 	}
 
 	return e
 }
 
-func makeStackWalk(pid, tid uint32, cpu uint8, triggerTS uint64, addrs []uintptr) *Event {
+func makeStackWalk(pid, tid uint32, cpu uint8, triggerTS uint64, addrs []uint64) *Event {
 	e := &Event{
 		PID:       pid,
 		Tid:       tid,
@@ -54,10 +50,10 @@ func makeStackWalk(pid, tid uint32, cpu uint8, triggerTS uint64, addrs []uintptr
 		Timestamp: filetime.ToEpoch(triggerTS + 50), // slight offset to prove we don't use StackWalk timestamp
 		Params:    Params{},
 	}
-	e.Params.Append(params.CallstackTimestamp, params.Uint64, triggerTS)
-	e.Params.Append(params.ProcessID, params.PID, pid)
-	e.Params.Append(params.ThreadID, params.TID, tid)
-	e.Params.Append(params.Callstack, params.Slice, addrs)
+	e.Params.Append(params.CallstackTimestamp, params.Uint64, params.U64(triggerTS))
+	e.Params.Append(params.ProcessID, params.PID, params.U32(pid))
+	e.Params.Append(params.ThreadID, params.TID, params.U32(tid))
+	e.Params.Append(params.Callstack, params.Slice, params.U64Slice(addrs))
 	return e
 }
 
@@ -72,7 +68,7 @@ func TestPushThenPop(t *testing.T) {
 	defer d.Stop()
 
 	const ts = uint64(133_000_000_000_000_000)
-	addrs := []uintptr{0xDEAD, 0xBEEF}
+	addrs := []uint64{0xDEAD, 0xBEEF}
 
 	e := makeEvent(100, 200, 3, ts, LoadModule)
 	d.Push(e)
@@ -82,8 +78,7 @@ func TestPushThenPop(t *testing.T) {
 
 	require.NotNil(t, got)
 	assert.Equal(t, e, got)
-	callstack, err := got.Params.GetSlice(params.Callstack)
-	require.NoError(t, err)
+	callstack := got.Params.GetUint64SliceByName(params.Callstack)
 	assert.Equal(t, addrs, callstack)
 }
 
@@ -92,7 +87,7 @@ func TestPopThenPush(t *testing.T) {
 	defer d.Stop()
 
 	const ts = uint64(133_000_000_000_000_001)
-	addrs := []uintptr{0xCAFE, 0xBABE}
+	addrs := []uint64{0xCAFE, 0xBABE}
 
 	sw := makeStackWalk(100, 200, 3, ts, addrs)
 	got := d.Pop(sw)
@@ -104,8 +99,7 @@ func TestPopThenPush(t *testing.T) {
 	// event should have been pushed directly to the queue with callstack attached
 	queued := <-q.Events()
 	require.NotNil(t, queued)
-	callstack, err := queued.Params.GetSlice(params.Callstack)
-	require.NoError(t, err)
+	callstack := queued.Params.GetUint64SliceByName(params.Callstack)
 	assert.Equal(t, addrs, callstack)
 }
 
@@ -114,13 +108,13 @@ func TestSurrogateProcess(t *testing.T) {
 	defer d.Stop()
 
 	const ts = uint64(133_000_000_000_000_010)
-	addrs := []uintptr{0xFACE}
+	addrs := []uint64{0xFACE}
 
 	// surrogate CreateProcess event
 	pars := []Param{
-		{Name: params.ProcessID, Type: params.PID, Value: uint32(500)},
-		{Name: params.ProcessParentID, Type: params.PID, Value: uint32(1999)},
-		{Name: params.ProcessRealParentID, Type: params.PID, Value: uint32(2929)},
+		NewParam(params.ProcessID, params.PID, params.U32(500)),
+		NewParam(params.ProcessParentID, params.PID, params.U32(1999)),
+		NewParam(params.ProcessRealParentID, params.PID, params.U32(2929)),
 	}
 	e := makeEvent(500, 600, 1, ts, CreateProcess, pars...)
 	d.Push(e)
@@ -142,19 +136,19 @@ func TestCreateRemoteThreadForwardToSurrogate(t *testing.T) {
 
 	const tsProc = uint64(133_000_000_000_000_020)
 	const tsThread = uint64(133_000_000_000_000_021)
-	addrs := []uintptr{0x1234, 0x5678}
+	addrs := []uint64{0x1234, 0x5678}
 
 	// park the surrogate CreateProcess event
 	pars := []Param{
-		{Name: params.ProcessID, Type: params.PID, Value: uint32(1700)},
-		{Name: params.ProcessParentID, Type: params.PID, Value: uint32(1999)},
-		{Name: params.ProcessRealParentID, Type: params.PID, Value: uint32(2929)},
+		NewParam(params.ProcessID, params.PID, params.U32(1700)),
+		NewParam(params.ProcessParentID, params.PID, params.U32(1999)),
+		NewParam(params.ProcessRealParentID, params.PID, params.U32(2929)),
 	}
 	procEvt := makeEvent(1700, 800, 0, tsProc, CreateProcess, pars...)
 	d.Push(procEvt)
 
 	// park the CreateRemoteThread event targeting the surrogate pid
-	threadEvt := makeEvent(700, 801, 0, tsThread, CreateThread, Param{Name: params.ProcessID, Type: params.PID, Value: uint32(1700)})
+	threadEvt := makeEvent(700, 801, 0, tsThread, CreateThread, NewParam(params.ProcessID, params.PID, params.U32(uint32(1700))))
 	d.Push(threadEvt)
 
 	sw := makeStackWalk(700, 801, 0, tsThread, addrs)
@@ -163,8 +157,7 @@ func TestCreateRemoteThreadForwardToSurrogate(t *testing.T) {
 	// the surrogate proc event should have been pushed to the queue with the callstack
 	queued := <-q.Events()
 	require.True(t, queued.IsCreateProcess())
-	cs, err := queued.Params.GetSlice(params.Callstack)
-	require.NoError(t, err)
+	cs := queued.Params.GetUint64SliceByName(params.Callstack)
 	assert.Equal(t, addrs, cs)
 }
 
@@ -222,7 +215,7 @@ func TestPopSkipsSelfStackWalk(t *testing.T) {
 	defer d.Stop()
 
 	const ts = uint64(133_000_000_000_000_050)
-	addrs := []uintptr{0xDEAD}
+	addrs := []uint64{0xDEAD}
 
 	sw := makeStackWalk(currentPid, 100, 0, ts, addrs)
 	d.Pop(sw)
@@ -240,8 +233,8 @@ func TestNoCallstackCrossContamination(t *testing.T) {
 
 	const tsA = uint64(133_000_000_000_000_060)
 	const tsB = uint64(133_000_000_000_000_061)
-	addrsA := []uintptr{0xAAAA}
-	addrsB := []uintptr{0xBBBB}
+	addrsA := []uint64{0xAAAA}
+	addrsB := []uint64{0xBBBB}
 
 	eA := makeEvent(100, 200, 0, tsA, RegCreateKey)
 	eB := makeEvent(100, 200, 0, tsB, RegCreateKey)
@@ -254,8 +247,8 @@ func TestNoCallstackCrossContamination(t *testing.T) {
 	gotB := d.Pop(swB)
 	gotA := d.Pop(swA)
 
-	csA, _ := gotA.Params.GetSlice(params.Callstack)
-	csB, _ := gotB.Params.GetSlice(params.Callstack)
+	csA := gotA.Params.GetUint64SliceByName(params.Callstack)
+	csB := gotB.Params.GetUint64SliceByName(params.Callstack)
 
 	assert.Equal(t, addrsA, csA, "event A must not receive event B's callstack")
 	assert.Equal(t, addrsB, csB, "event B must not receive event A's callstack")

@@ -19,6 +19,10 @@
 package processors
 
 import (
+	"os"
+	"testing"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/ps"
@@ -26,9 +30,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"os"
-	"testing"
-	"time"
 )
 
 func TestPsProcessor(t *testing.T) {
@@ -44,10 +45,10 @@ func TestPsProcessor(t *testing.T) {
 			"create exe parameter from cmdline",
 			&event.Event{
 				Type: event.CreateProcess,
-				Params: event.Params{
-					params.Cmdline:   {Name: params.Cmdline, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\svchost.exe -k RPCSS"},
-					params.ProcessID: {Name: params.ProcessID, Type: params.PID, Value: uint32(1023)},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.Cmdline, params.String, params.Str("C:\\Windows\\system32\\svchost.exe -k RPCSS")),
+					event.NewParam(params.ProcessID, params.PID, params.U32(uint32(1023))),
+				),
 			},
 			func() *ps.SnapshotterMock {
 				psnap := new(ps.SnapshotterMock)
@@ -64,11 +65,11 @@ func TestPsProcessor(t *testing.T) {
 			"complete exe for system procs",
 			&event.Event{
 				Type: event.CreateProcess,
-				Params: event.Params{
-					params.Cmdline:     {Name: params.Cmdline, Type: params.UnicodeString, Value: "csrss.exe"},
-					params.ProcessName: {Name: params.ProcessName, Type: params.AnsiString, Value: "csrss.exe"},
-					params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: uint32(676)},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.Cmdline, params.String, params.Str("csrss.exe")),
+					event.NewParam(params.ProcessName, params.String, params.Str("csrss.exe")),
+					event.NewParam(params.ProcessID, params.PID, params.U32(uint32(676))),
+				),
 			},
 			func() *ps.SnapshotterMock {
 				psnap := new(ps.SnapshotterMock)
@@ -86,10 +87,10 @@ func TestPsProcessor(t *testing.T) {
 			"clean quoted executable path",
 			&event.Event{
 				Type: event.CreateProcess,
-				Params: event.Params{
-					params.Cmdline:   {Name: params.Cmdline, Type: params.UnicodeString, Value: "\"C:\\Windows\\System32\\smss.exe\""},
-					params.ProcessID: {Name: params.ProcessID, Type: params.PID, Value: uint32(760)},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.Cmdline, params.String, params.Str("\"C:\\Windows\\System32\\smss.exe\"")),
+					event.NewParam(params.ProcessID, params.PID, params.U32(uint32(760))),
+				),
 			},
 			func() *ps.SnapshotterMock {
 				psnap := new(ps.SnapshotterMock)
@@ -107,10 +108,10 @@ func TestPsProcessor(t *testing.T) {
 			"expand SystemRoot in executable path",
 			&event.Event{
 				Type: event.CreateProcess,
-				Params: event.Params{
-					params.Cmdline:   {Name: params.Cmdline, Type: params.UnicodeString, Value: `\SystemRoot\System32\smss.exe`},
-					params.ProcessID: {Name: params.ProcessID, Type: params.PID, Value: uint32(760)},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.Cmdline, params.String, params.Str(`\SystemRoot\System32\smss.exe`)),
+					event.NewParam(params.ProcessID, params.PID, params.U32(uint32(760))),
+				),
 			},
 			func() *ps.SnapshotterMock {
 				psnap := new(ps.SnapshotterMock)
@@ -129,10 +130,10 @@ func TestPsProcessor(t *testing.T) {
 			&event.Event{
 				Type:      event.CreateProcess,
 				Timestamp: time.Now(),
-				Params: event.Params{
-					params.Cmdline:   {Name: params.Cmdline, Type: params.UnicodeString, Value: `C:\Program Files\Fibratus\fibratus.exe`},
-					params.ProcessID: {Name: params.ProcessID, Type: params.PID, Value: uint32(os.Getpid())},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.Cmdline, params.String, params.Str(`C:\Program Files\Fibratus\fibratus.exe`)),
+					event.NewParam(params.ProcessID, params.PID, params.U32(uint32(os.Getpid()))),
+				),
 			},
 			func() *ps.SnapshotterMock {
 				psnap := new(ps.SnapshotterMock)
@@ -141,17 +142,17 @@ func TestPsProcessor(t *testing.T) {
 			},
 			func(e *event.Event, t *testing.T, psnap *ps.SnapshotterMock) {
 				require.True(t, e.Params.Contains(params.StartTime))
-				require.NotEqual(t, e.Timestamp, e.Params.MustGetTime(params.StartTime))
+				require.NotEqual(t, e.Timestamp, e.Params.GetTimeByName(params.StartTime))
 			},
 		},
 		{
 			"terminate process",
 			&event.Event{
 				Type: event.TerminateProcess,
-				Params: event.Params{
-					params.Cmdline:   {Name: params.Cmdline, Type: params.UnicodeString, Value: `\SystemRoot\System32\smss.exe`},
-					params.ProcessID: {Name: params.ProcessID, Type: params.PID, Value: uint32(760)},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.Cmdline, params.String, params.Str(`\SystemRoot\System32\smss.exe`)),
+					event.NewParam(params.ProcessID, params.PID, params.U32(uint32(760))),
+				),
 			},
 			func() *ps.SnapshotterMock {
 				psnap := new(ps.SnapshotterMock)
@@ -170,10 +171,10 @@ func TestPsProcessor(t *testing.T) {
 			"create thread",
 			&event.Event{
 				Type: event.CreateThread,
-				Params: event.Params{
-					params.ProcessID: {Name: params.ProcessID, Type: params.PID, Value: uint32(760)},
-					params.ThreadID:  {Name: params.ThreadID, Type: params.TID, Value: uint32(10234)},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.ProcessID, params.PID, params.U32(uint32(760))),
+					event.NewParam(params.ThreadID, params.TID, params.U32(uint32(10234))),
+				),
 			},
 			func() *ps.SnapshotterMock {
 				psnap := new(ps.SnapshotterMock)
@@ -191,10 +192,10 @@ func TestPsProcessor(t *testing.T) {
 			"terminate thread",
 			&event.Event{
 				Type: event.TerminateThread,
-				Params: event.Params{
-					params.ProcessID: {Name: params.ProcessID, Type: params.PID, Value: uint32(760)},
-					params.ThreadID:  {Name: params.ThreadID, Type: params.TID, Value: uint32(10234)},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.ProcessID, params.PID, params.U32(uint32(760))),
+					event.NewParam(params.ThreadID, params.TID, params.U32(uint32(10234))),
+				),
 			},
 			func() *ps.SnapshotterMock {
 				psnap := new(ps.SnapshotterMock)
@@ -213,9 +214,9 @@ func TestPsProcessor(t *testing.T) {
 			"open process",
 			&event.Event{
 				Type: event.OpenProcess,
-				Params: event.Params{
-					params.ProcessID: {Name: params.ProcessID, Type: params.PID, Value: uint32(760)},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.ProcessID, params.PID, params.U32(uint32(760))),
+				),
 			},
 			func() *ps.SnapshotterMock {
 				psnap := new(ps.SnapshotterMock)

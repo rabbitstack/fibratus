@@ -127,10 +127,10 @@ func TestScan(t *testing.T) {
 					Type: event.CreateProcess,
 					Tid:  2484,
 					PID:  859,
-					Params: event.Params{
-						params.ProcessName: {Name: params.ProcessName, Type: params.UnicodeString, Value: "notepad.exe"},
-						params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: pi.ProcessId},
-					},
+					Params: event.ParamsOf(
+						event.NewParam(params.ProcessName, params.String, params.Str("notepad.exe")),
+						event.NewParam(params.ProcessID, params.PID, params.U32(pi.ProcessId)),
+					),
 					Metadata: make(map[event.MetadataKey]any),
 					PS:       proc,
 				}
@@ -207,10 +207,10 @@ func TestScan(t *testing.T) {
 					Type: event.CreateProcess,
 					Tid:  2484,
 					PID:  859,
-					Params: event.Params{
-						params.ProcessName: {Name: params.ProcessName, Type: params.UnicodeString, Value: "notepad.exe"},
-						params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: pi.ProcessId},
-					},
+					Params: event.ParamsOf(
+						event.NewParam(params.ProcessName, params.String, params.Str("notepad.exe")),
+						event.NewParam(params.ProcessID, params.PID, params.U32(pi.ProcessId)),
+					),
 					Metadata: make(map[event.MetadataKey]any),
 					PS:       proc,
 				}
@@ -289,13 +289,13 @@ func TestScan(t *testing.T) {
 					Type: event.LoadModule,
 					Tid:  2484,
 					PID:  pid,
-					Params: event.Params{
-						params.FilePath:            {Name: params.FilePath, Type: params.UnicodeString, Value: exe},
-						params.ModuleBase:          {Name: params.ModuleBase, Type: params.Uint64, Value: uint64(0x74888fd99)},
-						params.ModuleCheckSum:      {Name: params.ModuleCheckSum, Type: params.Uint32, Value: uint32(2323432)},
-						params.ModuleSignatureType: {Name: params.ModuleSignatureType, Type: params.Uint32, Value: signature.TypeNone},
-						params.ProcessID:           {Name: params.ProcessID, Type: params.PID, Value: pid},
-					},
+					Params: event.ParamsOf(
+						event.NewParam(params.FilePath, params.String, params.Str(exe)),
+						event.NewParam(params.ModuleBase, params.Uint64, params.U64(uint64(0x74888fd99))),
+						event.NewParam(params.ModuleCheckSum, params.Uint32, params.U32(uint32(2323432))),
+						event.NewParam(params.ModuleSignatureType, params.Uint32, params.U32(signature.TypeNone)),
+						event.NewParam(params.ProcessID, params.PID, params.U32(pid)),
+					),
 					Metadata: make(map[event.MetadataKey]any),
 					PS:       proc,
 				}
@@ -343,10 +343,10 @@ func TestScan(t *testing.T) {
 					Type: event.CreateFile,
 					Tid:  2484,
 					PID:  565,
-					Params: event.Params{
-						params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "notepad.exe")},
-						params.FileOperation: {Name: params.FileOperation, Type: params.Uint32, Value: uint32(windows.FILE_CREATE)},
-					},
+					Params: event.ParamsOf(
+						event.NewParam(params.FilePath, params.String, params.Str(filepath.Join(os.Getenv("windir"), "notepad.exe"))),
+						event.NewParam(params.FileOperation, params.Uint32, params.U32(uint32(windows.FILE_CREATE))),
+					),
 					Metadata: make(map[event.MetadataKey]any),
 					PS:       proc,
 				}
@@ -394,10 +394,10 @@ func TestScan(t *testing.T) {
 					Type: event.CreateFile,
 					Tid:  2484,
 					PID:  565,
-					Params: event.Params{
-						params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "cmd.exe")},
-						params.FileOperation: {Name: params.FileOperation, Type: params.Uint32, Value: uint32(windows.FILE_CREATE)},
-					},
+					Params: event.ParamsOf(
+						event.NewParam(params.FilePath, params.String, params.Str(filepath.Join(os.Getenv("windir"), "System32", "cmd.exe"))),
+						event.NewParam(params.FileOperation, params.Uint32, params.U32(uint32(windows.FILE_CREATE))),
+					),
 					Metadata: make(map[event.MetadataKey]any),
 					PS:       proc,
 				}
@@ -443,10 +443,10 @@ func TestScan(t *testing.T) {
 					Type: event.CreateFile,
 					Tid:  2484,
 					PID:  565,
-					Params: event.Params{
-						params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "splwow64.xml")},
-						params.FileOperation: {Name: params.FileOperation, Type: params.Uint32, Value: uint32(windows.FILE_CREATE)},
-					},
+					Params: event.ParamsOf(
+						event.NewParam(params.FilePath, params.String, params.Str(filepath.Join(os.Getenv("windir"), "splwow64.xml"))),
+						event.NewParam(params.FileOperation, params.Uint32, params.U32(uint32(windows.FILE_CREATE))),
+					),
 					Metadata: make(map[event.MetadataKey]any),
 					PS:       proc,
 				}
@@ -489,10 +489,10 @@ func TestScan(t *testing.T) {
 					Type: event.CreateFile,
 					Tid:  2484,
 					PID:  565,
-					Params: event.Params{
-						params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "cmd.exe")},
-						params.FileOperation: {Name: params.FileOperation, Type: params.Uint32, Value: uint32(windows.FILE_CREATE)},
-					},
+					Params: event.ParamsOf(
+						event.NewParam(params.FilePath, params.String, params.Str(filepath.Join(os.Getenv("windir"), "System32", "cmd.exe"))),
+						event.NewParam(params.FileOperation, params.Uint32, params.U32(uint32(windows.FILE_CREATE))),
+					),
 					Metadata: make(map[event.MetadataKey]any),
 					PS:       proc,
 				}
@@ -549,10 +549,10 @@ func TestScan(t *testing.T) {
 					Type: event.CreateFile,
 					Tid:  2484,
 					PID:  565,
-					Params: event.Params{
-						params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: ads},
-						params.FileOperation: {Name: params.FileOperation, Type: params.Uint32, Value: uint32(windows.FILE_CREATE)},
-					},
+					Params: event.ParamsOf(
+						event.NewParam(params.FilePath, params.String, params.Str(ads)),
+						event.NewParam(params.FileOperation, params.Uint32, params.U32(uint32(windows.FILE_CREATE))),
+					),
 					Metadata: make(map[event.MetadataKey]any),
 					PS:       proc,
 				}
@@ -630,11 +630,11 @@ func TestScan(t *testing.T) {
 					Type: event.VirtualAlloc,
 					Tid:  2484,
 					PID:  565,
-					Params: event.Params{
-						params.ProcessID:      {Name: params.ProcessID, Type: params.PID, Value: pid},
-						params.MemBaseAddress: {Name: params.MemBaseAddress, Type: params.Address, Value: uint64(0x7ffe0000)},
-						params.MemProtect:     {Name: params.MemProtect, Type: params.Flags, Value: uint32(windows.PAGE_EXECUTE_READWRITE), Flags: event.MemProtectionFlags},
-					},
+					Params: event.ParamsOf(
+						event.NewParam(params.ProcessID, params.PID, params.U32(pid)),
+						event.NewParam(params.MemBaseAddress, params.Address, params.U64(uint64(0x7ffe0000))),
+						event.NewParam(params.MemProtect, params.Flags, params.U32(uint32(windows.PAGE_EXECUTE_READWRITE)), event.WithFlags(event.MemProtectionFlags)),
+					),
 					Metadata: make(map[event.MetadataKey]any),
 					PS:       proc,
 				}
@@ -712,12 +712,12 @@ func TestScan(t *testing.T) {
 					Type: event.MapViewOfSection,
 					Tid:  2484,
 					PID:  565,
-					Params: event.Params{
-						params.ProcessID:    {Name: params.ProcessID, Type: params.PID, Value: pid},
-						params.FileViewBase: {Name: params.FileViewBase, Type: params.Address, Value: uint64(0x7ffe0000)},
-						params.FileViewSize: {Name: params.FileViewSize, Type: params.Uint64, Value: uint64(12333)},
-						params.MemProtect:   {Name: params.MemProtect, Type: params.Flags, Value: uint32(sys.SectionRX), Flags: event.ViewProtectionFlags},
-					},
+					Params: event.ParamsOf(
+						event.NewParam(params.ProcessID, params.PID, params.U32(pid)),
+						event.NewParam(params.FileViewBase, params.Address, params.U64(uint64(0x7ffe0000))),
+						event.NewParam(params.FileViewSize, params.Uint64, params.U64(uint64(12333))),
+						event.NewParam(params.MemProtect, params.Flags, params.U32(uint32(sys.SectionRX)), event.WithFlags(event.ViewProtectionFlags)),
+					),
 					Metadata: make(map[event.MetadataKey]any),
 					PS:       proc,
 				}
@@ -764,12 +764,12 @@ func TestScan(t *testing.T) {
 					Type: event.MapViewOfSection,
 					Tid:  2484,
 					PID:  321321,
-					Params: event.Params{
-						params.ProcessID:    {Name: params.ProcessID, Type: params.PID, Value: uint32(321321)},
-						params.FileViewBase: {Name: params.FileViewBase, Type: params.Address, Value: uint64(0x7ffe0000)},
-						params.FileViewSize: {Name: params.FileViewSize, Type: params.Uint64, Value: uint64(12333)},
-						params.MemProtect:   {Name: params.MemProtect, Type: params.Flags, Value: uint32(0x10000), Flags: event.ViewProtectionFlags},
-					},
+					Params: event.ParamsOf(
+						event.NewParam(params.ProcessID, params.PID, params.U32(uint32(321321))),
+						event.NewParam(params.FileViewBase, params.Address, params.U64(uint64(0x7ffe0000))),
+						event.NewParam(params.FileViewSize, params.Uint64, params.U64(uint64(12333))),
+						event.NewParam(params.MemProtect, params.Flags, params.U32(uint32(0x10000)), event.WithFlags(event.ViewProtectionFlags)),
+					),
 					Metadata: make(map[event.MetadataKey]any),
 					PS:       proc,
 				}
@@ -811,13 +811,13 @@ func TestScan(t *testing.T) {
 					Type: event.MapViewOfSection,
 					Tid:  2484,
 					PID:  565,
-					Params: event.Params{
-						params.ProcessID:    {Name: params.ProcessID, Type: params.PID, Value: uint32(1123)},
-						params.FilePath:     {Name: params.FilePath, Type: params.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "regedit.exe")},
-						params.FileViewBase: {Name: params.FileViewBase, Type: params.Address, Value: uint64(0x7ffe0000)},
-						params.FileViewSize: {Name: params.FileViewSize, Type: params.Uint64, Value: uint64(12333)},
-						params.MemProtect:   {Name: params.MemProtect, Type: params.Flags, Value: uint32(sys.SectionRWX), Flags: event.ViewProtectionFlags},
-					},
+					Params: event.ParamsOf(
+						event.NewParam(params.ProcessID, params.PID, params.U32(uint32(1123))),
+						event.NewParam(params.FilePath, params.String, params.Str(filepath.Join(os.Getenv("windir"), "regedit.exe"))),
+						event.NewParam(params.FileViewBase, params.Address, params.U64(uint64(0x7ffe0000))),
+						event.NewParam(params.FileViewSize, params.Uint64, params.U64(uint64(12333))),
+						event.NewParam(params.MemProtect, params.Flags, params.U32(uint32(sys.SectionRWX)), event.WithFlags(event.ViewProtectionFlags)),
+					),
 					Metadata: make(map[event.MetadataKey]any),
 					PS:       proc,
 				}
@@ -865,11 +865,11 @@ func TestScan(t *testing.T) {
 					Type: event.RegSetValue,
 					Tid:  2484,
 					PID:  565,
-					Params: event.Params{
-						params.RegValueType: {Name: params.RegValueType, Type: params.Uint32, Value: uint32(registry.BINARY)},
-						params.RegData:      {Name: params.RegValue, Type: params.Binary, Value: data},
-						params.RegPath:      {Name: params.RegPath, Type: params.UnicodeString, Value: `HKEY_LOCAL_MACHINE\CurrentControlSet\Control\DeviceGuard\Mal`},
-					},
+					Params: event.ParamsOf(
+						event.NewParam(params.RegValueType, params.Uint32, params.U32(uint32(registry.BINARY))),
+						event.NewParam(params.RegValue, params.Binary, params.Bin(data)),
+						event.NewParam(params.RegPath, params.String, params.Str(`HKEY_LOCAL_MACHINE\CurrentControlSet\Control\DeviceGuard\Mal`)),
+					),
 					Metadata: make(map[event.MetadataKey]any),
 					PS:       proc,
 				}
@@ -928,7 +928,7 @@ func TestScan(t *testing.T) {
 
 			if e.IsCreateProcess() || e.IsLoadModule() || e.IsVirtualAlloc() || e.IsMapViewOfSection() {
 				// cleanup
-				proc, err := windows.OpenProcess(windows.PROCESS_TERMINATE, false, e.Params.MustGetPid())
+				proc, err := windows.OpenProcess(windows.PROCESS_TERMINATE, false, e.Params.GetPid())
 				if err == nil {
 					windows.TerminateProcess(proc, uint32(257))
 					windows.Close(proc)

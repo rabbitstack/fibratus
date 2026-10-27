@@ -38,7 +38,7 @@ func (l *AddParamListener) CanEnqueue() bool { return true }
 
 func (l *AddParamListener) ProcessEvent(e *Event) (bool, error) {
 	args := l.Called(e)
-	e.AppendParam(params.FileAttributes, params.AnsiString, "HIDDEN")
+	e.Params.Append(params.FileAttributes, params.String, params.Str("HIDDEN"))
 	return args.Bool(0), args.Error(1)
 }
 
@@ -71,12 +71,12 @@ func TestQueuePush(t *testing.T) {
 				CPU:       1,
 				Seq:       2,
 				Timestamp: time.Now(),
-				Params: Params{
-					params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
-					params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
-					params.FileType:      {Name: params.FileType, Type: params.AnsiString, Value: "file"},
-					params.FileOperation: {Name: params.FileOperation, Type: params.Enum, Value: uint32(1), Enum: fs.FileCreateDispositions},
-				},
+				Params: ParamsOf(
+					NewParam(params.FileObject, params.Uint64, params.U64(uint64(12456738026482168384))),
+					NewParam(params.FilePath, params.String, params.Str("C:\\Windows\\system32\\user32.dll")),
+					NewParam(params.FileType, params.String, params.Str("file")),
+					NewParam(params.FileOperation, params.Enum, params.U32(uint32(1)), params.WithEnum(fs.FileCreateDispositions)),
+				),
 			},
 			nil,
 			func() []Listener {
@@ -96,12 +96,12 @@ func TestQueuePush(t *testing.T) {
 				CPU:       1,
 				Seq:       2,
 				Timestamp: time.Now(),
-				Params: Params{
-					params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
-					params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
-					params.FileType:      {Name: params.FileType, Type: params.AnsiString, Value: "file"},
-					params.FileOperation: {Name: params.FileOperation, Type: params.Enum, Value: uint32(1), Enum: fs.FileCreateDispositions},
-				},
+				Params: ParamsOf(
+					NewParam(params.FileObject, params.Uint64, params.U64(uint64(12456738026482168384))),
+					NewParam(params.FilePath, params.String, params.Str("C:\\Windows\\system32\\user32.dll")),
+					NewParam(params.FileType, params.String, params.Str("file")),
+					NewParam(params.FileOperation, params.Enum, params.U32(uint32(1)), params.WithEnum(fs.FileCreateDispositions)),
+				),
 			},
 			ErrCantEnqueue,
 			func() []Listener {
@@ -121,12 +121,12 @@ func TestQueuePush(t *testing.T) {
 				CPU:       1,
 				Seq:       2,
 				Timestamp: time.Now(),
-				Params: Params{
-					params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
-					params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
-					params.FileType:      {Name: params.FileType, Type: params.AnsiString, Value: "file"},
-					params.FileOperation: {Name: params.FileOperation, Type: params.Enum, Value: uint32(1), Enum: fs.FileCreateDispositions},
-				},
+				Params: ParamsOf(
+					NewParam(params.FileObject, params.Uint64, params.U64(uint64(12456738026482168384))),
+					NewParam(params.FilePath, params.String, params.Str("C:\\Windows\\system32\\user32.dll")),
+					NewParam(params.FileType, params.String, params.Str("file")),
+					NewParam(params.FileOperation, params.Enum, params.U32(uint32(1)), params.WithEnum(fs.FileCreateDispositions)),
+				),
 			},
 			nil,
 			func() []Listener {
@@ -147,12 +147,12 @@ func TestQueuePush(t *testing.T) {
 				CPU:       1,
 				Seq:       2,
 				Timestamp: time.Now(),
-				Params: Params{
-					params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
-					params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
-					params.FileType:      {Name: params.FileType, Type: params.AnsiString, Value: "file"},
-					params.FileOperation: {Name: params.FileOperation, Type: params.Enum, Value: uint32(1), Enum: fs.FileCreateDispositions},
-				},
+				Params: ParamsOf(
+					NewParam(params.FileObject, params.Uint64, params.U64(uint64(12456738026482168384))),
+					NewParam(params.FilePath, params.String, params.Str("C:\\Windows\\system32\\user32.dll")),
+					NewParam(params.FileType, params.String, params.Str("file")),
+					NewParam(params.FileOperation, params.Enum, params.U32(uint32(1)), params.WithEnum(fs.FileCreateDispositions)),
+				),
 			},
 			nil,
 			func() []Listener {

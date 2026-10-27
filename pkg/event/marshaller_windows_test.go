@@ -56,18 +56,18 @@ func TestMarshaller(t *testing.T) {
 		Seq:       2,
 		Timestamp: now,
 		Host:      "archrabbit",
-		Params: Params{
-			params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
-			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
-			params.FileType:      {Name: params.FileType, Type: params.AnsiString, Value: "file"},
-			params.FileOperation: {Name: params.FileOperation, Type: params.AnsiString, Value: "open"},
-			params.BasePrio:      {Name: params.BasePrio, Type: params.Int8, Value: int8(2)},
-			params.PagePrio:      {Name: params.PagePrio, Type: params.Uint8, Value: uint8(2)},
-			params.KstackLimit:   {Name: params.KstackLimit, Type: params.Address, Value: uint64(1888833888)},
-			params.StartTime:     {Name: params.StartTime, Type: params.Time, Value: time.Now()},
-			params.ProcessID:     {Name: params.ProcessID, Type: params.PID, Value: uint32(1204)},
-			params.NetDIPNames:   {Name: params.NetDIPNames, Type: params.Slice, Value: []string{"dns.google.", "github.com."}},
-		},
+		Params: ParamsOf(
+			NewParam(params.FileObject, params.Uint64, params.U64(uint64(12456738026482168384))),
+			NewParam(params.FilePath, params.String, params.Str("\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll")),
+			NewParam(params.FileType, params.String, params.Str("file")),
+			NewParam(params.FileOperation, params.String, params.Str("open")),
+			NewParam(params.BasePrio, params.Int8, params.I8(int8(2))),
+			NewParam(params.PagePrio, params.Uint8, params.U8(uint8(2))),
+			NewParam(params.KstackLimit, params.Address, params.U64(uint64(1888833888))),
+			NewParam(params.StartTime, params.Time, params.Timestamp(time.Now())),
+			NewParam(params.ProcessID, params.PID, params.U32(uint32(1204))),
+			NewParam(params.NetDIPNames, params.Slice, params.StrSlice([]string{"dns.google.", "github.com."})),
+		),
 		Metadata: map[MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
@@ -88,13 +88,11 @@ func TestMarshaller(t *testing.T) {
 	assert.Equal(t, "archrabbit", clone.Host)
 	assert.Equal(t, now, clone.Timestamp)
 
-	assert.Len(t, clone.Params, 10)
+	assert.Equal(t, 10, clone.Params.Len())
 
-	filename, err := clone.Params.GetString(params.FilePath)
-	require.NoError(t, err)
+	filename := clone.Params.GetStringByName(params.FilePath)
 	assert.Equal(t, "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll", filename)
-	fileobject, err := clone.Params.GetUint64(params.FileObject)
-	require.NoError(t, err)
+	fileobject := clone.Params.GetUint64ByName(params.FileObject)
 	assert.Equal(t, uint64(12456738026482168384), fileobject)
 
 	assert.Len(t, clone.Metadata, 2)
@@ -112,15 +110,15 @@ func TestEventMarshalJSON(t *testing.T) {
 		Seq:       2,
 		Timestamp: time.Now(),
 		Host:      "archrabbit",
-		Params: Params{
-			params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
-			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
-			params.FileType:      {Name: params.FileType, Type: params.AnsiString, Value: "file"},
-			params.FileOperation: {Name: params.FileOperation, Type: params.AnsiString, Value: "open"},
-			params.BasePrio:      {Name: params.BasePrio, Type: params.Int8, Value: int8(2)},
-			params.PagePrio:      {Name: params.PagePrio, Type: params.Uint8, Value: uint8(2)},
-			params.NetDIPNames:   {Name: params.NetDIPNames, Type: params.Slice, Value: []string{"dns.google.", "github.com."}},
-		},
+		Params: ParamsOf(
+			NewParam(params.FileObject, params.Uint64, params.U64(uint64(12456738026482168384))),
+			NewParam(params.FilePath, params.String, params.Str("\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll")),
+			NewParam(params.FileType, params.String, params.Str("file")),
+			NewParam(params.FileOperation, params.String, params.Str("open")),
+			NewParam(params.BasePrio, params.Int8, params.I8(int8(2))),
+			NewParam(params.PagePrio, params.Uint8, params.U8(uint8(2))),
+			NewParam(params.NetDIPNames, params.Slice, params.StrSlice([]string{"dns.google.", "github.com."})),
+		),
 		Metadata: map[MetadataKey]any{"foo": "bar", "fooz": "baarz"},
 		PS: &pstypes.PS{
 			PID:  2436,
@@ -226,14 +224,14 @@ func TestUnmarshalHugeHandles(t *testing.T) {
 		Seq:       2,
 		Timestamp: time.Now(),
 		Host:      "archrabbit",
-		Params: Params{
-			params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
-			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
-			params.FileType:      {Name: params.FileType, Type: params.AnsiString, Value: "file"},
-			params.FileOperation: {Name: params.FileOperation, Type: params.AnsiString, Value: "open"},
-			params.BasePrio:      {Name: params.BasePrio, Type: params.Int8, Value: int8(2)},
-			params.PagePrio:      {Name: params.PagePrio, Type: params.Uint8, Value: uint8(2)},
-		},
+		Params: ParamsOf(
+			NewParam(params.FileObject, params.Uint64, params.U64(uint64(12456738026482168384))),
+			NewParam(params.FilePath, params.String, params.Str("\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll")),
+			NewParam(params.FileType, params.String, params.Str("file")),
+			NewParam(params.FileOperation, params.String, params.Str("open")),
+			NewParam(params.BasePrio, params.Int8, params.I8(int8(2))),
+			NewParam(params.PagePrio, params.Uint8, params.U8(uint8(2))),
+		),
 		Metadata: map[MetadataKey]any{"foo": "bar", "fooz": "baarz"},
 		PS: &pstypes.PS{
 			PID:       2436,
@@ -285,14 +283,14 @@ func TestEventMarshalJSONMultiple(t *testing.T) {
 			Seq:       seq,
 			Timestamp: time.Now(),
 			Host:      "archrabbit",
-			Params: Params{
-				params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
-				params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
-				params.FileType:      {Name: params.FileType, Type: params.AnsiString, Value: "file"},
-				params.FileOperation: {Name: params.FileOperation, Type: params.AnsiString, Value: "open"},
-				params.BasePrio:      {Name: params.BasePrio, Type: params.Int8, Value: int8(2)},
-				params.PagePrio:      {Name: params.PagePrio, Type: params.Uint8, Value: uint8(2)},
-			},
+			Params: ParamsOf(
+				NewParam(params.FileObject, params.Uint64, params.U64(uint64(12456738026482168384))),
+				NewParam(params.FilePath, params.String, params.Str("\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll")),
+				NewParam(params.FileType, params.String, params.Str("file")),
+				NewParam(params.FileOperation, params.String, params.Str("open")),
+				NewParam(params.BasePrio, params.Int8, params.I8(int8(2))),
+				NewParam(params.PagePrio, params.Uint8, params.U8(uint8(2))),
+			),
 			Metadata: map[MetadataKey]any{"foo": "bar", "fooz": "baarz"},
 			PS: &pstypes.PS{
 				PID:       2436,
@@ -362,14 +360,14 @@ func BenchmarkEventMarshalJSON(b *testing.B) {
 		Seq:       2,
 		Timestamp: time.Now(),
 		Host:      "archrabbit",
-		Params: Params{
-			params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
-			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
-			params.FileType:      {Name: params.FileType, Type: params.AnsiString, Value: "file"},
-			params.FileOperation: {Name: params.FileOperation, Type: params.AnsiString, Value: "open"},
-			params.BasePrio:      {Name: params.BasePrio, Type: params.Int8, Value: int8(2)},
-			params.PagePrio:      {Name: params.PagePrio, Type: params.Uint8, Value: uint8(2)},
-		},
+		Params: ParamsOf(
+			NewParam(params.FileObject, params.Uint64, params.U64(uint64(12456738026482168384))),
+			NewParam(params.FilePath, params.String, params.Str("\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll")),
+			NewParam(params.FileType, params.String, params.Str("file")),
+			NewParam(params.FileOperation, params.String, params.Str("open")),
+			NewParam(params.BasePrio, params.Int8, params.I8(int8(2))),
+			NewParam(params.PagePrio, params.Uint8, params.U8(uint8(2))),
+		),
 		Metadata: map[MetadataKey]any{"foo": "bar", "fooz": "baarz"},
 		PS: &pstypes.PS{
 			PID:       2436,
@@ -443,14 +441,14 @@ func BenchmarkEventMarshalJSONStdlib(b *testing.B) {
 		Seq:       2,
 		Timestamp: time.Now(),
 		Host:      "archrabbit",
-		Params: Params{
-			params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
-			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
-			params.FileType:      {Name: params.FileType, Type: params.AnsiString, Value: "file"},
-			params.FileOperation: {Name: params.FileOperation, Type: params.AnsiString, Value: "open"},
-			params.BasePrio:      {Name: params.BasePrio, Type: params.Int8, Value: int8(2)},
-			params.PagePrio:      {Name: params.PagePrio, Type: params.Uint8, Value: uint8(2)},
-		},
+		Params: ParamsOf(
+			NewParam(params.FileObject, params.Uint64, params.U64(uint64(12456738026482168384))),
+			NewParam(params.FilePath, params.String, params.Str("\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll")),
+			NewParam(params.FileType, params.String, params.Str("file")),
+			NewParam(params.FileOperation, params.String, params.Str("open")),
+			NewParam(params.BasePrio, params.Int8, params.I8(int8(2))),
+			NewParam(params.PagePrio, params.Uint8, params.U8(uint8(2))),
+		),
 		Metadata: map[MetadataKey]any{"foo": "bar", "fooz": "baarz"},
 		PS: &pstypes.PS{
 			PID:       2436,
@@ -526,12 +524,12 @@ func BenchmarkMarshal(b *testing.B) {
 		Seq:       2,
 		Timestamp: time.Now(),
 		Host:      "archrabbit",
-		Params: Params{
-			params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
-			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
-			params.FileType:      {Name: params.FileType, Type: params.AnsiString, Value: "file"},
-			params.FileOperation: {Name: params.FileOperation, Type: params.AnsiString, Value: "open"},
-		},
+		Params: ParamsOf(
+			NewParam(params.FileObject, params.Uint64, params.U64(uint64(12456738026482168384))),
+			NewParam(params.FilePath, params.String, params.Str("\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll")),
+			NewParam(params.FileType, params.String, params.Str("file")),
+			NewParam(params.FileOperation, params.String, params.Str("open")),
+		),
 		Metadata: map[MetadataKey]any{"foo": "bar", "fooz": "barz"},
 	}
 	b.ReportAllocs()
@@ -551,12 +549,12 @@ func BenchmarkUnmarshal(b *testing.B) {
 		Seq:       2,
 		Timestamp: time.Now(),
 		Host:      "archrabbit",
-		Params: Params{
-			params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
-			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
-			params.FileType:      {Name: params.FileType, Type: params.AnsiString, Value: "file"},
-			params.FileOperation: {Name: params.FileOperation, Type: params.AnsiString, Value: "open"},
-		},
+		Params: ParamsOf(
+			NewParam(params.FileObject, params.Uint64, params.U64(uint64(12456738026482168384))),
+			NewParam(params.FilePath, params.String, params.Str("\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll")),
+			NewParam(params.FileType, params.String, params.Str("file")),
+			NewParam(params.FileOperation, params.String, params.Str("open")),
+		),
 		Metadata: map[MetadataKey]any{"foo": "bar", "fooz": "barz"},
 	}
 	buf := evt.MarshalRaw()

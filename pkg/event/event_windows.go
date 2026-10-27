@@ -64,7 +64,7 @@ func New(seq uint64, r *etw.EventRecord, typ Type) *Event {
 		Tid:       tid,
 		CPU:       cpu,
 		Type:      typ,
-		Params:    make(map[string]*Param),
+		Params:    NewParams(typ),
 		Timestamp: ts,
 		Host:      hostname.Get(),
 	}
@@ -89,7 +89,7 @@ func (e *Event) adjustPID() {
 		// sometimes the pid present in event header is invalid
 		// but, we can get the valid one from the event parameters
 		if e.InvalidPid() {
-			e.PID, _ = e.Params.GetPid()
+			e.PID = e.Params.GetPid()
 		}
 	case File:
 		if e.InvalidPid() {
@@ -110,22 +110,22 @@ func (e *Event) adjustPID() {
 		// As a result, the ProcessId member of EVENT_TRACE_HEADER may not correspond to the
 		// process being created, so we extract the process id from the event parameters
 		if e.IsCreateProcess() {
-			e.PID, _ = e.Params.GetPid()
+			e.PID = e.Params.GetPid()
 		}
 	case Network:
 		if !e.IsDNS() {
-			e.PID, _ = e.Params.GetPid()
+			e.PID = e.Params.GetPid()
 		}
 	case Thread:
 		if e.Type == StackWalk {
-			e.PID, _ = e.Params.GetPid()
-			e.Tid, _ = e.Params.GetTid()
+			e.PID = e.Params.GetPid()
+			e.Tid = e.Params.GetTid()
 		}
 	case Memory:
 		if e.Type == MapViewSectionRundown {
 			// a valid pid for map rundown events
 			// is located in the event parameters
-			e.PID = e.Params.MustGetPid()
+			e.PID = e.Params.GetPid()
 		}
 	}
 }
@@ -153,7 +153,7 @@ func IsCurrentProcDropped(pid uint32) bool { return DropCurrentProc && pid == cu
 
 // IsNetworkTCP determines whether the event pertains to network TCP events.
 func (e *Event) IsNetworkTCP() bool {
-	return e.Category() == Network && network.L4Proto(e.Params.MustGetUint32(params.NetL4Proto)) == network.TCP
+	return e.Category() == Network && network.L4Proto(e.Params.GetUint32ByName(params.NetL4Proto)) == network.TCP
 }
 
 // IsDNS determines whether the event is a DNS question/answer.
@@ -237,18 +237,18 @@ func (e *Event) IsState() bool { return e.Type.OnlyState() }
 
 // IsCreateDisposition determines if the file disposition leads to creating a new file.
 func (e *Event) IsCreateDisposition() bool {
-	return e.IsCreateFile() && e.Params.MustGetUint32(params.FileOperation) == windows.FILE_CREATE
+	return e.IsCreateFile() && e.Params.GetUint32ByName(params.FileOperation) == windows.FILE_CREATE
 }
 
 // IsOverwriteDisposition determines if the file disposition leads to file overwriting.
 func (e *Event) IsOverwriteDisposition() bool {
-	o := e.Params.MustGetUint32(params.FileOperation)
+	o := e.Params.GetUint32ByName(params.FileOperation)
 	return e.IsCreateFile() && (o == windows.FILE_OVERWRITE || o == windows.FILE_OVERWRITE_IF)
 }
 
 // IsOpenDisposition determines if the file disposition leads to opening a file object.
 func (e *Event) IsOpenDisposition() bool {
-	return e.IsCreateFile() && e.Params.MustGetUint32(params.FileOperation) == windows.FILE_OPEN
+	return e.IsCreateFile() && e.Params.GetUint32ByName(params.FileOperation) == windows.FILE_OPEN
 }
 
 // StackPID returns the process id as seen the creator
@@ -258,22 +258,22 @@ func (e *Event) IsOpenDisposition() bool {
 func (e *Event) StackPID() uint32 {
 	if e.IsCreateProcess() {
 		if e.IsSurrogateProcess() {
-			return e.Params.MustGetUint32(params.ProcessRealParentID)
+			return e.Params.GetUint32ByName(params.ProcessRealParentID)
 		}
-		return e.Params.MustGetPpid()
+		return e.Params.GetPpid()
 	}
 	return e.PID
 }
 
 // IsCreateRemoteThread indicates if the remote thread creation occurred.
 func (e *Event) IsCreateRemoteThread() bool {
-	return e.Type == CreateThread && e.PID != e.Params.MustGetPid()
+	return e.Type == CreateThread && e.PID != e.Params.GetPid()
 }
 
 // IsSurrogateProcess indicates if the process creation event parent id
 // differs from the real process parent identifier.
 func (e *Event) IsSurrogateProcess() bool {
-	return e.IsCreateProcess() && e.Params.MustGetUint32(params.ProcessParentID) != e.Params.MustGetUint32(params.ProcessRealParentID)
+	return e.IsCreateProcess() && e.Params.GetUint32ByName(params.ProcessParentID) != e.Params.GetUint32ByName(params.ProcessRealParentID)
 }
 
 // SignatureKey derives the key into signature store.
@@ -296,23 +296,23 @@ func (e *Event) RundownKey() uint64 {
 	switch e.Type {
 	case ProcessRundown:
 		b := make([]byte, 4)
-		pid, _ := e.Params.GetPid()
+		pid := e.Params.GetPid()
 
 		binary.LittleEndian.PutUint32(b, pid)
 
 		return hashers.FnvUint64(b)
 	case ThreadRundown:
 		b := make([]byte, 8)
-		pid, _ := e.Params.GetPid()
-		tid, _ := e.Params.GetTid()
+		pid := e.Params.GetPid()
+		tid := e.Params.GetTid()
 
 		binary.LittleEndian.PutUint32(b, pid)
 		binary.LittleEndian.PutUint32(b, tid)
 
 		return hashers.FnvUint64(b)
 	case ModuleRundown:
-		pid, _ := e.Params.GetPid()
-		mod, _ := e.Params.GetString(params.ModulePath)
+		pid := e.Params.GetPid()
+		mod := e.Params.GetStringByName(params.ModulePath)
 		b := make([]byte, 4+len(mod))
 
 		binary.LittleEndian.PutUint32(b, pid)
@@ -321,19 +321,19 @@ func (e *Event) RundownKey() uint64 {
 		return hashers.FnvUint64(b)
 	case FileRundown:
 		b := make([]byte, 8)
-		fileObject, _ := e.Params.GetUint64(params.FileObject)
+		fileObject := e.Params.GetUint64ByName(params.FileObject)
 		binary.LittleEndian.PutUint64(b, fileObject)
 
 		return hashers.FnvUint64(b)
 	case MapViewSectionRundown:
 		b := make([]byte, 12)
-		fileKey, _ := e.Params.GetUint64(params.FileKey)
+		fileKey := e.Params.GetUint64ByName(params.FileKey)
 		binary.LittleEndian.PutUint32(b, e.PID)
 		binary.LittleEndian.PutUint64(b, fileKey)
 
 		return hashers.FnvUint64(b)
 	case RegKCBRundown:
-		key, _ := e.Params.GetString(params.RegPath)
+		key := e.Params.GetStringByName(params.RegPath)
 		b := make([]byte, 4+len(key))
 
 		binary.LittleEndian.PutUint32(b, e.PID)
@@ -350,26 +350,26 @@ func (e *Event) RundownKey() uint64 {
 func (e *Event) PartialKey() uint64 {
 	switch e.Type {
 	case WriteFile, ReadFile:
-		return e.Params.MustGetUint64(params.FileObject) + uint64(e.PID)
+		return e.Params.GetUint64ByName(params.FileObject) + uint64(e.PID)
 	case MapViewOfSection, UnmapViewOfSection:
-		return e.Params.MustGetUint64(params.FileViewBase) + uint64(e.PID)
+		return e.Params.GetUint64ByName(params.FileViewBase) + uint64(e.PID)
 	case CreateFile:
-		file, _ := e.Params.GetString(params.FilePath)
+		file := e.Params.GetStringByName(params.FilePath)
 		b := make([]byte, 4+len(file))
 		binary.LittleEndian.PutUint32(b, e.PID)
 		b = append(b, []byte(file)...)
 		return hashers.FnvUint64(b)
 	case OpenProcess:
-		pid := e.Params.MustGetUint32(params.ProcessID)
-		access := e.Params.MustGetUint32(params.DesiredAccess)
+		pid := e.Params.GetUint32ByName(params.ProcessID)
+		access := e.Params.GetUint32ByName(params.DesiredAccess)
 		return uint64(pid + access + e.PID)
 	case OpenThread:
-		tid := e.Params.MustGetUint32(params.ThreadID)
-		access := e.Params.MustGetUint32(params.DesiredAccess)
+		tid := e.Params.GetUint32ByName(params.ThreadID)
+		access := e.Params.GetUint32ByName(params.DesiredAccess)
 		return uint64(tid + access + e.PID)
 	case Accept, Recv:
 		var b []byte
-		ip, _ := e.Params.GetIP(params.NetSIP)
+		ip := e.Params.GetIPByName(params.NetSIP)
 		if ip.To4() != nil {
 			b = make([]byte, 10)
 			binary.LittleEndian.PutUint32(b, binary.BigEndian.Uint32(ip.To4()))
@@ -378,13 +378,13 @@ func (e *Event) PartialKey() uint64 {
 			binary.LittleEndian.PutUint64(b, binary.BigEndian.Uint64(ip.To16()[0:8]))
 			binary.LittleEndian.PutUint64(b, binary.BigEndian.Uint64(ip.To16()[8:16]))
 		}
-		port, _ := e.Params.GetUint16(params.NetSport)
+		port := e.Params.GetUint16ByName(params.NetSport)
 		binary.LittleEndian.PutUint32(b, e.PID)
 		binary.LittleEndian.PutUint16(b, port)
 		return hashers.FnvUint64(b)
 	case Connect, Send:
 		var b []byte
-		ip, _ := e.Params.GetIP(params.NetDIP)
+		ip := e.Params.GetIPByName(params.NetDIP)
 		if ip.To4() != nil {
 			b = make([]byte, 10)
 			binary.LittleEndian.PutUint32(b, binary.BigEndian.Uint32(ip.To4()))
@@ -393,22 +393,22 @@ func (e *Event) PartialKey() uint64 {
 			binary.LittleEndian.PutUint64(b, binary.BigEndian.Uint64(ip.To16()[0:8]))
 			binary.LittleEndian.PutUint64(b, binary.BigEndian.Uint64(ip.To16()[8:16]))
 		}
-		port, _ := e.Params.GetUint16(params.NetDport)
+		port := e.Params.GetUint16ByName(params.NetDport)
 		binary.LittleEndian.PutUint32(b, e.PID)
 		binary.LittleEndian.PutUint16(b, port)
 		return hashers.FnvUint64(b)
 	case RegOpenKey, RegQueryKey, RegQueryValue,
 		RegDeleteKey, RegDeleteValue, RegSetValue,
 		RegCloseKey:
-		key, _ := e.Params.GetString(params.RegPath)
+		key := e.Params.GetStringByName(params.RegPath)
 		b := make([]byte, 4+len(key))
 		binary.LittleEndian.PutUint32(b, e.PID)
 		b = append(b, key...)
 		return hashers.FnvUint64(b)
 	case VirtualAlloc, VirtualFree:
-		return e.Params.MustGetUint64(params.MemBaseAddress) + uint64(e.PID)
+		return e.Params.GetUint64ByName(params.MemBaseAddress) + uint64(e.PID)
 	case QueryDNS, ReplyDNS:
-		n, _ := e.Params.GetString(params.DNSName)
+		n := e.Params.GetStringByName(params.DNSName)
 		b := make([]byte, 4+len(n))
 		binary.LittleEndian.PutUint32(b, e.PID)
 		b = append(b, n...)
@@ -422,31 +422,31 @@ func (e *Event) PartialKey() uint64 {
 func (e *Event) Summary() string {
 	switch e.Type {
 	case CreateProcess:
-		exe := e.Params.MustGetString(params.Exe)
+		exe := e.Params.GetStringByName(params.Exe)
 		sid := e.GetParamAsString(params.Username)
 		return printSummary(e, fmt.Sprintf("spawned <code>%s</code> process as <code>%s</code> user", exe, sid))
 	case TerminateProcess:
-		exe := e.Params.MustGetString(params.Exe)
+		exe := e.Params.GetStringByName(params.Exe)
 		sid := e.GetParamAsString(params.Username)
 		return printSummary(e, fmt.Sprintf("terminated <code>%s</code> process as <code>%s</code> user", exe, sid))
 	case OpenProcess:
 		access := e.GetParamAsString(params.DesiredAccess)
-		exe, _ := e.Params.GetString(params.Exe)
+		exe := e.Params.GetStringByName(params.Exe)
 		return printSummary(e, fmt.Sprintf("opened <code>%s</code> process object with <code>%s</code> access right(s)",
 			exe, access))
 	case CreateThread:
-		tid, _ := e.Params.GetTid()
+		tid := e.Params.GetTid()
 		addr := e.GetParamAsString(params.StartAddress)
 		return printSummary(e, fmt.Sprintf("spawned a new thread with <code>%d</code> id at <code>%s</code> address",
 			tid, addr))
 	case TerminateThread:
-		tid, _ := e.Params.GetTid()
+		tid := e.Params.GetTid()
 		addr := e.GetParamAsString(params.StartAddress)
 		return printSummary(e, fmt.Sprintf("terminated a thread with <code>%d</code> id at <code>%s</code> address",
 			tid, addr))
 	case OpenThread:
 		access := e.GetParamAsString(params.DesiredAccess)
-		exe, _ := e.Params.GetString(params.Exe)
+		exe := e.Params.GetStringByName(params.Exe)
 		return printSummary(e, fmt.Sprintf("opened <code>%s</code> process' thread object with <code>%s</code> access right(s)",
 			exe, access))
 	case LoadModule:
@@ -461,11 +461,11 @@ func (e *Event) Summary() string {
 		return printSummary(e, fmt.Sprintf("%sed a file <code>%s</code>", strings.ToLower(op), filename))
 	case ReadFile:
 		filename := e.GetParamAsString(params.FilePath)
-		size, _ := e.Params.GetUint32(params.FileIoSize)
+		size := e.Params.GetUint32ByName(params.FileIoSize)
 		return printSummary(e, fmt.Sprintf("read <code>%d</code> bytes from <code>%s</code> file", size, filename))
 	case WriteFile:
 		filename := e.GetParamAsString(params.FilePath)
-		size, _ := e.Params.GetUint32(params.FileIoSize)
+		size := e.Params.GetUint32ByName(params.FileIoSize)
 		return printSummary(e, fmt.Sprintf("wrote <code>%d</code> bytes to <code>%s</code> file", size, filename))
 	case SetFileInformation:
 		filename := e.GetParamAsString(params.FilePath)
@@ -497,10 +497,10 @@ func (e *Event) Summary() string {
 		return printSummary(e, fmt.Sprintf("queried <code>%s</code> key", key))
 	case RegSetValue:
 		key := e.GetParamAsString(params.RegPath)
-		val, err := e.Params.GetString(params.RegValue)
-		if err != nil {
+		if !e.Params.Contains(params.RegValue) {
 			return printSummary(e, fmt.Sprintf("set <code>%s</code> value", key))
 		}
+		val := e.Params.GetStringByName(params.RegValue)
 		return printSummary(e, fmt.Sprintf("set <code>%s</code> payload in <code>%s</code> value", val, key))
 	case RegDeleteValue:
 		key := e.GetParamAsString(params.RegPath)
@@ -509,23 +509,23 @@ func (e *Event) Summary() string {
 		key := e.GetParamAsString(params.RegPath)
 		return printSummary(e, fmt.Sprintf("queried <code>%s</code> value", key))
 	case Accept:
-		ip, _ := e.Params.GetIP(params.NetSIP)
-		port, _ := e.Params.GetUint16(params.NetSport)
+		ip := e.Params.GetIPByName(params.NetSIP)
+		port := e.Params.GetUint16ByName(params.NetSport)
 		return printSummary(e, fmt.Sprintf("accepted connection from <code>%v</code> and <code>%d</code> port", ip, port))
 	case Connect:
-		ip, _ := e.Params.GetIP(params.NetDIP)
-		port, _ := e.Params.GetUint16(params.NetDport)
+		ip := e.Params.GetIPByName(params.NetDIP)
+		port := e.Params.GetUint16ByName(params.NetDport)
 		return printSummary(e, fmt.Sprintf("connected to <code>%v</code> and <code>%d</code> port", ip, port))
 	case Send:
-		ip, _ := e.Params.GetIP(params.NetDIP)
-		port, _ := e.Params.GetUint16(params.NetDport)
-		size, _ := e.Params.GetUint32(params.NetSize)
+		ip := e.Params.GetIPByName(params.NetDIP)
+		port := e.Params.GetUint16ByName(params.NetDport)
+		size := e.Params.GetUint32ByName(params.NetSize)
 		return printSummary(e, fmt.Sprintf("sent <code>%d</code> bytes to <code>%v</code> and <code>%d</code> port",
 			size, ip, port))
 	case Recv:
-		ip, _ := e.Params.GetIP(params.NetSIP)
-		port, _ := e.Params.GetUint16(params.NetSport)
-		size, _ := e.Params.GetUint32(params.NetSize)
+		ip := e.Params.GetIPByName(params.NetSIP)
+		port := e.Params.GetUint16ByName(params.NetSport)
+		size := e.Params.GetUint32ByName(params.NetSize)
 		return printSummary(e, fmt.Sprintf("received <code>%d</code> bytes from <code>%v</code> and <code>%d</code> port",
 			size, ip, port))
 	case VirtualAlloc:

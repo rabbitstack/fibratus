@@ -207,12 +207,13 @@ func (a Alert) MarshalJSON() ([]byte, error) {
 			Proc:      newAlertProcess(e),
 		}
 
-		for _, param := range e.Params {
-			if param.Type == params.Bool || param.Type == params.PID ||
-				param.Type == params.TID || param.Type == params.Port || param.IsNumber() {
-				evt.Params[param.Name] = param.Value
+		for _, param := range e.Params.Present() {
+			typ := param.Type()
+			if typ == params.Bool || typ == params.PID ||
+				typ == params.TID || typ == params.Port || param.IsNumber() {
+				evt.Params[param.Name()] = nativeValue(param.Value)
 			} else {
-				evt.Params[param.Name] = param.String()
+				evt.Params[param.Name()] = param.String()
 			}
 		}
 
@@ -230,4 +231,21 @@ func NewAlert(title, text string, tags []string, severity Severity) Alert {
 // NewAlertWithEvents builds a new alert with associated events.
 func NewAlertWithEvents(title, text string, tags []string, severity Severity, evts []*event.Event) Alert {
 	return Alert{Title: title, Text: text, Tags: tags, Severity: severity, Events: evts}
+}
+
+// nativeValue converts the tagged union to the native Go value
+// that is suitable for the JSON encoding.
+func nativeValue(v params.Value) any {
+	switch v.Kind() {
+	case params.KindUint:
+		return v.Uint64()
+	case params.KindInt:
+		return v.Int64()
+	case params.KindBool:
+		return v.Bool()
+	case params.KindFloat:
+		return v.Float64()
+	default:
+		return nil
+	}
 }

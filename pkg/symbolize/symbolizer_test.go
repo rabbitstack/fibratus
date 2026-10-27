@@ -151,13 +151,13 @@ func TestProcessCallstackPeExports(t *testing.T) {
 		Seq:       2,
 		Timestamp: time.Now(),
 		Host:      "archrabbit",
-		Params: event.Params{
-			params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
-			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\mimi.dll"},
-			params.FileType:      {Name: params.FileType, Type: params.AnsiString, Value: "file"},
-			params.FileOperation: {Name: params.FileOperation, Type: params.Enum, Value: uint32(2), Enum: fs.FileCreateDispositions},
-			params.Callstack:     {Name: params.Callstack, Type: params.Slice, Value: []va.Address{0x7ffb5c1d0396, 0x7ffb5d8e61f4, 0x7ffb3138592e, 0x7ffb313853b2, 0x2638e59e0a5}},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.FileObject, params.Uint64, params.U64(uint64(12456738026482168384))),
+			event.NewParam(params.FilePath, params.String, params.Str("C:\\Windows\\system32\\mimi.dll")),
+			event.NewParam(params.FileType, params.String, params.Str("file")),
+			event.NewParam(params.FileOperation, params.Enum, params.U32(uint32(2)), event.WithEnum(fs.FileCreateDispositions)),
+			event.NewParam(params.Callstack, params.Slice, event.Addresses([]va.Address{0x7ffb5c1d0396, 0x7ffb5d8e61f4, 0x7ffb3138592e, 0x7ffb313853b2, 0x2638e59e0a5})),
+		),
 		PS: proc,
 	}
 
@@ -204,10 +204,10 @@ func TestProcessCallstackPeExports(t *testing.T) {
 		CPU:       1,
 		Seq:       2,
 		Timestamp: time.Now(),
-		Params: event.Params{
-			params.ModuleBase: {Name: params.ModuleBase, Type: params.Address, Value: uint64(0x7ffb5d8e11c4)},
-			params.FilePath:   {Name: params.FilePath, Type: params.UnicodeString, Value: `C:\Windows\System32\user32.dll`},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.ModuleBase, params.Address, params.U64(uint64(0x7ffb5d8e11c4))),
+			event.NewParam(params.FilePath, params.String, params.Str(`C:\Windows\System32\user32.dll`)),
+		),
 		PS: proc,
 	}
 
@@ -264,11 +264,11 @@ func TestProcessCallstack(t *testing.T) {
 		Seq:       2,
 		Timestamp: time.Now(),
 		Host:      "archrabbit",
-		Params: event.Params{
-			params.ProcessParentID:     {Name: params.ProcessParentID, Type: params.PID, Value: (uint32(os.Getpid()))},
-			params.ProcessRealParentID: {Name: params.ProcessRealParentID, Type: params.PID, Value: (uint32(os.Getpid()))},
-			params.Callstack:           {Name: params.Callstack, Type: params.Slice, Value: []va.Address{0x7ffb5c1d0396, 0x7ffb5d8e61f4, 0x7ffb3138592e, 0x7ffb313853b2, 0x2638e59e0a5}},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.ProcessParentID, params.PID, params.U32((uint32(os.Getpid())))),
+			event.NewParam(params.ProcessRealParentID, params.PID, params.U32((uint32(os.Getpid())))),
+			event.NewParam(params.Callstack, params.Slice, event.Addresses([]va.Address{0x7ffb5c1d0396, 0x7ffb5d8e61f4, 0x7ffb3138592e, 0x7ffb313853b2, 0x2638e59e0a5})),
+		),
 		PS: proc,
 	}
 
@@ -285,9 +285,9 @@ func TestProcessCallstack(t *testing.T) {
 		Seq:       3,
 		Timestamp: time.Now(),
 		Host:      "archrabbit",
-		Params: event.Params{
-			params.ProcessID: {Name: params.ProcessID, Type: params.PID, Value: uint32(os.Getpid())},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.ProcessID, params.PID, params.U32(uint32(os.Getpid()))),
+		),
 		PS: proc,
 	}
 	_, err = s.ProcessEvent(e1)
@@ -352,20 +352,16 @@ func TestKernelCallstackSymbolizationFromDriverStore(t *testing.T) {
 		Seq:       2,
 		Timestamp: time.Now(),
 		Host:      "archrabbit",
-		Params: event.Params{
-			params.ProcessParentID:     {Name: params.ProcessParentID, Type: params.PID, Value: uint32(os.Getpid())},
-			params.ProcessRealParentID: {Name: params.ProcessRealParentID, Type: params.PID, Value: uint32(os.Getpid())},
-			params.Callstack: {
-				Name: params.Callstack,
-				Type: params.Slice,
-				Value: []va.Address{
-					0xFFFFF80000100000, // ntoskrnl.exe
-					0xFFFFF80000810000, // hal.dll
-					0xFFFFF80001010000, // fltMgr.sys
-					0xFFFFF80001210000, // ksecdd.sys
-				},
-			},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.ProcessParentID, params.PID, params.U32(uint32(os.Getpid()))),
+			event.NewParam(params.ProcessRealParentID, params.PID, params.U32(uint32(os.Getpid()))),
+			event.NewParam(params.Callstack, params.Slice, event.Addresses([]va.Address{
+				0xFFFFF80000100000, // ntoskrnl.exe
+				0xFFFFF80000810000, // hal.dll
+				0xFFFFF80001010000, // fltMgr.sys
+				0xFFFFF80001210000, // ksecdd.sys
+			})),
+		),
 		PS: proc,
 	}
 
@@ -456,11 +452,11 @@ func TestSymbolizeEventParamAddress(t *testing.T) {
 		Seq:       2,
 		Timestamp: time.Now(),
 		Host:      "archrabbit",
-		Params: event.Params{
-			params.Callstack:    {Name: params.Callstack, Type: params.Slice, Value: []va.Address{0x7ffb5c1d0396, 0x7ffb5d8e61f4, 0x7ffb3138592e, 0x7ffb313853b2, 0x2638e59e0a5}},
-			params.StartAddress: {Name: params.StartAddress, Type: params.Address, Value: uint64(0x7ffb3138592e)},
-			params.ProcessID:    {Name: params.ProcessID, Type: params.PID, Value: uint32(os.Getpid())},
-		},
+		Params: event.ParamsOf(
+			event.NewParam(params.Callstack, params.Slice, event.Addresses([]va.Address{0x7ffb5c1d0396, 0x7ffb5d8e61f4, 0x7ffb3138592e, 0x7ffb313853b2, 0x2638e59e0a5})),
+			event.NewParam(params.StartAddress, params.Address, params.U64(uint64(0x7ffb3138592e))),
+			event.NewParam(params.ProcessID, params.PID, params.U32(uint32(os.Getpid()))),
+		),
 		PS: proc,
 	}
 
@@ -503,11 +499,11 @@ func TestProcessCallstackProcsTTL(t *testing.T) {
 			Seq:       2,
 			Timestamp: time.Now().Add(time.Millisecond * time.Duration(n)),
 			Host:      "archrabbit",
-			Params: event.Params{
-				params.ProcessParentID:     {Name: params.ProcessParentID, Type: params.PID, Value: (uint32(os.Getpid()))},
-				params.ProcessRealParentID: {Name: params.ProcessRealParentID, Type: params.PID, Value: (uint32(os.Getpid()))},
-				params.Callstack:           {Name: params.Callstack, Type: params.Slice, Value: []va.Address{0x7ffb5c1d0396, 0x7ffb5d8e61f4, 0x7ffb3138592e, 0x7ffb313853b2, 0x2638e59e0a5}},
-			},
+			Params: event.ParamsOf(
+				event.NewParam(params.ProcessParentID, params.PID, params.U32((uint32(os.Getpid())))),
+				event.NewParam(params.ProcessRealParentID, params.PID, params.U32((uint32(os.Getpid())))),
+				event.NewParam(params.Callstack, params.Slice, event.Addresses([]va.Address{0x7ffb5c1d0396, 0x7ffb5d8e61f4, 0x7ffb3138592e, 0x7ffb313853b2, 0x2638e59e0a5})),
+			),
 		}
 		_, _ = s.ProcessEvent(e)
 		n--
