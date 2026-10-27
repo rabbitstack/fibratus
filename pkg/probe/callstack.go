@@ -22,7 +22,6 @@ package probe
 
 import (
 	"expvar"
-	"sync"
 	"time"
 
 	"github.com/rabbitstack/fibratus/pkg/event"
@@ -77,7 +76,6 @@ type reservedStack struct {
 type CallstackLinker struct {
 	// buckets holds events waiting for their stack walk and stack walks waiting for their event
 	buckets map[uint64]*event.Event
-	mu      sync.Mutex
 
 	periodical *periodical.Periodical
 
@@ -95,8 +93,6 @@ type CallstackLinker struct {
 // is parked until splice receives the stack walk.
 func (l *CallstackLinker) Put(e *event.Event) *event.Event {
 	ts := e.RawTimestamp()
-	// l.mu.Lock()
-	// defer l.mu.Unlock()
 
 	// the stack walk arrived ahead of the event
 	if stack, ok := l.stacks[ts]; ok {
@@ -127,9 +123,6 @@ func (l *CallstackLinker) Put(e *event.Event) *event.Event {
 // addresses and dispatchers to consumers/listeners. If the originating
 // event hasn't arrived yet, the stack walk is parked.
 func (l *CallstackLinker) Link(ts uint64, pid, tid uint32, addrs va.Callstack) {
-	// l.mu.Lock()
-	// defer l.mu.Unlock()
-
 	evt, ok := l.buckets[ts]
 	if !ok {
 		// park the stack walk, the event hasn't reached Put yet
@@ -165,9 +158,6 @@ func (l *CallstackLinker) Link(ts uint64, pid, tid uint32, addrs va.Callstack) {
 // maximum stack wait period. Events are published without the callstack,
 // while orphaned stack walks are discarded.
 func (l *CallstackLinker) evictExpired() {
-	// l.mu.Lock()
-	// defer l.mu.Unlock()
-
 	for ts, s := range l.stacks {
 		if !l.expired(filetime.Nanoseconds(ts)) {
 			continue
@@ -175,7 +165,6 @@ func (l *CallstackLinker) evictExpired() {
 		s.addrs.ReleasePool()
 		delete(l.stacks, ts)
 	}
-
 	for ts, evt := range l.buckets {
 		if !l.expired(filetime.Nanoseconds(ts)) {
 			continue
@@ -200,9 +189,9 @@ func (s *CallstackLinker) removeSurrogate(e *event.Event) {
 	}
 }
 
-// RunPeriodic advances the event-time clock and evicts the expired entries once per
+// doPeriodic advances the event-time clock and evicts the expired entries once per
 // eviction interval.
-func (l *CallstackLinker) RunPeriodic(ts int64) { l.periodical.Do(ts, l.evictExpired) }
+func (l *CallstackLinker) doPeriodic(ts int64) { l.periodical.Do(ts, l.evictExpired) }
 
 // expired reports whether an entry parked at the given clock reading has
 // waited longer than maxStackWait.

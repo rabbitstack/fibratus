@@ -79,7 +79,7 @@ type Probe struct {
 	kcbPathResolver map[uint64]string // maps KCB (Key Control Block) pointer to registry path
 
 	filePathStringCache *stringcache.StringCache
-	kcbPathStringCache  *stringcache.StringCache
+	kcbPathStringCache  *stringcache.ScopedStringCache
 
 	// stores pending I/O request packets
 	enqueuedIORequests map[uint64]ioRequest
@@ -103,7 +103,7 @@ type Probe struct {
 
 	linker *CallstackLinker
 
-	// periodics keeps a list of periodical runners per pipeline producer ID
+	// periodics keeps a list of periodical runners per pipeline producer ID.
 	periodics [pipeline.ProducerMax + 1][]periodical.Periodic
 
 	regionProber *va.RegionProber
@@ -334,17 +334,17 @@ func (p *Probe) Close() error {
 // ring buffer, parked until a related event arrives, used for state management
 // or discarded.
 func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecord) error {
-	eventType := event.TypeFromEventRecord(rec)
+	t := event.TypeFromEventRecord(rec)
 
 	if event.IsCurrentProcDropped(rec) {
 		return nil
 	}
 
-	if p.config.EventSource.HasDropType(eventType) {
+	if p.config.EventSource.HasDropType(t) {
 		return nil
 	}
 
-	switch eventType {
+	switch t {
 	case event.CreateFile:
 		return p.initIORequest(rec)
 	case event.CloseFile:
@@ -364,7 +364,7 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 		if producerID == pipeline.ProducerKernel && p.claimIORequestStack(rec) {
 			return nil
 		}
-		return p.pipeline.Publish(producerID, eventType, func(evt *event.Event) { evt.Parse(rec) })
+		return p.pipeline.Publish(producerID, t, func(evt *event.Event) { evt.Parse(rec) })
 	case event.RegKCBRundown, event.RegCreateKCB:
 		kcb := rec.ReadUint64(16)
 		path := rec.ConsumeUTF16String(24)
@@ -378,11 +378,11 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 		return nil
 	}
 
-	switch eventType {
+	switch t {
 	case event.FileOpEnd:
 		return p.completeIORequest(producerID, rec)
 	case event.MapViewOfSection, event.UnmapViewOfSection, event.MapViewSectionRundown, event.DeleteFile, event.SetFileInformation, event.RenameFile, event.EnumDirectory, event.ReadFile, event.WriteFile:
-		return p.pipeline.Publish(producerID, eventType, func(evt *event.Event) {
+		return p.pipeline.Publish(producerID, t, func(evt *event.Event) {
 			evt.Parse(rec)
 			p.addFileInfoFromFCB(rec, evt)
 		})
@@ -402,7 +402,7 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 			}
 		}
 
-		if (eventType == event.RegOpenKey || eventType == event.RegQueryKey || eventType == event.RegQueryValue) &&
+		if (t == event.RegOpenKey || t == event.RegQueryKey || t == event.RegQueryValue) &&
 			!p.isRegPathApproved(path) {
 			registryApproverRejections.Add(1)
 			return nil
@@ -410,13 +410,13 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 
 		registryApproverApprovals.Add(1)
 
-		return p.pipeline.Publish(producerID, eventType, func(evt *event.Event) {
+		return p.pipeline.Publish(producerID, t, func(evt *event.Event) {
 			evt.Parse(rec)
 			_ = evt.Params.SetValue(params.RegPath, path)
 		})
 	case event.OpenProcess, event.OpenThread:
 		pid := rec.ReadUint32(0)
-		if !p.isExecutablePathApproved(pid, eventType == event.OpenThread && rec.Header.ProcessID != pid) {
+		if !p.isExecutablePathApproved(pid, t == event.OpenThread && rec.Header.ProcessID != pid) {
 			procApproverRejections.Add(1)
 			return nil
 		}
@@ -424,7 +424,7 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 	}
 
 	producer := p.pipeline.Producer(producerID)
-	evt := producer.Acquire(eventType)
+	evt := producer.Acquire(t)
 	if evt == nil {
 		return pipeline.ErrRingNoSlots
 	}
@@ -493,8 +493,11 @@ func (p *Probe) completeIORequest(producerID pipeline.ProducerID, rec *etw.Event
 		disposition = opts >> 24
 		switch ioStatus {
 		case sys.IoReparse:
+			isReparse = true
 		case sys.IoRemount:
+			isRemount = true
 		case sys.IoReparseGlobal:
+			isReparseGlobal = true
 		default:
 			reparseTag = ioStatus
 		}
@@ -615,8 +618,10 @@ func (p *Probe) resolveFileInfo(rec *etw.EventRecord) (FileInfo, bool) {
 		// with possibly reused later resolutions
 		if rec.Header.EventDescriptor.Opcode == event.RenameFileID || p.fcbPathResolver.Contains(key) {
 			p.fcbPathResolver.Remove(key)
-			p.fcbPathResolver.Add(key, file)
-		} else if !p.fcbPathResolver.Contains(key) {
+			if key != 0 {
+				p.fcbPathResolver.Add(key, file)
+			}
+		} else if key != 0 && !p.fcbPathResolver.Contains(key) {
 			p.fcbPathResolver.Add(key, file)
 		}
 	}
@@ -637,9 +642,9 @@ func (p *Probe) resolveKCBPath(rec *etw.EventRecord) string {
 		return ""
 	}
 
-	if baseKey, exists := p.kcbPathResolver[kcb]; exists {
+	if base, exists := p.kcbPathResolver[kcb]; exists {
 		path := rec.ConsumeUTF16String(24)
-		return baseKey + `\` + path
+		return base + `\` + path
 	}
 
 	return ""
@@ -726,6 +731,10 @@ func (p *Probe) handleEvent(evt *event.Event) error {
 			evt.AppendParam(params.Exe, params.Path, proc.Exe)
 			evt.AppendParam(params.ProcessName, params.AnsiString, proc.Name)
 		}
+	}
+
+	if p.linker != nil {
+		p.linker.doPeriodic(evt.Timestamp.UnixNano())
 	}
 
 	if p.config.EventSource.StackEnrichment && evt.Type.WaitStack() && !evt.Params.Contains(params.Callstack) {
@@ -951,6 +960,8 @@ func (p *Probe) Handle(evt *event.Event) {
 	}
 }
 
+// AddPeriodic adds a new periodic to the given producer slot. Beware periodics run in the
+// event processing thread. For this reason, never run CPU-intensive tasks inside the periodic.
 func (p *Probe) AddPeriodic(producerID pipeline.ProducerID, periodic periodical.Periodic) error {
 	if producerID >= pipeline.ProducerMax {
 		return fmt.Errorf("producer ID (%d) not allowed", producerID)
@@ -997,7 +1008,7 @@ func New(ctx context.Context, psnap ps.Snapshotter, config *config.Config) (*Pro
 		kcbPathResolver:  make(map[uint64]string),
 
 		filePathStringCache: stringcache.New(),
-		kcbPathStringCache:  stringcache.New(),
+		kcbPathStringCache:  stringcache.NewScoped(stringcache.CacheSize),
 
 		enqueuedIORequests:   make(map[uint64]ioRequest),
 		enqueuedRegSetValues: expirable.NewLRU[pair.Pair[uint32, string], *event.Event](50, nil, time.Second*10),
@@ -1018,9 +1029,6 @@ func New(ctx context.Context, psnap ps.Snapshotter, config *config.Config) (*Pro
 
 	if config.EventSource.StackEnrichment {
 		p.linker = NewCallstackLinker(p)
-		if err := p.AddPeriodic(pipeline.ProducerKernel, p.linker); err != nil {
-			return nil, err
-		}
 	}
 
 	return p, nil

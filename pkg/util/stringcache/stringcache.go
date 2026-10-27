@@ -26,23 +26,32 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-const cacheSize = 8192 // power of two
+const CacheSize = 8192 // must be power of two
 
 type slot struct {
 	key string // owned copy of the raw UTF-16 bytes
 	val string // decoded UTF-8
 }
 
+type sslot struct {
+	slot
+	scope string // namespace
+}
+
 // StringCache is NOT goroutine-safe
 type StringCache struct {
 	seed  maphash.Seed
-	slots [cacheSize]slot
+	slots [CacheSize]slot
 }
 
-func New() *StringCache { return &StringCache{seed: maphash.MakeSeed()} }
+type ScopedStringCache struct {
+	seed  maphash.Seed
+	slots []sslot
+	mask  uint64
+}
 
 func (c *StringCache) slotFor(view string) *slot {
-	return &c.slots[maphash.String(c.seed, view)&(cacheSize-1)]
+	return &c.slots[maphash.String(c.seed, view)&(CacheSize-1)]
 }
 
 // Lookup returns the value cached for the raw UTF-16 key, if present.
@@ -94,6 +103,56 @@ func (c *StringCache) Get(k []uint16) string {
 	v := windows.UTF16ToString(trimNul(k))
 	c.Add(k, v)
 	return v
+}
+
+func (c *ScopedStringCache) slotFor(scope, view string) *sslot {
+	h := maphash.String(c.seed, view)
+	if scope != "" {
+		h ^= maphash.String(c.seed, scope) * 0x9e3779b97f4a7c15
+	}
+	return &c.slots[h&c.mask]
+}
+
+func (c *ScopedStringCache) Lookup(scope string, k []uint16) (string, bool) {
+	k = trimNul(k)
+	if len(k) == 0 && scope == "" {
+		return "", false
+	}
+	view := utf16View(k)
+	if s := c.slotFor(scope, view); s.key == view && s.scope == scope {
+		return s.val, true
+	}
+	return "", false
+}
+
+func (c *ScopedStringCache) Add(scope string, k []uint16, val string) {
+	k = trimNul(k)
+	if len(k) == 0 && scope == "" {
+		return
+	}
+	view := utf16View(k)
+	s := c.slotFor(scope, view)
+	if s.key != view || s.scope != scope {
+		s.key = strings.Clone(view) // must not alias the ETW buffer
+		s.scope = scope             // long-lived string from r.kcbs, safe to share
+	}
+	s.val = val
+}
+
+// New builds a new string cache with the fixed slots size.
+func New() *StringCache { return &StringCache{seed: maphash.MakeSeed()} }
+
+// NewScoped rounds size up to a power of two.
+func NewScoped(size int) *ScopedStringCache {
+	n := 1
+	for n < size {
+		n <<= 1
+	}
+	return &ScopedStringCache{
+		seed:  maphash.MakeSeed(),
+		mask:  uint64(n - 1),
+		slots: make([]sslot, n),
+	}
 }
 
 func utf16View(k []uint16) string {

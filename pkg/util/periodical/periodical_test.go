@@ -29,39 +29,8 @@ import (
 // base is a realistic event time: 2026-10-20 12:00:00 UTC.
 var base = time.Date(2026, time.October, 20, 12, 0, 0, 0, time.UTC)
 
-// ft converts a wall-clock time to a FILETIME timestamp (100ns ticks since 1601).
-func ft(t time.Time) uint64 {
-	return filetimeEpoch + uint64(t.UnixNano()/100)
-}
-
 // at returns the FILETIME timestamp d after base.
-func at(d time.Duration) uint64 { return ft(base.Add(d)) }
-
-func TestNanoseconds(t *testing.T) {
-	tests := []struct {
-		name string
-		ts   uint64
-		want int64
-	}{
-		{"unix epoch", filetimeEpoch, 0},
-		{"one tick after epoch", filetimeEpoch + 1, 100},
-		{"one second after epoch", filetimeEpoch + 10_000_000, int64(time.Second)},
-		{"real timestamp", ft(base), base.UnixNano()},
-		{"sub-microsecond precision is truncated to 100ns", ft(base) + 3, base.UnixNano() + 300},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, nanoseconds(tt.ts))
-		})
-	}
-}
-
-func TestNanosecondsMatchesStdlibConversion(t *testing.T) {
-	for _, d := range []time.Duration{0, time.Millisecond, time.Minute, 36 * time.Hour, 24 * 365 * time.Hour} {
-		want := base.Add(d).UnixNano()
-		assert.Equal(t, want, nanoseconds(at(d)), "offset %v", d)
-	}
-}
+func at(d time.Duration) int64 { return base.Add(d).UnixNano() }
 
 func TestNewAndInterval(t *testing.T) {
 	p := New(time.Second)
@@ -91,8 +60,8 @@ func TestAdvanceRandomOrderNeverMovesBackwards(t *testing.T) {
 	var max int64
 	for i := 0; i < 10_000; i++ {
 		ts := at(time.Duration(rng.Int63n(int64(time.Hour))))
-		if ns := nanoseconds(ts); ns > max {
-			max = ns
+		if ts > max {
+			max = ts
 		}
 		prev := p.Clock()
 		got := p.Advance(ts)
@@ -259,11 +228,11 @@ func TestReset(t *testing.T) {
 // Typical use: sweep the pending map at most once per interval of event time.
 func TestSweepScenario(t *testing.T) {
 	p := New(time.Second)
-	pending := map[int]uint64{} // id -> FILETIME enqueue time
+	pending := map[int]int64{} // id -> nanoseconds
 	const ttl = 5 * time.Second
 
 	sweeps := 0
-	enqueue := func(id int, ts uint64) {
+	enqueue := func(id int, ts int64) {
 		if p.Tick(ts) {
 			sweeps++
 			for id, enq := range pending {
@@ -293,7 +262,7 @@ func TestSweepScenario(t *testing.T) {
 	assert.Equal(t, []int{7}, keys(pending))
 }
 
-func keys(m map[int]uint64) []int {
+func keys(m map[int]int64) []int {
 	out := make([]int, 0, len(m))
 	for k := range m {
 		out = append(out, k)
