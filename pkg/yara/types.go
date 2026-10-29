@@ -24,7 +24,6 @@ import "github.com/rabbitstack/fibratus/pkg/event"
 // triggers the scanning either on the process memory or on-disk file. If matches occur,
 // an alert is emitted via registered alert senders.
 type Scanner interface {
-	event.Listener
 	// Scan runs a scan when the specified signal is observed. The signal
 	// can be the creation of a new process, image loading, writing the PE
 	// file or ADS to the file system, or a suspicious memory allocation.

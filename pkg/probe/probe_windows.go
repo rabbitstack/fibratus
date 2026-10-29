@@ -43,6 +43,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
+	"github.com/rabbitstack/fibratus/pkg/util/ntstatus"
 	"github.com/rabbitstack/fibratus/pkg/util/pair"
 	"github.com/rabbitstack/fibratus/pkg/util/periodical"
 	"github.com/rabbitstack/fibratus/pkg/util/ports"
@@ -82,7 +83,10 @@ type Probe struct {
 	kcbPathStringCache  *stringcache.ScopedStringCache
 
 	// stores pending I/O request packets
-	enqueuedIORequests map[uint64]ioRequest
+	enqueuedIORequests    map[uint64]ioRequest
+	enquededDeleteOnClose map[uint64]struct{}
+
+	ioRequestsPurger *periodical.Periodical
 
 	// enqueuedRegSetValues keeps temporarily RegSetValue internal events by pid and base value name
 	enqueuedRegSetValues *expirable.LRU[pair.Pair[uint32, string], *event.Event]
@@ -115,9 +119,9 @@ type Probe struct {
 // the callback returns. Any state that needs to outlive the
 // buffer lifetime must copy it safely.
 type ioRequest struct {
-	rec   *etw.EventRecord // keeps the original CreateFile event record
+	rec   *etw.EventRecord // keeps the original event record
 	buf   []byte           // keeps the data buffer alive
-	stack va.Callstack     // claimed CreateFile call stack addresses
+	stack va.Callstack     // claimed call stack addresses
 }
 
 func (p *Probe) Init(rs *config.RulesCompileResult) error {
@@ -131,7 +135,8 @@ func (p *Probe) Init(rs *config.RulesCompileResult) error {
 		// the default for sensor mode. For any event not present in the
 		// rule set, the bitmap rejects it is offloaded from the session
 		// buffers
-		p.config.EventSource.AddDropTypes(slices.DeleteFunc(slices.Clone(event.AllTypes()), func(t event.Type) bool {
+		types := slices.Clone(event.AllTypes())
+		p.config.EventSource.AddDropTypes(slices.DeleteFunc(types, func(t event.Type) bool {
 			if t.OnlyState() || t.StateSnapshot() {
 				// State events are always accepted
 				return true
@@ -345,7 +350,7 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 	}
 
 	switch t {
-	case event.CreateFile:
+	case event.CreateFile, event.DeleteFile:
 		return p.initIORequest(rec)
 	case event.CloseFile:
 		object := rec.ReadUint64(8)
@@ -358,8 +363,8 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 		p.filePathResolver[object] = FileInfo{Path: path, Type: fs.GetFileType(path, 0)}
 		return nil
 	case event.StackWalk:
-		// CreateFile is held aside until FileOpEnd, so its callstack is parked on
-		// the pending request instead of becoming a pipeline event per CreateFile.
+		// I/O requests are held aside until FileOpEnd, so their callstacks are parked
+		// on the pending request instead of becoming a pipeline event per I/O event.
 		// The pending requests are only touched by the kernel trace goroutine.
 		if producerID == pipeline.ProducerKernel && p.claimIORequestStack(rec) {
 			return nil
@@ -381,7 +386,7 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 	switch t {
 	case event.FileOpEnd:
 		return p.completeIORequest(producerID, rec)
-	case event.MapViewOfSection, event.UnmapViewOfSection, event.MapViewSectionRundown, event.DeleteFile, event.SetFileInformation, event.RenameFile, event.EnumDirectory, event.ReadFile, event.WriteFile:
+	case event.MapViewOfSection, event.UnmapViewOfSection, event.MapViewSectionRundown, event.SetFileInformation, event.RenameFile, event.EnumDirectory, event.ReadFile, event.WriteFile:
 		return p.pipeline.Publish(producerID, t, func(evt *event.Event) {
 			evt.Parse(rec)
 			p.addFileInfoFromFCB(rec, evt)
@@ -429,10 +434,10 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 		return pipeline.ErrRingNoSlots
 	}
 	evt.Parse(rec)
-	timestamp := evt.Timestamp.UnixNano()
 
 	producer.Publish()
 
+	timestamp := evt.Timestamp.UnixNano()
 	// Run periodical tasks driven by monotonic event-time clock
 	for _, periodic := range p.periodics[producerID] {
 		periodic.RunPeriodic(timestamp)
@@ -471,8 +476,11 @@ func (p *Probe) completeIORequest(producerID pipeline.ProducerID, rec *etw.Event
 	if !enqueued || req.rec.Header.Timestamp > rec.Header.Timestamp {
 		return nil
 	}
-	defer req.rec.ReleasePool()
 	delete(p.enqueuedIORequests, irp)
+	if req.rec.Header.EventDescriptor.Opcode == event.DeleteFileID {
+		return p.completeDeleteIORequest(producerID, req, rec)
+	}
+	defer req.rec.ReleasePool()
 
 	// Drive the state management of active files
 	object := req.rec.ReadUint64(8)
@@ -503,6 +511,16 @@ func (p *Probe) completeIORequest(producerID pipeline.ProducerID, rec *etw.Event
 		}
 	} else {
 		disposition = ioStatus
+	}
+
+	// File handle opened with FILE_DELETE_ON_CLOSE forces us
+	// the park the identify of the owner and file path in the
+	// delete-on-close pending map.
+	if ntstatus.IsSuccess(status) && windows.NTStatus(status) != windows.STATUS_REPARSE {
+		o := opts & 0xFFFFFF // mask create options
+		if o&windows.FILE_DELETE_ON_CLOSE != 0 {
+
+		}
 	}
 
 	f := FileInfo{
@@ -538,10 +556,59 @@ func (p *Probe) completeIORequest(producerID pipeline.ProducerID, rec *etw.Event
 	})
 }
 
+func (p *Probe) completeDeleteIORequest(producerID pipeline.ProducerID, req ioRequest, endop *etw.EventRecord) error {
+	var status uint32
+
+	status = endop.ReadUint32(16)
+	return p.pipeline.Publish(producerID, event.DeleteFile, func(evt *event.Event) {
+		evt.Parse(req.rec)
+		evt.AppendParam(params.NTStatus, params.Status, status)
+		if req.stack != nil {
+			evt.AppendParam(params.Callstack, params.Slice, req.stack)
+		}
+
+		p.addFileInfoFromFCB(req.rec, evt)
+	})
+	// if !ntSuccess(end.ReadUint32(16)) {
+	// 	p.discard(req.rec)
+	// 	return nil
+	// }
+
+	// var (
+	// 	object = req.rec.ReadUint64(8)
+	// 	key    = req.rec.ReadUint64(16)
+	// 	extra  = req.rec.ReadUint64(24)
+	// 	class  = req.rec.ReadUint32(36)
+	// )
+
+	// // FileDispositionInformation carries a BOOLEAN, the Ex variant carries flags
+	// var set bool
+	// if class == fileDispositionInformation {
+	// 	set = extra&0xFF != 0
+	// } else {
+	// 	set = extra&fileDispositionDelete != 0
+	// }
+
+	// p.dropPending(key) // either replaces or erases (undelete)
+
+	// if !set {
+	// 	p.discard(req.rec)
+	// 	return nil
+	// }
+
+	// p.pendingDeletes[key] = pendingDelete{
+	// 	pid:    req.rec.Header.ProcessID,
+	// 	tid:    req.rec.Header.ThreadID,
+	// 	posix:  class == fileDispositionInformationEx && extra&fileDispositionPosixSemantics != 0,
+	// 	object: object,
+	// 	rec:    req.rec, // ownership moves to the pending entry
+	// }
+	// _ = ts
+}
+
 // claimIORequestStack parks the callstack carried by a StackWalk record on the
-// pending CreateFile request it belongs to. It reports whether such a request
-// exists. The stack walk is matched on the time stamp and the thread, because
-// the time stamp alone isn't unique.
+// pending IO event request it belongs to. It reports whether such a request
+// exists. The stack walk is matched on the time stamp.
 func (p *Probe) claimIORequestStack(rec *etw.EventRecord) bool {
 	var ts = rec.ReadUint64(0)
 	for irp, req := range p.enqueuedIORequests {

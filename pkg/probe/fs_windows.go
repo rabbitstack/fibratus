@@ -36,9 +36,9 @@ type FileInfo struct {
 	// IsRemount
 	IsRemount bool
 
+	// IsReparseGlobal
 	IsReparseGlobal bool
 
+	// ReparseTag
 	ReparseTag uint32
 }
-
-type ioRequestJanitor struct{}
