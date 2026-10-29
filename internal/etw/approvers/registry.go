@@ -111,19 +111,9 @@ func (r *registry) Approve(rec *etw.EventRecord) (*etw.EventRecord, bool) {
 		// registry path
 		path = utf16.Decode(s[:len(s)/2-1])
 		if kcb != 0 {
-			path = key.ConcatPaths(r.kcbs[kcb], path)
+			path = r.kcbs[kcb] + `\` + path
 		}
-
-		rootkey, subkey := key.Format(path)
-		if rootkey != key.Invalid {
-			root := rootkey.String()
-			if subkey != "" {
-				path = key.ConcatPaths(root, subkey)
-			} else {
-				path = root
-			}
-		}
-		r.pathLRUCache.Add(h, path)
+		r.pathLRUCache.Add(h, key.Format(path))
 	}
 
 	if r.approveKey(path) {

@@ -19,7 +19,6 @@
 package event
 
 import (
-	"expvar"
 	"fmt"
 	"net"
 	"strconv"
@@ -40,8 +39,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
 )
-
-var unknownKeysCount = expvar.NewInt("registry.unknown.keys.count")
 
 // NewParam creates a new event parameter. Since the parameter type is already categorized,
 // we can coerce the value to the appropriate representation (e.g. hex, IP address)
@@ -83,15 +80,7 @@ func (p Param) String() string {
 	case params.DOSPath:
 		return fs.GetDevMapper().Convert(p.Value.(string))
 	case params.Key:
-		rootKey, keyName := key.Format(p.Value.(string))
-		if keyName != "" && rootKey != key.Invalid {
-			return rootKey.String() + "\\" + keyName
-		}
-		if rootKey != key.Invalid {
-			return rootKey.String()
-		}
-		unknownKeysCount.Add(1)
-		return keyName
+		return key.Format(p.Value.(string))
 	case params.HandleType:
 		return htypes.ConvertTypeIDToName(p.Value.(uint16))
 	case params.Status:

@@ -22,22 +22,21 @@
 package key
 
 import (
-	"path/filepath"
-	"regexp"
+	"errors"
 	"strings"
 
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"golang.org/x/sys/windows/registry"
 )
 
-var (
-	hklmPrefixes = []string{"\\REGISTRY\\MACHINE", "\\Registry\\Machine", "\\Registry\\MACHINE", "\\registry\\machine"}
-	hkcrPrefixes = []string{"\\REGISTRY\\MACHINE\\SOFTWARE\\CLASSES", "\\Registry\\Machine\\Software\\Classes", "\\REGISTRY\\COMROOT\\CLASSES"}
-	hkuPrefixes  = []string{"\\REGISTRY\\USER", "\\Registry\\User"}
+const (
+	machineRoot    = `\REGISTRY\MACHINE`
+	machineClasses = `\REGISTRY\MACHINE\SOFTWARE\CLASSES`
+	comrootClasses = `\REGISTRY\COMROOT\CLASSES`
+	userRoot       = `\REGISTRY\USER`
 )
 
-// rx detects a file path starting with a drive letter, e.g. C:\
-var rx = regexp.MustCompile(`[A-Za-z]:\\`)
+const classesSuffix = "_Classes"
 
 var loggedSID = getLoggedSID()
 
@@ -61,7 +60,8 @@ var (
 	CurrentUser  = Key(registry.CURRENT_USER)
 	LocalMachine = Key(registry.LOCAL_MACHINE)
 	ClassesRoot  = Key(registry.CLASSES_ROOT)
-	// Invalid represents an invalid registry key
+	// Invalid represents an invalid registry key. For example, registry
+	// hive used in Windows application isolation or sandboxing context
 	Invalid = Key(registry.Key(0))
 )
 
@@ -91,47 +91,55 @@ func (key Key) String() string {
 	}
 }
 
-func shiftPath(k, s, v string) (string, string) {
-	r := rx.FindString(s)
-	if r == "" {
-		return s, v
-	}
-	n := strings.LastIndex(s, r)
-	for n > 0 {
-		n--
-		// find first slash occurrence backwards
-		if s[n] == '\\' {
-			return k[:n], k[n+1:]
-		}
-	}
-	return s, v
+func hasPrefixFold(s, p string) bool {
+	return len(s) >= len(p) && strings.EqualFold(s[:len(p)], p)
 }
 
-// cleanSID returns the SID without trailing identifiers.
-// In some circumstances, the SID can contain the `_Classes`
-// suffix.
-func cleanSID(sid string) string {
-	return strings.TrimSuffix(sid, "_Classes")
+// splitKey splits a native key name onto a root handle plus subkey.
+func splitKey(path string) (Key, string) {
+	if root, subkey, ok := matchPrefix(path, false); ok {
+		return root, subkey
+	}
+	// Now match the slow path where registry keys can be reported with any casing
+	if root, subkey, ok := matchPrefix(path, true); ok {
+		return root, subkey
+	}
+	// Can return Invalid (e.g. \Registry\WC) for sandboxed hives
+	return Invalid, path
 }
+
+// matchPrefix reports whether the registry path starts with the root prefix.
+// If fold is set to true, registry keys can be reported with any casing.
+func matchPrefix(path string, fold bool) (Key, string, bool) {
+	hasPrefix := strings.HasPrefix
+	if fold {
+		hasPrefix = hasPrefixFold
+	}
+	switch {
+	case hasPrefix(path, machineRoot):
+		if hasPrefix(path, machineClasses) {
+			return ClassesRoot, subkey(path, machineClasses), true
+		}
+		return LocalMachine, subkey(path, machineRoot), true
+	case hasPrefix(path, userRoot):
+		return Users, subkey(path, userRoot), true
+	case hasPrefix(path, comrootClasses):
+		return ClassesRoot, subkey(path, comrootClasses), true
+	}
+	return Invalid, path, false
+}
+
+var ErrInvalidRoot = errors.New("invalid root key")
 
 // ReadValue reads the registry value from the specified key path.
-func (key Key) ReadValue(k string) (uint32, any, error) {
-	// sometimes the value can contain slashes, in which
-	// case we use it as a separator between subkey. For
-	// example, \Device\HarddiskVolume4\Windows\regedit.exe
-	n := strings.Index(k, "\\\\")
-	var subkey string
-	var value string
-	if n > 0 {
-		subkey, value = k[0:n], k[n+1:]
-	} else {
-		subkey, value = filepath.Split(k)
-		// here we handle another corner case
-		// when the value can contain a file
-		// path starting with a drive letter
-		subkey, value = shiftPath(k, subkey, value)
+// Returns the registry value type identifier, the value data and
+// an error, if the value cannot be read.
+func ReadValue(path string, value string) (uint32, any, error) {
+	root, subkey := splitKey(strings.TrimSuffix(path, value))
+	if root == Invalid {
+		return 0, nil, ErrInvalidRoot
 	}
-	regKey, err := registry.OpenKey(registry.Key(key), subkey, registry.QUERY_VALUE)
+	regKey, err := registry.OpenKey(registry.Key(root), subkey, registry.QUERY_VALUE)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -159,60 +167,60 @@ func (key Key) ReadValue(k string) (uint32, any, error) {
 	return typ, val, nil
 }
 
-// Format produces a root,key tuple from registry native key name.
-func Format(key string) (Key, string) {
-	for _, p := range hklmPrefixes {
-		if strings.HasPrefix(key, p) {
-			return LocalMachine, subkey(key, p)
-		}
+// Format produces the full registry path (e.g. HKEY_LOCAL_MACHINE\SOFTWARE)
+// from the native key name. If the native name has no known registry root
+// the original native path is returned.
+func Format(path string) string {
+	root, subkey := splitKey(path)
+	switch root {
+	case Invalid:
+		return path
+	case Users:
+		root, subkey = remapUserHive(subkey)
 	}
-	for _, p := range hkcrPrefixes {
-		if strings.HasPrefix(key, p) {
-			return ClassesRoot, subkey(key, p)
-		}
+	if subkey == "" {
+		return root.String()
 	}
-	for _, p := range hkuPrefixes {
-		if strings.HasPrefix(key, p) {
-			path := subkey(key, p)
-			n := strings.Index(path, "\\")
-			var sid string
-			if n > 0 && path[0] == 'S' {
-				sid = path[:n]
-			} else if len(path) > 0 && path[0] == 'S' {
-				sid = path
-			}
-			// if the HKEY_USERS hive sid is equal to
-			// the sid of the currently logged user, we
-			// remap the root key to HKEY_CURRENT_USER
-			switch {
-			case cleanSID(sid) == loggedSID && strings.Contains(path, "_Classes"):
-				if strings.HasSuffix(sid, "_Classes") {
-					return CurrentUser, "Software\\Classes\\" + path[n+1:]
-				}
-				return CurrentUser, strings.Replace(path[n+1:], "_Classes", "Software\\Classes", 1)
-			case sid == loggedSID:
-				if len(path) == len(loggedSID) {
-					return CurrentUser, ""
-				}
-				return CurrentUser, path[n+1:]
-			default:
-				return Users, path
-			}
-		}
-	}
-	return Invalid, key
+	return root.String() + `\` + subkey
 }
 
-// ConcatPaths concatenates root and subkey registry paths.
-func ConcatPaths(root, path string) string {
-	var b strings.Builder
-	b.Grow(len(root) + len(path) + 1)
-	if root != "" {
-		b.WriteString(root)
-		b.WriteByte('\\')
+func isSID(s string) bool {
+	return len(s) > 2 && (s[0] == 'S' || s[0] == 's') && s[1] == '-'
+}
+
+// remapUserHive receives the path without the root key prefix
+// and attempts to remap it to the current user hive if the SID
+// correspond to the currently logged-in user SID.
+func remapUserHive(path string) (Key, string) {
+	sid, subpath, _ := strings.Cut(path, `\`)
+	if loggedSID == "" || !isSID(sid) {
+		return Users, path
 	}
-	b.WriteString(path)
-	return b.String()
+	base := sid
+	// Trim the _Classes suffix
+	if n := len(sid); n >= len(classesSuffix) && sid[n-len(classesSuffix):] == classesSuffix {
+		base = sid[:n-len(classesSuffix)]
+	}
+	if !strings.EqualFold(base, loggedSID) {
+		return Users, path
+	}
+	// Handle per-user classes hive, where the SID contains
+	// the `_Classes` suffix
+	if len(base) != len(sid) {
+		if subpath == "" {
+			return CurrentUser, `Software\Classes`
+		}
+		return CurrentUser, `Software\Classes\` + subpath
+	}
+	// SID doesn't contain the `_Classes` suffix, but _Classes
+	// is its adjacent path component
+	if subpath == classesSuffix {
+		return CurrentUser, `Software\Classes`
+	}
+	if len(subpath) >= len(classesSuffix) && strings.HasPrefix(subpath, classesSuffix) {
+		return CurrentUser, `Software\Classes` + subpath[len(classesSuffix):]
+	}
+	return CurrentUser, subpath
 }
 
 func subkey(key string, prefix string) string {
