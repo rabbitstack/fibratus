@@ -39,8 +39,8 @@ import (
 
 var (
 	// ErrReadValue describes an error occurred while reading the registry value
-	ErrReadValue = func(key, subkey string, err error) error {
-		return fmt.Errorf("unable to read value %s : %v", filepath.Join(key, subkey), err)
+	ErrReadValue = func(path string, err error) error {
+		return fmt.Errorf("unable to read value %s : %v", path, err)
 	}
 
 	// valueTTL specifies the maximum allowed period for RegSetValueInternal events
@@ -137,9 +137,12 @@ func (r *registryProcessor) processEvent(e *event.Event) (*event.Event, error) {
 		// key handles contain the partial key name. In this case we assume
 		// the correct key is encountered.
 		path := e.Params.MustGetString(params.RegPath)
+		if e.IsRegSetValue() {
+			e.Params.Append(params.RegValue, params.UnicodeString, path)
+		}
 		if kcb != 0 {
 			if baseKey, ok := r.keys[kcb]; ok {
-				path = key.ConcatPaths(baseKey, path)
+				path = baseKey + `\` + path
 			} else {
 				kcbMissCount.Add(1)
 				path = r.findMatchingKey(e.PID, path)
@@ -184,20 +187,14 @@ func (r *registryProcessor) processEvent(e *event.Event) (*event.Event, error) {
 			return e, nil
 		}
 
-		// get the type/value of the registry key and append to parameters
-		rootkey, subkey := key.Format(path)
-		if rootkey == key.Invalid {
-			return e, nil
-		}
-
 		readValueOps.Add(1)
-		typ, val, err := rootkey.ReadValue(subkey)
+		typ, val, err := key.ReadValue(path, e.GetParamAsString(params.RegValue))
 		if err != nil {
 			errno, ok := err.(windows.Errno)
 			if ok && (errno.Is(os.ErrNotExist) || err == windows.ERROR_ACCESS_DENIED) {
 				return e, nil
 			}
-			return e, ErrReadValue(rootkey.String(), path, err)
+			return e, ErrReadValue(path, err)
 		}
 		e.AppendEnum(params.RegValueType, typ, key.RegistryValueTypes)
 

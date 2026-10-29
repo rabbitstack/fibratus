@@ -900,7 +900,8 @@ func (r *registryAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 		return e.GetParamAsString(params.RegPath), nil
 	case fields.RegistryKeyName:
 		if e.IsRegSetValue() {
-			return filepath.Base(filepath.Dir(e.GetParamAsString(params.RegPath))), nil
+			path := strings.TrimSuffix(e.GetParamAsString(params.RegPath), e.GetParamAsString(params.RegValue))
+			return filepath.Base(path), nil
 		} else {
 			return filepath.Base(e.GetParamAsString(params.RegPath)), nil
 		}
@@ -908,7 +909,7 @@ func (r *registryAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 		return e.GetParamAsString(params.RegKCB), nil
 	case fields.RegistryValue:
 		if e.IsRegSetValue() {
-			return filepath.Base(filepath.Base(e.GetParamAsString(params.RegPath))), nil
+			return e.GetParamAsString(params.RegValue), nil
 		}
 		return nil, nil
 	case fields.RegistryValueType:

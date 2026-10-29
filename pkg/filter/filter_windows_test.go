@@ -934,6 +934,7 @@ func TestRegistryFilter(t *testing.T) {
 		PID:  859,
 		Params: event.Params{
 			params.RegPath:      {Name: params.RegPath, Type: params.UnicodeString, Value: `HKEY_LOCAL_MACHINE\SYSTEM\Setup\Pid`},
+			params.RegValue:     {Name: params.RegValue, Type: params.UnicodeString, Value: "Pid"},
 			params.RegData:      {Name: params.RegData, Type: params.Uint32, Value: uint32(10234)},
 			params.RegValueType: {Name: params.RegValueType, Type: params.AnsiString, Value: "DWORD"},
 			params.NTStatus:     {Name: params.NTStatus, Type: params.AnsiString, Value: "success"},

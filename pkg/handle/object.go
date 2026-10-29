@@ -120,14 +120,7 @@ func QueryName(handle windows.Handle, typ string, withTimeout bool) (string, hty
 		}
 		switch typ {
 		case Key:
-			rootKey, subkey := key.Format(name)
-			if rootKey == key.Invalid {
-				return name, nil, nil
-			}
-			if subkey != "" {
-				return rootKey.String() + "\\" + subkey, nil, nil
-			}
-			return rootKey.String(), nil, nil
+			return key.Format(name), nil, nil
 		default:
 			return name, nil, nil
 		}

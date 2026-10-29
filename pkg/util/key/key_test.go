@@ -22,6 +22,7 @@
 package key
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -34,7 +35,7 @@ func init() {
 	loggedSID = "S-1-5-21-2271034452-2606270099-984871569-500"
 }
 
-func TestFormatKey(t *testing.T) {
+func TestSplitKey(t *testing.T) {
 	var tests = []struct {
 		nativeKey   string
 		wantsKey    Key
@@ -56,28 +57,8 @@ func TestFormatKey(t *testing.T) {
 			``,
 		},
 		{
-			`\REGISTRY\USER\S-1-5-21-2271034452-2606270099-984871569-500\Console`,
-			windows.HKEY_CURRENT_USER,
-			`Console`,
-		},
-		{
-			`\REGISTRY\USER\S-1-5-21-2271034452-2606270099-984871569-500\_Classes`,
-			windows.HKEY_CURRENT_USER,
-			`Software\Classes`,
-		},
-		{
-			`\REGISTRY\USER\S-1-5-21-2271034452-2606270099-984871569-500_Classes\Local Settings\Software\Microsoft\Windows\Shell\MuiCache`,
-			windows.HKEY_CURRENT_USER,
-			`Software\Classes\Local Settings\Software\Microsoft\Windows\Shell\MuiCache`,
-		},
-		{
-			`\REGISTRY\USER\S-1-5-21-2271034452-2606270099-984871569-500\_Classes\.all`,
-			windows.HKEY_CURRENT_USER,
-			`Software\Classes\.all`,
-		},
-		{
-			`\REGISTRY\USER\S-1-5-21-2271034452-2606270099-984871569-500`,
-			windows.HKEY_CURRENT_USER,
+			`\REGISTRY\USER`,
+			windows.HKEY_USERS,
 			``,
 		},
 		{
@@ -86,9 +67,9 @@ func TestFormatKey(t *testing.T) {
 			`S-1-5-9\Network`,
 		},
 		{
-			`\REGISTRY\USER`,
-			windows.HKEY_USERS,
-			``,
+			`\REGISTRY\A`,
+			Invalid,
+			`\REGISTRY\A`,
 		},
 	}
 
@@ -96,57 +77,125 @@ func TestFormatKey(t *testing.T) {
 		t.Run(tt.nativeKey, func(t *testing.T) {
 			nativeKey := tt.nativeKey
 			k, s := tt.wantsKey, tt.wantsSubkey
-			key, subkey := Format(nativeKey)
-			assert.Equal(t, k, key)
+			root, subkey := splitKey(nativeKey)
+			assert.Equal(t, k, root)
 			assert.Equal(t, s, subkey)
 		})
 	}
 }
 
-func TestReadValue(t *testing.T) {
+func TestFormat(t *testing.T) {
 	var tests = []struct {
-		key      Key
-		subkey   string
-		expected interface{}
+		nativeKey    string
+		formattedKey string
 	}{
 		{
-			CurrentUser,
-			"Volatile Environment\\FibratusTestDword",
+			`\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\Windows Workflow Foundation 4.0.0.0\Linkage`,
+			`HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\Windows Workflow Foundation 4.0.0.0\Linkage`,
+		},
+		{
+			`\Registry\Machine\SYSTEM\ControlSet001\Services\Windows Workflow Foundation 4.0.0.0\Linkage`,
+			`HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\Windows Workflow Foundation 4.0.0.0\Linkage`,
+		},
+		{
+			`\REGISTRY\MACHINE`,
+			`HKEY_LOCAL_MACHINE`,
+		},
+		{
+			`\REGISTRY\USER`,
+			`HKEY_USERS`,
+		},
+		{
+			`\REGISTRY\USER\S-1-5-9\Network`,
+			`HKEY_USERS\S-1-5-9\Network`,
+		},
+		{
+			`\REGISTRY\A`,
+			`\REGISTRY\A`,
+		},
+		{
+			`\REGISTRY\USER\S-1-5-21-2271034452-2606270099-984871569-500\Console`,
+			`HKEY_CURRENT_USER\Console`,
+		},
+		{
+			`\REGISTRY\USER\S-1-5-21-2271034452-2606270099-984871569-500\_Classes`,
+			`HKEY_CURRENT_USER\Software\Classes`,
+		},
+		{
+			`\REGISTRY\USER\S-1-5-21-2271034452-2606270099-984871569-500_Classes\Local Settings\Software\Microsoft\Windows\Shell\MuiCache`,
+			`HKEY_CURRENT_USER\Software\Classes\Local Settings\Software\Microsoft\Windows\Shell\MuiCache`,
+		},
+		{
+			`\REGISTRY\USER\S-1-5-21-2271034452-2606270099-984871569-500\_Classes\.all`,
+			`HKEY_CURRENT_USER\Software\Classes\.all`,
+		},
+		{
+			`\REGISTRY\USER\S-1-5-21-2271034452-2606270099-984871569-500`,
+			`HKEY_CURRENT_USER`,
+		},
+		{
+			`\REGISTRY\USER\S-1-5-9\Network`,
+			`HKEY_USERS\S-1-5-9\Network`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.nativeKey, func(t *testing.T) {
+			assert.Equal(t, tt.formattedKey, Format(tt.nativeKey))
+		})
+	}
+}
+
+func TestSplitKeyKeepsSID(t *testing.T) {
+	root, sub := splitKey(`\REGISTRY\USER\S-1-5-21-1-2-3-1001\Software\Fibratus`)
+	assert.Equal(t, Users, root)
+	assert.Equal(t, `S-1-5-21-1-2-3-1001\Software\Fibratus`, sub)
+}
+
+func TestReadValue(t *testing.T) {
+	var tests = []struct {
+		path     string
+		value    string
+		expected any
+	}{
+		{
+			fmt.Sprintf("\\REGISTRY\\USER\\%s\\Volatile Environment\\FibratusTestDword", getLoggedSID()),
+			"FibratusTestDword",
 			uint64(1),
 		},
 		{
-			CurrentUser,
-			"Volatile Environment\\FibratusTestQword",
+			fmt.Sprintf("\\REGISTRY\\USER\\%s\\Volatile Environment\\FibratusTestQword", getLoggedSID()),
+			"FibratusTestQword",
 			uint64(1000),
 		},
 		{
-			CurrentUser,
-			"Volatile Environment\\FibratusTestSz",
+			fmt.Sprintf("\\REGISTRY\\USER\\%s\\Volatile Environment\\FibratusTestSz", getLoggedSID()),
+			"FibratusTestSz",
 			"fibratus",
 		},
 		{
-			CurrentUser,
-			"Volatile Environment\\\\FibratusTestSzSlash",
+			fmt.Sprintf("\\REGISTRY\\USER\\%s\\Volatile Environment\\\\FibratusTestSzSlash", getLoggedSID()),
+			"\\FibratusTestSzSlash",
 			"slash",
 		},
 		{
-			CurrentUser,
-			"Volatile Environment\\FibratusTestMultiSz",
+			fmt.Sprintf("\\REGISTRY\\USER\\%s\\Volatile Environment\\FibratusTestMultiSz", getLoggedSID()),
+			"FibratusTestMultiSz",
 			[]string{"fibratus", "edr"},
 		},
 		{
-			CurrentUser,
-			"Volatile Environment\\FibratusTestExpandSz",
+			fmt.Sprintf("\\REGISTRY\\USER\\%s\\Volatile Environment\\FibratusTestExpandSz", getLoggedSID()),
+			"FibratusTestExpandSz",
 			"%SYSTEMROOT%\\fibratus",
 		},
 		{
-			CurrentUser,
-			"Volatile Environment\\UDP Query User{108C2D9B-A047-4E78-B337-BAFC7D9273AB}C:\\users\\admin\\appdata\\local\\temp\\go-build49437379\\b001\\kstream.test.exe",
+			fmt.Sprintf("\\REGISTRY\\USER\\%s\\Volatile Environment\\UDP Query User{108C2D9B-A047-4E78-B337-BAFC7D9273AB}C:\\users\\admin\\appdata\\local\\temp\\go-build49437379\\b001\\kstream.test.exe", getLoggedSID()),
+			"UDP Query User{108C2D9B-A047-4E78-B337-BAFC7D9273AB}C:\\users\\admin\\appdata\\local\\temp\\go-build49437379\\b001\\kstream.test.exe",
 			`path`,
 		},
 		{
-			CurrentUser,
-			"Volatile Environment\\C:\\Program Files\\Java\\jre1.8.0_311\\bin\\javaws.exe.FriendlyAppName",
+			fmt.Sprintf("\\REGISTRY\\USER\\%s\\Volatile Environment\\C:\\Program Files\\Java\\jre1.8.0_311\\bin\\javaws.exe.FriendlyAppName", getLoggedSID()),
+			"C:\\Program Files\\Java\\jre1.8.0_311\\bin\\javaws.exe.FriendlyAppName",
 			"javaws.exe",
 		},
 	}
@@ -176,40 +225,10 @@ func TestReadValue(t *testing.T) {
 	require.NoError(t, key.SetStringValue("C:\\Program Files\\Java\\jre1.8.0_311\\bin\\javaws.exe.FriendlyAppName", "javaws.exe"))
 
 	for _, tt := range tests {
-		t.Run(tt.subkey, func(t *testing.T) {
-			_, val, err := tt.key.ReadValue(tt.subkey)
+		t.Run(tt.path, func(t *testing.T) {
+			_, val, err := ReadValue(tt.path, tt.value)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, val)
-		})
-	}
-}
-
-func TestConcatPaths(t *testing.T) {
-	var tests = []struct {
-		root     string
-		subkey   string
-		expected string
-	}{
-		{
-			root:     "HKEY_LOCAL_MACHINE",
-			subkey:   `Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\Capabilities`,
-			expected: `HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\Capabilities`,
-		},
-		{
-			root:     "",
-			subkey:   `Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\Capabilities`,
-			expected: `Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\Capabilities`,
-		},
-		{
-			root:     "HKEY_LOCAL_MACHINE",
-			subkey:   "",
-			expected: "HKEY_LOCAL_MACHINE\\",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.root+tt.subkey, func(t *testing.T) {
-			assert.Equal(t, tt.expected, ConcatPaths(tt.root, tt.subkey))
 		})
 	}
 }
