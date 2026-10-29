@@ -32,6 +32,27 @@ const InvalidHwnd = 0
 // when the application is about to shut down
 const WmClose = 0x10
 
+// WmDestroy is the message sent to the window procedure
+// when the window is being destroyed. It is sent after
+// the window is removed from the screen.
+const WmDestroy = 0x02
+
+// Point defines the x- and y-coordinates of a point.
+type Point struct {
+	X int32
+	Y int32
+}
+
+// WndMsg contains message information from a thread's message queue.
+type WndMsg struct {
+	Hwnd    Hwnd
+	Message uint32
+	WParam  uintptr
+	LParam  uintptr
+	Time    uint32
+	Pt      Point
+}
+
 // Hicon defines the icon handle type
 type Hicon uintptr
 
