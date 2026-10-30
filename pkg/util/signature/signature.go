@@ -29,13 +29,16 @@ import (
 	"time"
 
 	"github.com/golang/groupcache/singleflight"
-	"github.com/rabbitstack/fibratus/pkg/pe"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	log "github.com/sirupsen/logrus"
 )
 
 // requestQueueSize is the signature request input channel size
 const requestQueueSize = 2048
+
+// maxInlineChecks bounds the number of signature checks that can run
+// concurrently on caller goroutines when the request queue is saturated.
+const maxInlineChecks = 2
 
 var signatureAsyncRequestDrops = expvar.NewInt("signature.async.request.drops")
 
@@ -54,6 +57,8 @@ var signatureEvictions = expvar.NewInt("signature.evictions")
 var signatureInvalidations = expvar.NewMap("signature.invalidations")
 
 var signatureCertParseErrors = expvar.NewMap("signature.cert.parse.errors")
+
+var signatureAsyncRequestDeduped = expvar.NewInt("signature.async.request.deduped")
 
 // Key stores the attributes used for mapping the executable/DLL to its signature info.
 type Key struct {
@@ -121,6 +126,12 @@ type Signatures struct {
 
 	group singleflight.Group
 
+	// inline bounds concurrent checks run on caller goroutines
+	inline chan struct{}
+
+	// pending tracks keys that are enqueued or being checked
+	pending sync.Map
+
 	stop chan struct{}
 }
 
@@ -153,10 +164,14 @@ func newSignatures() *Signatures {
 		purger:     time.NewTicker(time.Minute),
 		requests:   make(chan Request, requestQueueSize),
 		certs:      make(chan Request, requestQueueSize),
+		inline:     make(chan struct{}, maxInlineChecks),
 		stop:       make(chan struct{}),
 	}
 
-	workerCount := max(runtime.NumCPU()/2, 4)
+	workerCount := 2
+	if runtime.NumCPU() >= 16 {
+		workerCount = 4
+	}
 	for range workerCount {
 		go sigs.runWorker()
 	}
@@ -183,8 +198,11 @@ func (s *Signatures) DoRequest(key Key) *Signature {
 	} else {
 		// hot path returns immediately if the signature is already resolved
 		if sig := s.get(key); sig != nil {
-			if sig.IsTrusted() && !sig.HasCertificate() {
-				s.parseCertificate(sig)
+			if sig.IsTrusted() && !sig.HasCertificate() && !sig.certTried.Load() {
+				select {
+				case s.certs <- Request{Key: key}:
+				default:
+				}
 			}
 			return sig
 		}
@@ -196,8 +214,15 @@ func (s *Signatures) DoRequest(key Key) *Signature {
 	default:
 		// queue full: fall back to inline check rather than
 		// dropping a decision that has a security consequence.
+		// Also, bound concurrent inline checks with a semaphore
 		signatureAsyncRequestDrops.Add(1)
-		return s.getOrCheck(key)
+		select {
+		case s.inline <- struct{}{}:
+			defer func() { <-s.inline }()
+		case <-s.stop:
+			return newUncheckedSignature(key.Path)
+		}
+		return s.resolve(key)
 	}
 	r := <-ch
 	return r
@@ -211,9 +236,16 @@ func (s *Signatures) DoRequestAsync(key Key) {
 	if s.contains(key) {
 		return
 	}
+
+	if _, loaded := s.pending.LoadOrStore(key, struct{}{}); loaded {
+		signatureAsyncRequestDeduped.Add(1)
+		return
+	}
+
 	select {
 	case s.requests <- Request{Key: key}:
 	default:
+		s.pending.Delete(key) // release the claim so a later event can retry
 		// drop rather than block the event processing thread
 		signatureAsyncRequestDrops.Add(1)
 	}
@@ -264,6 +296,7 @@ func (s *Signatures) PutSignature(key Key, sigType Type, sigLevel Level) {
 	s.mux.Lock()
 	s.signatures[key] = newSignature(key.Path, sigType, sigLevel)
 	s.mux.Unlock()
+	s.pending.Delete(key)
 	signatureCount.Add(1)
 	signatureCiCount.Add(1)
 
@@ -286,14 +319,28 @@ func (s *Signatures) get(key Key) *Signature {
 	return sig
 }
 
+// peek looks up the signature without touching the access timestamp
+// or the hit counter.
+func (s *Signatures) peek(key Key) *Signature {
+	s.mux.RLock()
+	sig := s.signatures[key]
+	s.mux.RUnlock()
+	return sig
+}
+
 // contains returns true if the signature with the given key exists in the store.
 // If the signature doesn't exist, this method returns false.
 func (s *Signatures) contains(key Key) bool {
 	return s.get(key) != nil
 }
 
-func (s *Signatures) getOrCheck(key Key) *Signature {
+// resolve returns the cached signature for the key, or verifies the
+// module and stores the result. Concurrent callers for the same key
+// share a single verification. The call blocks until the result is
+// available.
+func (s *Signatures) resolve(key Key) *Signature {
 	if sig := s.get(key); sig != nil {
+		s.pending.Delete(key)
 		return sig
 	}
 
@@ -301,27 +348,29 @@ func (s *Signatures) getOrCheck(key Key) *Signature {
 	// concurrently, only one of them does the PE/catalog work, while the
 	// rest block and share the result. This is critical during process
 	// startup when many threads load the same DLL simultaneously
-	v, err := s.group.Do(key.String(), func() (any, error) {
+	v, _ := s.group.Do(key.String(), func() (any, error) {
+		// previous flight may have finished just before this one started
+		if sig := s.peek(key); sig != nil {
+			return sig, nil
+		}
+
 		sig := newUncheckedSignature(key.Path)
 		if err := sig.check(); err != nil {
-			return sig, err
+			signatureCheckErrors.Add(err.Error(), 1)
 		}
+
+		// store and count once per check, not once per sharer
+		s.mux.Lock()
+		s.signatures[key] = sig
+		s.mux.Unlock()
+		signatureCount.Add(1)
+		signatureCacheMisses.Add(1)
+
+		s.pending.Delete(key)
 		return sig, nil
 	})
 
-	if err != nil {
-		signatureCheckErrors.Add(err.Error(), 1)
-	}
-
-	// put the signature in the store
-	s.mux.Lock()
-	sign := v.(*Signature)
-	s.signatures[key] = sign
-	s.mux.Unlock()
-	signatureCount.Add(1)
-	signatureCacheMisses.Add(1)
-
-	return sign
+	return v.(*Signature)
 }
 
 func (s *Signatures) runWorker() {
@@ -336,7 +385,7 @@ func (s *Signatures) runWorker() {
 			s.processRequest(req)
 		case req := <-s.certs:
 			sig := s.get(req.Key)
-			if sig != nil {
+			if sig == nil {
 				continue
 			}
 			s.parseCertificate(sig)
@@ -347,7 +396,7 @@ func (s *Signatures) runWorker() {
 }
 
 func (s *Signatures) processRequest(req Request) {
-	sign := s.getOrCheck(req.Key)
+	sign := s.resolve(req.Key)
 	if req.Response != nil {
 		req.Response <- sign
 	}
@@ -400,6 +449,9 @@ func (s *Signatures) gcSignatures() {
 }
 
 func (s *Signatures) parseCertificate(sig *Signature) {
+	if sig == nil || !sig.certTried.CompareAndSwap(false, true) {
+		return
+	}
 	cert, err := sig.parseCertificate(false)
 	if err != nil {
 		signatureCertParseErrors.Add(err.Error(), 1)
@@ -421,15 +473,15 @@ func (s *Signature) check() error {
 	}
 
 	// check if the signature is embedded in PE
-	f, err := pe.ParseFile(s.Path, pe.WithSecurity())
+	signed, cert, err := parseSecurityDirectory(s.Path)
 	if err != nil {
 		return err
 	}
 
-	if f.IsSigned() {
+	if signed {
 		s.setExists()
 		s.setType(TypeEmbedded)
-		s.setCert(f.Cert)
+		s.setCert(cert)
 		if !sys.IsWintrustFound() {
 			return ErrWintrustUnavailable
 		}
@@ -442,10 +494,10 @@ func (s *Signature) check() error {
 
 	// maybe the signature is in the catalog?
 	catalog := sys.NewCatalog()
+	defer catalog.Close()
 	if err := catalog.Open(s.Path); err != nil {
 		return ErrNoSignature
 	}
-	defer catalog.Close()
 
 	if !catalog.IsCatalogSigned() {
 		return ErrNoSignature
@@ -456,7 +508,7 @@ func (s *Signature) check() error {
 	if err := s.verifyCatalog(catalog); err != nil {
 		return err
 	}
-	cert, err := catalog.ParseCertificate()
+	cert, err = catalog.ParseCertificate()
 	if err != nil {
 		signatureCertParseErrors.Add(err.Error(), 1)
 		return err

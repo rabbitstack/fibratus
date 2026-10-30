@@ -24,7 +24,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/rabbitstack/fibratus/pkg/pe"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 )
 
@@ -143,6 +142,8 @@ type Signature struct {
 
 	// cert represents certificate information for the particular signature.
 	cert atomic.Pointer[sys.Cert]
+	// certTried indicates if certificate parsing was attempted
+	certTried atomic.Bool
 
 	// accessed the timestamp of the signature access by field extractor.
 	accessed atomic.Int64
@@ -270,15 +271,15 @@ func (s *Signature) verifyFile() error {
 }
 
 // verifyCatalog verifies the catalog-based file signature.
-func (s *Signature) verifyCatalog(catalog sys.Cat) error {
+func (s *Signature) verifyCatalog(catalog *sys.Cat) error {
 	status, err := catalog.Verify(s.Path)
 	s.setStatus(status)
 	return err
 }
 
 // parseCertificate parses the certificate data for catalog-based
-// or PE signatures if the parameter is set to false.
-func (s *Signature) parseCertificate(onlyCatalog bool) (*sys.Cert, error) {
+// or PE signatures if the skipEmbedded parameter is set to false.
+func (s *Signature) parseCertificate(skipEmbedded bool) (*sys.Cert, error) {
 	if s == nil {
 		return nil, ErrNilSignature
 	}
@@ -291,24 +292,22 @@ func (s *Signature) parseCertificate(onlyCatalog bool) (*sys.Cert, error) {
 		return nil, ErrNoSignature
 	}
 
-	if !onlyCatalog {
+	if !skipEmbedded {
 		// parse PE certificate
-		f, err := pe.ParseFile(s.Path, pe.WithSecurity())
-		if err != nil {
-			goto cat
+		if _, cert, err := parseSecurityDirectory(s.Path); err == nil && cert != nil {
+			return cert, nil
 		}
-		return f.Cert, nil
 	}
 
-cat:
 	if !sys.IsWintrustFound() {
 		return nil, ErrWintrustUnavailable
 	}
+
 	// parse catalog certificate
 	catalog := sys.NewCatalog()
+	defer catalog.Close()
 	if err := catalog.Open(s.Path); err != nil {
 		return nil, err
 	}
-	defer catalog.Close()
 	return catalog.ParseCertificate()
 }
