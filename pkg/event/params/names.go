@@ -51,6 +51,8 @@ const (
 	FileObject = "file_object"
 	// FilePath represents the field that designates the absolute path of the file.
 	FilePath = "file_path"
+	// FileName represents the field that designates the file name.
+	FileName = "file_name"
 	// FileCreated represents the name for the file creation field.
 	FileCreated = "created"
 	// FileAccessed represents the name for the file access field.

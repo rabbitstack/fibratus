@@ -620,7 +620,7 @@ func TestComplexSequence(t *testing.T) {
 		},
 		Params: event.ParamsOf(
 			event.NewParam(params.FilePath, params.String, params.Str("C:\\Temp\\dropper.exe")),
-			event.NewParam(params.FileOperation, params.Enum, params.U32(uint32(2)), event.WithEnum(fs.FileCreateDispositions)),
+			event.NewParam(params.FileOperation, params.Enum, params.U32(uint32(2)), params.WithEnum(fs.FileCreateDispositions)),
 		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
@@ -709,7 +709,7 @@ func TestSequenceOOO(t *testing.T) {
 		Params: event.ParamsOf(
 			event.NewParam(params.Exe, params.String, params.Str("C:\\Windows\\System32\\lsass.exe")),
 			event.NewParam(params.ProcessID, params.PID, params.U32(uint32(2243))),
-			event.NewParam(params.DesiredAccess, params.Flags, params.U32(uint32(0x1400)), event.WithFlags(event.PsAccessRightFlags)),
+			event.NewParam(params.DesiredAccess, params.Flags32, params.U32(uint32(0x1400)), params.WithFlags(params.PsAccessRightFlags)),
 		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
@@ -747,7 +747,7 @@ func TestSequenceGC(t *testing.T) {
 		Params: event.ParamsOf(
 			event.NewParam(params.Exe, params.String, params.Str("C:\\Windows\\System32\\lsass.exe")),
 			event.NewParam(params.ProcessID, params.PID, params.U32(uint32(2243))),
-			event.NewParam(params.DesiredAccess, params.Flags, params.U32(uint32(0x1400)), event.WithFlags(event.PsAccessRightFlags)),
+			event.NewParam(params.DesiredAccess, params.Flags32, params.U32(uint32(0x1400)), params.WithFlags(params.PsAccessRightFlags)),
 		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
@@ -791,7 +791,7 @@ func TestSequenceExpire(t *testing.T) {
 					Params: event.ParamsOf(
 						event.NewParam(params.Exe, params.String, params.Str("C:\\Windows\\System32\\lsass.exe")),
 						event.NewParam(params.ProcessID, params.PID, params.U32(uint32(2243))),
-						event.NewParam(params.DesiredAccess, params.Flags, params.U32(uint32(0x1400)), event.WithFlags(event.PsAccessRightFlags)),
+						event.NewParam(params.DesiredAccess, params.Flags32, params.U32(uint32(0x1400)), params.WithFlags(params.PsAccessRightFlags)),
 					),
 					Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 				},

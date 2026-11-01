@@ -44,7 +44,7 @@ func TestNetworkProcessor(t *testing.T) {
 					event.NewParam(params.NetSport, params.Uint16, params.U16(uint16(43123))),
 					event.NewParam(params.NetSIP, params.IPv4, params.IPAddr(net.ParseIP("127.0.0.1"))),
 					event.NewParam(params.NetDIP, params.IPv4, params.IPAddr(net.ParseIP("8.8.8.8"))),
-					event.NewParam(params.NetL4Proto, params.Enum, params.U32(uint32(network.TCP)), event.WithEnum(network.ProtoNames)),
+					event.NewParam(params.NetL4Proto, params.Enum, params.U32(uint32(network.TCP)), params.WithEnum(network.ProtoNames)),
 				),
 			},
 			func(e *event.Event, t *testing.T) {
@@ -66,7 +66,7 @@ func TestNetworkProcessor(t *testing.T) {
 					event.NewParam(params.NetSport, params.Uint16, params.U16(uint16(43123))),
 					event.NewParam(params.NetSIP, params.IPv4, params.IPAddr(net.ParseIP("127.0.0.1"))),
 					event.NewParam(params.NetDIP, params.IPv4, params.IPAddr(net.ParseIP("8.8.8.8"))),
-					event.NewParam(params.NetL4Proto, params.Enum, params.U32(uint32(network.UDP)), event.WithEnum(network.ProtoNames)),
+					event.NewParam(params.NetL4Proto, params.Enum, params.U32(uint32(network.UDP)), params.WithEnum(network.ProtoNames)),
 				),
 			},
 			func(e *event.Event, t *testing.T) {

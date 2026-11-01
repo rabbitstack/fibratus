@@ -69,7 +69,7 @@ func New(seq uint64, r *etw.EventRecord, typ Type) *Event {
 		Host:      hostname.Get(),
 	}
 
-	e.decodeParams(r)
+	DecodeParams(r, e)
 	e.adjustPID()
 
 	return e

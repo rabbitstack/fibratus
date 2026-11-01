@@ -74,7 +74,7 @@ func TestFsProcessor(t *testing.T) {
 					event.NewParam(params.FileKey, params.Uint64, params.U64(uint64(124567380264))),
 					event.NewParam(params.FileViewSize, params.Uint64, params.U64(uint64(3098))),
 					event.NewParam(params.FileViewBase, params.Uint64, params.U64(uint64(0xffff23433))),
-					event.NewParam(params.FileViewSectionType, params.Enum, params.U32(uint32(va.SectionImage)), event.WithEnum(event.ViewSectionTypes)),
+					event.NewParam(params.FileViewSectionType, params.Enum, params.U32(uint32(va.SectionImage)), params.WithEnum(params.ViewSectionTypes)),
 				),
 			},
 			func(p Processor) {
@@ -125,7 +125,7 @@ func TestFsProcessor(t *testing.T) {
 					event.NewParam(params.FileKey, params.Uint64, params.U64(uint64(124567380264))),
 					event.NewParam(params.FileViewSize, params.Uint64, params.U64(uint64(3098))),
 					event.NewParam(params.FileViewBase, params.Uint64, params.U64(uint64(0xffff23433))),
-					event.NewParam(params.FileViewSectionType, params.Enum, params.U32(uint32(va.SectionImage)), event.WithEnum(event.ViewSectionTypes)),
+					event.NewParam(params.FileViewSectionType, params.Enum, params.U32(uint32(va.SectionImage)), params.WithEnum(params.ViewSectionTypes)),
 				),
 			},
 			nil,

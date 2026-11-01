@@ -21,12 +21,15 @@ package params
 import (
 	"encoding/binary"
 	"slices"
+	"strings"
 
 	"github.com/rabbitstack/fibratus/pkg/fs"
+	"github.com/rabbitstack/fibratus/pkg/network"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
 	"github.com/rabbitstack/fibratus/pkg/util/signature"
 	"github.com/rabbitstack/fibratus/pkg/util/utf16"
+	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 )
 
@@ -43,17 +46,19 @@ const (
 	WireU32
 	WireU64
 	WireU32Bool
-	WireAnsi      // NUL-terminated ANSI string
-	WireUTF16     // NUL-terminated UTF-16 string
-	WireNTUnicode // UTF-16 string for NT native APIs
-	WireSID       // TOKEN_USER-prefixed variable length SID
+	WireAnsi         // NUL-terminated ANSI string
+	WireUTF16        // NUL-terminated UTF-16 string
+	WireUTF16Trailer // NUL-terminated UTF-16 string occupies remaining event buffer
+	WireNTUnicode    // UTF-16 string for NT native APIs
+	WireSID          // TOKEN_USER-prefixed variable length SID
 	WireWbemSID
 	WireBytes
 	WireBytesU16 // uint16 length prefix + bytes payload
 	WireIP
 	WirePort
 	WireFileTime
-	WireAddrs // call stack return addresses
+	WireAddrs   // call stack return addresses
+	WireU64Bits // one uint64 that encodes several parameters
 )
 
 // ShiftDir describes the bit shift direction.
@@ -69,6 +74,11 @@ type BitField struct {
 	Shift uint8
 	Dir   ShiftDir
 	Mask  uint32
+}
+
+type DerivedBitFieldParamInfo struct {
+	ParamInfo
+	BitField
 }
 
 // Extract applies the field to a raw value.
@@ -114,9 +124,15 @@ type ParamInfo struct {
 	// the raw event record.
 	FromRecord func(rec *etw.EventRecord) Value
 
+	// Sanitize apply sanitization/transformation on the input string.
+	Sanitize func(s string) Value
+
 	// BitField describes the bit layout for packed parameter types. The
 	// shift and mask extract the value by applying bitwise operations.
 	BitField *BitField
+
+	// Derives are extra params sliced out of the same encoded value
+	Derives []DerivedBitFieldParamInfo
 }
 
 // Parameter schemas. The parameters are declared in the order in which they are decoded from the
@@ -372,7 +388,7 @@ var LoadModuleDescriptor = []ParamInfo{
 	{WireFormat: WireSkip, Size: 4},
 	{WireFormat: WireSkip, Size: 4},
 	{WireFormat: WireSkip, Size: 4},
-	{Name: ModulePath, Type: DOSPath, WireFormat: WireUTF16},
+	{Name: ModulePath, Type: DOSPath, WireFormat: WireUTF16Trailer},
 	{Name: Callstack, Type: Slice},
 	{Name: ModuleCertIssuer, Type: String},
 	{Name: ModuleCertSubject, Type: String},
@@ -395,7 +411,7 @@ var UnloadModuleDescriptor = []ParamInfo{
 	{WireFormat: WireSkip, Size: 4},
 	{WireFormat: WireSkip, Size: 4},
 	{WireFormat: WireSkip, Size: 4},
-	{Name: ModulePath, Type: DOSPath, WireFormat: WireUTF16},
+	{Name: ModulePath, Type: DOSPath, WireFormat: WireUTF16Trailer},
 }
 
 var ModuleRundownDescriptor = UnloadModuleDescriptor
@@ -418,7 +434,7 @@ var LoadModuleInternalDescriptor = []ParamInfo{
 	{Name: ModuleCheckSum, Type: Uint32, WireFormat: WireU32},
 	{Name: ModuleTimeDateStamp, Type: Uint32, WireFormat: WireU32},
 	{Name: ModuleDefaultBase, Type: Address, WireFormat: WireU64},
-	{Name: ModulePath, Type: DOSPath, WireFormat: WireUTF16},
+	{Name: ModulePath, Type: DOSPath, WireFormat: WireUTF16Trailer},
 }
 
 // RegistryDescriptor represents the parameters schema for registry events.
@@ -439,20 +455,29 @@ var RegistryDescriptor = []ParamInfo{
 	{Name: NTStatus, Type: Status, WireFormat: WireU32},
 	{WireFormat: WireSkip, Size: 4},
 	{Name: RegKCB, Type: Address, WireFormat: WireU64},
-	{Name: RegPath, Type: Key, WireFormat: WireUTF16},
+	{Name: RegPath, Type: Key, WireFormat: WireUTF16Trailer},
 }
 
 var RegCreateKeyDescriptor = slices.Concat(RegistryDescriptor, []ParamInfo{{Name: Callstack, Type: Slice}})
 var RegDeleteKeyDescriptor = slices.Concat(RegistryDescriptor, []ParamInfo{{Name: Callstack, Type: Slice}})
-var RegSetValueDescriptor = slices.Concat(
-	RegistryDescriptor,
-	[]ParamInfo{
-		{Name: RegValueType, Type: Enum, Enum: key.RegistryValueTypes},
-		{Name: RegData, Type: Variant},
-		{Name: Callstack, Type: Slice},
-	})
 var RegDeleteValueDescriptor = slices.Concat(RegistryDescriptor, []ParamInfo{{Name: Callstack, Type: Slice}})
 
+var RegSetValueDescriptor = []ParamInfo{
+	{WireFormat: WireSkip, Size: 8},
+	{Name: NTStatus, Type: Status, WireFormat: WireU32},
+	{WireFormat: WireSkip, Size: 4},
+	{Name: RegKCB, Type: Address, WireFormat: WireU64},
+	{Name: RegValue, Type: String, WireFormat: WireUTF16Trailer},
+	{Name: RegPath, Type: Key},
+	{Name: RegValueType, Type: Enum, Enum: key.RegistryValueTypes},
+	{Name: RegData, Type: Variant},
+	{Name: Callstack, Type: Slice},
+}
+
+// The event describes a registry value modification operation and contains
+// both metadata about the target registry value and a captured snapshot of
+// the written data buffer.
+//
 // <template tid="task_0SetValueKeyArgs">
 //
 //	<data name="KeyObject" inType="win:Pointer" />
@@ -503,136 +528,240 @@ var CreateFileDescriptor = []ParamInfo{
 	{Name: FileCreateOptions, Type: Flags32, WireFormat: WireU32, Flags: FileCreateOptionsFlags, BitField: &BitField{Mask: 0xFFFFFF}},
 	{Name: FileAttributes, Type: Flags32, WireFormat: WireU32, Flags: FileAttributeFlags},
 	{Name: FileShareMask, Type: Flags32, WireFormat: WireU32, Flags: FileShareModeFlags},
-	{Name: FilePath, Type: DOSPath, WireFormat: WireUTF16},
+	{Name: FilePath, Type: DOSPath, WireFormat: WireUTF16Trailer},
 	{Name: NTStatus, Type: Status},
 	{Name: FileOperation, Type: Enum, Enum: fs.FileCreateDispositions},
 	{Name: FileType, Type: Enum, Enum: fs.FileTypes},
 	{Name: Callstack, Type: Slice},
 }
 
-// 	createSymbolicLinkObjectParams = []ParamInfo{
-// 		pi(params.LinkSource, params.String),
-// 		pi(params.LinkTarget, params.String),
-// 		pf(params.DesiredAccess, params.Flags, AccessMaskFlags),
-// 		pi(params.NTStatus, params.Status),
-// 		callstackParam,
-// 	}
+//	typedef struct _PERFINFO_FILE_SIMPLE_OPERATION {
+//	    ULONG_PTR Irp;
+//	    ULONG_PTR FileObject;
+//	    ULONG_PTR FileKey;
+//	    ULONG IssuingThreadId;
+//	} PERFINFO_FILE_SIMPLE_OPERATION, *PPERFINFO_FILE_SIMPLE_OPERATION;
+var ReleaseFileDescriptor = []ParamInfo{
+	{Name: FileIrpPtr, Type: Address, WireFormat: WireU64},
+	{Name: FileObject, Type: Address, WireFormat: WireU64},
+	{Name: FileKey, Type: Address, WireFormat: WireU64},
+	{Name: ThreadID, Type: TID, WireFormat: WireU32},
+}
+var CloseFileDescriptor = []ParamInfo{
+	{Name: FileIrpPtr, Type: Address, WireFormat: WireU64},
+	{Name: FileObject, Type: Address, WireFormat: WireU64},
+	{Name: FileKey, Type: Address, WireFormat: WireU64},
+	{Name: ThreadID, Type: TID, WireFormat: WireU32},
+}
 
-// 	createFileParams = []ParamInfo{
-// 		pi(params.FileIrpPtr, params.Address),
-// 		pi(params.FileObject, params.Address),
-// 		pi(params.ThreadID, params.TID),
-// 		pf(params.FileCreateOptions, params.Flags, FileCreateOptionsFlags),
-// 		pf(params.FileAttributes, params.Flags, FileAttributeFlags),
-// 		pf(params.FileShareMask, params.Flags, FileShareModeFlags),
-// 		pi(params.FilePath, params.DOSPath),
-// 		pi(params.NTStatus, params.Status),
-// 		pen(params.FileOperation, fs.FileCreateDispositions),
-// 		callstackParam,
-// 		// enrichments
-// 		pen(params.FileType, fs.FileTypes),
-// 	}
-// 	fileOpEndParams = []ParamInfo{
-// 		pi(params.FileIrpPtr, params.Address),
-// 		pi(params.FileExtraInfo, params.Address),
-// 		pi(params.NTStatus, params.Status),
-// 	}
-// 	fileInformationParams = []ParamInfo{
-// 		pi(params.FileIrpPtr, params.Address),
-// 		pi(params.FileObject, params.Address),
-// 		pi(params.FileKey, params.Address),
-// 		pi(params.FileExtraInfo, params.Uint64),
-// 		pi(params.ThreadID, params.TID),
-// 		pen(params.FileInfoClass, fs.FileInfoClasses),
-// 		// enrichments
-// 		pen(params.FileType, fs.FileTypes),
-// 		pi(params.FilePath, params.Path),
-// 	}
-// 	fileInformationCallstackParams = slices.Concat(fileInformationParams, []ParamInfo{callstackParam})
-// 	fileSimpleParams               = []ParamInfo{
-// 		pi(params.FileIrpPtr, params.Address),
-// 		pi(params.FileObject, params.Address),
-// 		pi(params.FileKey, params.Address),
-// 		pi(params.ThreadID, params.TID),
-// 		// enrichments
-// 		pen(params.FileType, fs.FileTypes),
-// 		pi(params.FilePath, params.Path),
-// 	}
-// 	fileReadWriteParams = []ParamInfo{
-// 		pi(params.FileOffset, params.Uint64),
-// 		pi(params.FileIrpPtr, params.Address),
-// 		pi(params.FileObject, params.Address),
-// 		pi(params.FileKey, params.Address),
-// 		pi(params.ThreadID, params.TID),
-// 		pi(params.FileIoSize, params.Uint32),
-// 		// enrichments
-// 		pen(params.FileType, fs.FileTypes),
-// 		pi(params.FilePath, params.Path),
-// 	}
-// 	enumDirectoryParams = []ParamInfo{
-// 		pi(params.FileIrpPtr, params.Address),
-// 		pi(params.FileObject, params.Address),
-// 		pi(params.FileKey, params.Address),
-// 		pi(params.ThreadID, params.TID),
-// 		pen(params.FileInfoClass, fs.FileInfoClasses),
-// 		pi(params.FilePath, params.String),
-// 		// enrichments
-// 		pi(params.FileDirectory, params.Path),
-// 		pen(params.FileType, fs.FileTypes),
-// 	}
-// 	fileRundownParams = []ParamInfo{
-// 		pi(params.FileObject, params.Address),
-// 		pi(params.FilePath, params.DOSPath),
-// 	}
+// // typedef struct _PERFINFO_FILE_READ_WRITE {
+// //     ULONGLONG Offset;
+// //     ULONG_PTR Irp;
+// //     ULONG_PTR FileObject;
+// //     ULONG_PTR FileKey;
+// //     ULONG IssuingThreadId;
+// //     ULONG Size;
+// //     ULONG Flags;
+// //     ULONG ExtraFlags;
+// // } PERFINFO_FILE_READ_WRITE, *PPERFINFO_FILE_READ_WRITE;
+var ReadWriteFileDescriptor = []ParamInfo{
+	{Name: FileOffset, Type: Uint64, WireFormat: WireU64},
+	{Name: FileIrpPtr, Type: Address, WireFormat: WireU64},
+	{Name: FileObject, Type: Address, WireFormat: WireU64},
+	{Name: FileKey, Type: Address, WireFormat: WireU64},
+	{Name: ThreadID, Type: TID, WireFormat: WireU32},
+	{Name: FileIoSize, Type: Uint32, WireFormat: WireU32},
+	{Name: FilePath, Type: Path},
+	{Name: FileType, Type: Enum, Enum: fs.FileTypes},
+}
 
-// 	networkParams = []ParamInfo{
-// 		pi(params.ProcessID, params.PID),
-// 		pi(params.NetSize, params.Uint32),
-// 		pi(params.NetDIP, params.IP),
-// 		pi(params.NetSIP, params.IP),
-// 		pi(params.NetDport, params.Port),
-// 		pi(params.NetSport, params.Port),
-// 		pen(params.NetL4Proto, network.ProtoNames),
-// 		// enrichments
-// 		pi(params.NetDportName, params.String),
-// 		pi(params.NetSportName, params.String),
-// 	}
-// 	queryDNSParams = []ParamInfo{
-// 		pi(params.DNSName, params.String),
-// 		pen(params.DNSRR, DNSRecordTypes),
-// 		pf(params.DNSOpts, params.Flags64, DNSOptsFlags),
-// 	}
-// 	replyDNSParams = slices.Concat(queryDNSParams, []ParamInfo{
-// 		pen(params.DNSRcode, DNSResponseCodes),
-// 		pi(params.DNSAnswers, params.Slice),
-// 	})
+//	typedef struct _PERFINFO_FILE_INFORMATION {
+//	    ULONG_PTR Irp;
+//	    ULONG_PTR FileObject;
+//	    ULONG_PTR FileKey;
+//	    ULONG_PTR ExtraInformation;
+//	    ULONG IssuingThreadId;
+//	    ULONG InfoClass;
+//	} PERFINFO_FILE_INFORMATION, *PPERFINFO_FILE_INFORMATION;
+var SetFileInformationDescriptor = []ParamInfo{
+	{Name: FileIrpPtr, Type: Address, WireFormat: WireU64},
+	{Name: FileObject, Type: Address, WireFormat: WireU64},
+	{Name: FileKey, Type: Address, WireFormat: WireU64},
+	{Name: FileExtraInfo, Type: Address, WireFormat: WireU64},
+	{Name: ThreadID, Type: TID, WireFormat: WireU32},
+	{Name: FileInfoClass, Type: Enum, WireFormat: WireU32, Enum: fs.FileInfoClasses},
+	{Name: FilePath, Type: Path},
+	{Name: FileType, Type: Enum, Enum: fs.FileTypes},
+}
 
-// 	mapViewParams = []ParamInfo{
-// 		pi(params.FileViewBase, params.Address),
-// 		pi(params.FileKey, params.Address),
-// 		pf(params.MemProtect, params.Flags, ViewProtectionFlags),
-// 		pen(params.FileViewSectionType, ViewSectionTypes),
-// 		pi(params.FileViewSize, params.Uint64),
-// 		pi(params.FileOffset, params.Uint64),
-// 		pi(params.ProcessID, params.PID),
-// 		// enrichments
-// 		pi(params.FilePath, params.Path),
-// 		pi(params.Exe, params.Path),
-// 		pi(params.ProcessName, params.String),
-// 	}
-// 	virtualAllocParams = []ParamInfo{
-// 		pi(params.MemBaseAddress, params.Address),
-// 		pi(params.MemRegionSize, params.Uint64),
-// 		pi(params.ProcessID, params.PID),
-// 		pf(params.MemAllocType, params.Flags, MemAllocationFlags),
-// 		// enrichments
-// 		pi(params.FilePath, params.DOSPath),
-// 		pen(params.MemPageType, MemPageTypes),
-// 		pf(params.MemProtect, params.Flags, MemProtectionFlags),
-// 		pi(params.MemProtectMask, params.String),
-// 		pi(params.Exe, params.Path),
-// 		pi(params.ProcessName, params.String),
-// 		callstackParam,
-// 	}
-// 	virtualFreeParams = virtualAllocParams[:len(virtualAllocParams)-1]
-// )
+var DeleteFileDescriptor = []ParamInfo{
+	{Name: FileIrpPtr, Type: Address, WireFormat: WireU64},
+	{Name: FileObject, Type: Address, WireFormat: WireU64},
+	{Name: FileKey, Type: Address, WireFormat: WireU64},
+	{Name: FileExtraInfo, Type: Address, WireFormat: WireU64},
+	{Name: ThreadID, Type: TID, WireFormat: WireU32},
+	{Name: FileInfoClass, Type: Enum, WireFormat: WireU32, Enum: fs.FileInfoClasses},
+	{Name: FilePath, Type: Path},
+	{Name: FileType, Type: Enum, Enum: fs.FileTypes},
+	{Name: Callstack, Type: Slice},
+}
+
+var RenameFileDescriptor = []ParamInfo{
+	{Name: FileIrpPtr, Type: Address, WireFormat: WireU64},
+	{Name: FileObject, Type: Address, WireFormat: WireU64},
+	{Name: FileKey, Type: Address, WireFormat: WireU64},
+	{Name: FileExtraInfo, Type: Address, WireFormat: WireU64},
+	{Name: ThreadID, Type: TID, WireFormat: WireU32},
+	{Name: FileInfoClass, Type: Enum, WireFormat: WireU32, Enum: fs.FileInfoClasses},
+	{Name: FilePath, Type: Path},
+	{Name: FileType, Type: Enum, Enum: fs.FileTypes},
+	{Name: Callstack, Type: Slice},
+}
+
+//	typedef struct _PERFINFO_FILE_DIRENUM {
+//	     ULONG_PTR Irp;
+//	     ULONG_PTR FileObject;
+//	     ULONG_PTR FileKey;
+//	     ULONG IssuingThreadId;
+//	     ULONG Length;
+//	     ULONG InfoClass;
+//	     ULONG FileIndex;
+//	     WCHAR FileName[1];
+//	 } PERFINFO_FILE_DIRENUM, *PPERFINFO_FILE_DIRENUM;
+var EnumDirectoryDescriptor = []ParamInfo{
+	{Name: FileIrpPtr, Type: Address, WireFormat: WireU64},
+	{Name: FileObject, Type: Address, WireFormat: WireU64},
+	{Name: FileKey, Type: Address, WireFormat: WireU64},
+	{Name: ThreadID, Type: TID, WireFormat: WireU32},
+	{WireFormat: WireSkip, Size: 4},
+	{Name: FileInfoClass, Type: Enum, WireFormat: WireU32, Enum: fs.FileInfoClasses},
+	{WireFormat: WireSkip, Size: 4},
+	{Name: FileName, Type: String, WireFormat: WireUTF16Trailer},
+	{Name: FilePath, Type: Path},
+}
+
+var FileRundownDescriptor = []ParamInfo{
+	{Name: FileObject, Type: Address, WireFormat: WireU64},
+	{Name: FileName, Type: String, WireFormat: WireUTF16Trailer},
+}
+
+//	typedef struct _PERFINFO_FILE_OPERATION_END {
+//	    ULONG_PTR Irp;
+//	    ULONG_PTR ExtraInformation;
+//	    NTSTATUS Status;
+//	} PERFINFO_FILE_OPERATION_END, *PPERFINFO_FILE_OPERATION_END;
+var FileOpEndDescriptor = []ParamInfo{
+	{Name: FileIrpPtr, Type: Address, WireFormat: WireU64},
+	{Name: FileExtraInfo, Type: Address, WireFormat: WireU64},
+	{Name: NTStatus, Type: Status, WireFormat: WireU32},
+}
+
+var NetworkTCPEventGUID = windows.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}
+
+// NetworkDescriptor is the schema for TCP/UDP network events. All
+// network event share the same schema layout. For IPv6 events, the
+// IP fields are 128 bits long.
+//
+// typedef struct _WMI_TCPIP {
+//     ULONG Context;
+//     ULONG  Size;
+//     ULONG DestAddr;
+//     ULONG SrcAddr;
+//     USHORT DestPort;
+//     USHORT SrcPort;
+// } WMI_TCPIP, *PWMI_TCPIP;
+
+//	typedef struct _WMI_UDP {
+//	    ULONG PID;
+//	    USHORT Size;
+//	    ULONG DestAddr;
+//	    ULONG SrcAddr;
+//	    USHORT DestPort;
+//	    USHORT SrcPort;
+//	}WMI_UDP, *PWMI_UDP;
+var NetworkDescriptor = []ParamInfo{
+	{Name: ProcessID, Type: PID, WireFormat: WireU32},
+	{Name: NetSize, Type: Uint32, WireFormat: WireU32},
+	{Name: NetDIP, Type: IP, WireFormat: WireIP},
+	{Name: NetSIP, Type: IP, WireFormat: WireIP},
+	{Name: NetDport, Type: Port, WireFormat: WirePort},
+	{Name: NetSport, Type: Port, WireFormat: WirePort},
+	{Name: NetL4Proto, Type: Enum, Enum: network.ProtoNames, FromRecord: func(rec *etw.EventRecord) Value {
+		if rec.Header.ProviderID == NetworkTCPEventGUID {
+			return U32(uint32(network.TCP))
+		}
+		return U32(uint32(network.UDP))
+	}},
+	{Name: NetDportName, Type: String},
+	{Name: NetSportName, Type: String},
+}
+
+var QueryDNSDescriptor = []ParamInfo{
+	{Name: DNSName, Type: String, WireFormat: WireUTF16},
+	{Name: DNSRR, Type: Enum, WireFormat: WireU32, Enum: DNSRecordTypes},
+	{Name: DNSOpts, Type: Flags64, WireFormat: WireU64, Flags: DNSOptsFlags},
+}
+
+var ReplyDNSDescriptor = []ParamInfo{
+	{Name: DNSName, Type: String, WireFormat: WireUTF16},
+	{Name: DNSRR, Type: Enum, WireFormat: WireU32, Enum: DNSRecordTypes},
+	{Name: DNSOpts, Type: Flags64, WireFormat: WireU64, Flags: DNSOptsFlags},
+	{Name: DNSRcode, Type: Enum, WireFormat: WireU32, Enum: DNSResponseCodes},
+	{Name: DNSAnswers, Type: Slice, WireFormat: WireUTF16, Sanitize: func(s string) Value {
+		return StrSlice(strings.Split(strings.ReplaceAll(s, "type: 5 ", ""), ";"))
+	}},
+}
+
+var MapViewOfSectionDescriptor = []ParamInfo{
+	{Name: FileViewBase, Type: Address, WireFormat: WireU64},
+	{Name: FileKey, Type: Address, WireFormat: WireU64},
+	{Name: FileExtraInfo, Type: Uint64, WireFormat: WireU64Bits, Derives: []DerivedBitFieldParamInfo{
+		{BaseParamInfo: BaseParamInfo{Name: MemProtect, Type: Flags32, Flags: ViewProtectionFlags}, BitField: BitField{Shift: 32, Dir: ShiftLeft}},
+		{BaseParamInfo: BaseParamInfo{Name: FileViewSectionType, Type: Enum, Enum: ViewSectionTypes}, BitField: BitField{Shift: 52, Dir: ShiftLeft}},
+	}},
+	{Name: FileViewSize, Type: Uint64, WireFormat: WireU64},
+	{Name: FileOffset, Type: Uint64, WireFormat: WireU64},
+	{Name: ProcessID, Type: PID, WireFormat: WireU32},
+	{Name: FilePath, Type: Path},
+	{Name: FileType, Type: Enum, Enum: fs.FileTypes},
+	{Name: Exe, Type: Path},
+	{Name: ProcessName, Type: String},
+}
+
+var UnmapViewOfSectionDescriptor = MapViewOfSectionDescriptor
+var MapViewSectionRundownDescriptor = MapViewOfSectionDescriptor
+
+//	typedef struct _PERFINFO_VIRTUAL_ALLOC {
+//	    PVOID CapturedBase;
+//	    SIZE_T CapturedRegionSize;
+//	    ULONG ProcessId;
+//	    ULONG Flags;
+//	} PERFINFO_VIRTUAL_ALLOC, *PPERFINFO_VIRTUAL_ALLOC;
+var VirtualAllocDescriptor = []ParamInfo{
+	{Name: MemBaseAddress, Type: Address, WireFormat: WireU64},
+	{Name: MemRegionSize, Type: Uint64, WireFormat: WireU64},
+	{Name: ProcessID, Type: PID, WireFormat: WireU32},
+	{Name: MemAllocType, Type: Flags32, WireFormat: WireU32, Flags: MemAllocationFlags},
+	{Name: MemPageType, Type: Enum, Enum: MemPageTypes},
+	{Name: MemProtect, Type: Flags32, Flags: MemProtectionFlags},
+	{Name: MemProtectMask, Type: String},
+	{Name: Exe, Type: Path},
+	{Name: ProcessName, Type: String},
+	{Name: Callstack, Type: Slice},
+}
+
+var VirtualFreeDescriptor = []ParamInfo{
+	{Name: MemBaseAddress, Type: Address, WireFormat: WireU64},
+	{Name: MemRegionSize, Type: Uint64, WireFormat: WireU64},
+	{Name: ProcessID, Type: PID, WireFormat: WireU32},
+}
+
+var CreateSymbolicLinkObjectDescriptor = []ParamInfo{
+	{Name: LinkSource, Type: String, WireFormat: WireUTF16},
+	{Name: LinkTarget, Type: String, WireFormat: WireUTF16},
+	{Name: DesiredAccess, Type: Flags32, WireFormat: WireU32, Flags: AccessMaskFlags},
+	{Name: NTStatus, Type: Status, WireFormat: WireU32},
+	{Name: Callstack, Type: Slice, FromRecord: func(rec *etw.EventRecord) Value {
+		return Addresses(rec.Callstack())
+	}},
+}

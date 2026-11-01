@@ -433,9 +433,9 @@ func (s *snapshotter) newProcState(pid, ppid uint32, e *event.Event) (*pstypes.P
 
 	proc.Parent = s.procs[ppid]
 	proc.StartTime = e.Params.GetTimeByName(params.StartTime)
-	proc.IsWOW64 = (e.Params.GetUint32ByName(params.ProcessFlags) & event.PsWOW64) != 0
-	proc.IsPackaged = (e.Params.GetUint32ByName(params.ProcessFlags) & event.PsPackaged) != 0
-	proc.IsProtected = (e.Params.GetUint32ByName(params.ProcessFlags) & event.PsProtected) != 0
+	proc.IsWOW64 = (e.Params.GetUint32ByName(params.ProcessFlags) & params.PsWOW64) != 0
+	proc.IsPackaged = (e.Params.GetUint32ByName(params.ProcessFlags) & params.PsPackaged) != 0
+	proc.IsProtected = (e.Params.GetUint32ByName(params.ProcessFlags) & params.PsProtected) != 0
 	proc.IsCreatedFromSystemLogger = true
 
 	if !s.capture {

@@ -39,7 +39,7 @@ func TestDecodeRegistry(t *testing.T) {
 		{name: "RegSetValue",
 			assertions: func(t *testing.T, e *Event) {
 				assert.Equal(t, 3, e.Params.Len())
-				assert.Equal(t, "StartTime", e.Params.GetStringByName(params.RegPath))
+				assert.Equal(t, "StartTime", e.Params.GetStringByName(params.RegValue))
 				assert.Equal(t, uint32(0), e.Params.GetUint32ByName(params.NTStatus))
 				assert.Equal(t, uint64(0xffffde0e05e45330), e.Params.GetUint64ByName(params.RegKCB))
 			},
@@ -210,50 +210,50 @@ func TestDecodeFile(t *testing.T) {
 		// 		0, 0, 0, 0,
 		// 	},
 		// },
-		// {
-		// 	name: "MapViewOfSection", opcode: MapViewOfSectionID,
-		// 	assertions: func(t *testing.T, e *Event) {
-		// 		assert.Equal(t, 7, e.Params.Len())
-		// 		assert.Equal(t, uint64(0xffffb58b75fb7e10), e.Params.GetUint64ByName(params.FileKey))
-		// 		assert.Equal(t, uint64(0), e.Params.GetUint64ByName(params.FileOffset))
-		// 		assert.Equal(t, uint32(1716), e.Params.GetUint32ByName(params.ProcessID))
-		// 		assert.Equal(t, "READONLY", e.GetParamAsString(params.MemProtect))
-		// 		assert.Equal(t, "PAGEFILE", e.GetParamAsString(params.FileViewSectionType))
-		// 		assert.Equal(t, uint64(0x191ab210000), e.Params.GetUint64ByName(params.FileViewBase))
-		// 		assert.Equal(t, uint64(4096), e.Params.GetUint64ByName(params.FileViewSize))
-		// 	},
-		// 	event: &Event{Params: Params{}, Type: MapViewOfSection},
-		// 	buf: []byte{
-		// 		0, 0, 33, 171, 145, 1, 0, 0,
-		// 		16, 126, 251, 117, 139, 181, 255, 255,
-		// 		0, 0, 0, 0, 0, 0, 193, 0,
-		// 		0, 16, 0, 0, 0, 0, 0, 0,
-		// 		0, 0, 0, 0, 0, 0, 0, 0,
-		// 		180, 6, 0, 0,
-		// 	},
-		// },
-		// {
-		// 	name: "UnmapViewOfSection", opcode: UnmapViewOfSectionID,
-		// 	assertions: func(t *testing.T, e *Event) {
-		// 		assert.Equal(t, 7, e.Params.Len())
-		// 		assert.Equal(t, uint64(0xffffb58bc1f91010), e.Params.GetUint64ByName(params.FileKey))
-		// 		assert.Equal(t, uint64(0), e.Params.GetUint64ByName(params.FileOffset))
-		// 		assert.Equal(t, uint32(12448), e.Params.GetUint32ByName(params.ProcessID))
-		// 		assert.Equal(t, "READWRITE", e.GetParamAsString(params.MemProtect))
-		// 		assert.Equal(t, "PAGEFILE", e.GetParamAsString(params.FileViewSectionType))
-		// 		assert.Equal(t, uint64(0x1675e410000), e.Params.GetUint64ByName(params.FileViewBase))
-		// 		assert.Equal(t, uint64(921600), e.Params.GetUint64ByName(params.FileViewSize))
-		// 	},
-		// 	event: &Event{Params: Params{}, Type: UnmapViewOfSection},
-		// 	buf: []byte{
-		// 		0, 0, 65, 94, 103, 1, 0, 0,
-		// 		16, 16, 249, 193, 139, 181, 255, 255,
-		// 		0, 0, 0, 0, 0, 0, 196, 0,
-		// 		0, 16, 14, 0, 0, 0, 0, 0,
-		// 		0, 0, 0, 0, 0, 0, 0, 0,
-		// 		160, 48, 0, 0,
-		// 	},
-		// },
+		{
+			name: "MapViewOfSection", opcode: MapViewOfSectionID,
+			assertions: func(t *testing.T, e *Event) {
+				assert.Equal(t, 7, e.Params.Len())
+				assert.Equal(t, uint64(0xffffb58b75fb7e10), e.Params.GetUint64ByName(params.FileKey))
+				assert.Equal(t, uint64(0), e.Params.GetUint64ByName(params.FileOffset))
+				assert.Equal(t, uint32(1716), e.Params.GetUint32ByName(params.ProcessID))
+				assert.Equal(t, "READONLY", e.GetParamAsString(params.MemProtect))
+				assert.Equal(t, "PAGEFILE", e.GetParamAsString(params.FileViewSectionType))
+				assert.Equal(t, uint64(0x191ab210000), e.Params.GetUint64ByName(params.FileViewBase))
+				assert.Equal(t, uint64(4096), e.Params.GetUint64ByName(params.FileViewSize))
+			},
+			event: &Event{Params: NewParams(MapViewOfSection), Type: MapViewOfSection},
+			buf: []byte{
+				0, 0, 33, 171, 145, 1, 0, 0,
+				16, 126, 251, 117, 139, 181, 255, 255,
+				0, 0, 0, 0, 0, 0, 193, 0,
+				0, 16, 0, 0, 0, 0, 0, 0,
+				0, 0, 0, 0, 0, 0, 0, 0,
+				180, 6, 0, 0,
+			},
+		},
+		{
+			name: "UnmapViewOfSection", opcode: UnmapViewOfSectionID,
+			assertions: func(t *testing.T, e *Event) {
+				assert.Equal(t, 7, e.Params.Len())
+				assert.Equal(t, uint64(0xffffb58bc1f91010), e.Params.GetUint64ByName(params.FileKey))
+				assert.Equal(t, uint64(0), e.Params.GetUint64ByName(params.FileOffset))
+				assert.Equal(t, uint32(12448), e.Params.GetUint32ByName(params.ProcessID))
+				assert.Equal(t, "READWRITE", e.GetParamAsString(params.MemProtect))
+				assert.Equal(t, "PAGEFILE", e.GetParamAsString(params.FileViewSectionType))
+				assert.Equal(t, uint64(0x1675e410000), e.Params.GetUint64ByName(params.FileViewBase))
+				assert.Equal(t, uint64(921600), e.Params.GetUint64ByName(params.FileViewSize))
+			},
+			event: &Event{Params: Params{}, Type: UnmapViewOfSection},
+			buf: []byte{
+				0, 0, 65, 94, 103, 1, 0, 0,
+				16, 16, 249, 193, 139, 181, 255, 255,
+				0, 0, 0, 0, 0, 0, 196, 0,
+				0, 16, 14, 0, 0, 0, 0, 0,
+				0, 0, 0, 0, 0, 0, 0, 0,
+				160, 48, 0, 0,
+			},
+		},
 		// {
 		// 	name: "SetFileInformation", opcode: SetFileInformationID,
 		// 	assertions: func(t *testing.T, e *Event) {
@@ -577,8 +577,8 @@ func TestDecodeModule(t *testing.T) {
 	}
 
 	r := initEventRecord(0, 0, buf)
-	e := &Event{Params: Params{}}
-	paramDecoder.DecodeModule(r, e)
+	e := &Event{Type: LoadModule, Params: NewParams(LoadModule)}
+	require.NoError(t, DecodeParams(r, e))
 
 	assert.Equal(t, 9, e.Params.Len())
 	assert.Equal(t, uint64(0x7ffd09200000), e.Params.GetUint64ByName(params.ModuleBase))
@@ -622,8 +622,8 @@ func TestDecodeModuleInternal(t *testing.T) {
 	}
 
 	r := initEventRecord(0, 0, buf)
-	e := &Event{Params: Params{}}
-	paramDecoder.DecodeModuleInternal(r, e)
+	e := &Event{Type: LoadModuleInternal, Params: NewParams(LoadModuleInternal)}
+	require.NoError(t, DecodeParams(r, e))
 
 	assert.Equal(t, 6, e.Params.Len())
 	assert.Equal(t, uint64(0x7ffcfc960000), e.Params.GetUint64ByName(params.ModuleBase))
@@ -772,8 +772,8 @@ func TestDecodeCreateSymbolicLinkObject(t *testing.T) {
 	}
 
 	r := initEventRecord(0, 0, buf)
-	e := &Event{Params: Params{}}
-	paramDecoder.DecodeCreateSymbolicLinkObject(r, e)
+	e := &Event{Type: CreateSymbolicLinkObject, Params: NewParams(CreateSymbolicLinkObject)}
+	require.NoError(t, DecodeParams(r, e))
 
 	assert.Equal(t, 5, e.Params.Len())
 	assert.Equal(t, "DELETE|READ_CONTROL|WRITE_DAC|WRITE_OWNER", e.GetParamAsString(params.DesiredAccess))
@@ -830,8 +830,8 @@ func TestDecodeMemory(t *testing.T) {
 	}
 
 	r := initEventRecord(0, 0, buf)
-	e := &Event{Params: Params{}}
-	paramDecoder.DecodeMemory(r, e)
+	e := &Event{Type: VirtualAlloc, Params: NewParams(VirtualAlloc)}
+	require.NoError(t, DecodeParams(r, e))
 
 	assert.Equal(t, 4, e.Params.Len())
 	assert.Equal(t, uint32(3440), e.Params.GetPid())
@@ -933,7 +933,7 @@ func TestDecodeNetwork(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := initEventRecord(tt.opcode, 0, tt.buf, withProviderID(tt.providerID))
 			e := &Event{Params: Params{}}
-			paramDecoder.DecodeNetwork(r, e)
+			require.NoError(t, DecodeParams(r, e))
 			tt.assertions(t, e)
 		})
 	}
@@ -971,8 +971,8 @@ func TestDecodeDNS(t *testing.T) {
 	}
 
 	r := initEventRecord(0, ReplyDNSID, buf)
-	e := &Event{Params: Params{}}
-	paramDecoder.DecodeDNS(r, e)
+	e := &Event{Type: ReplyDNS, Params: NewParams(ReplyDNS)}
+	require.NoError(t, DecodeParams(r, e))
 
 	assert.Equal(t, 5, e.Params.Len())
 	assert.Equal(t, []string{"2600:1901:0:e988::", ""}, e.Params.GetStringSliceByName(params.DNSAnswers))

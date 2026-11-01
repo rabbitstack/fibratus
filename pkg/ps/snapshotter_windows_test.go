@@ -62,7 +62,7 @@ func TestWrite(t *testing.T) {
 					event.NewParam(params.UserSID, params.WbemSID, params.Bin([]byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0})),
 					event.NewParam(params.StartTime, params.Time, params.Timestamp(time.Now())),
 					event.NewParam(params.SessionID, params.Uint32, params.U32(uint32(1))),
-					event.NewParam(params.ProcessFlags, params.Flags, params.U32(uint32(0x00000010))),
+					event.NewParam(params.ProcessFlags, params.Flags32, params.U32(uint32(0x00000010))),
 				),
 			},
 			&pstypes.PS{
@@ -93,7 +93,7 @@ func TestWrite(t *testing.T) {
 					event.NewParam(params.UserSID, params.WbemSID, params.Bin([]byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0})),
 					event.NewParam(params.StartTime, params.Time, params.Timestamp(time.Now())),
 					event.NewParam(params.SessionID, params.Uint32, params.U32(uint32(1))),
-					event.NewParam(params.ProcessFlags, params.Flags, params.U32(uint32(0x00000010))),
+					event.NewParam(params.ProcessFlags, params.Flags32, params.U32(uint32(0x00000010))),
 				),
 				PID: uint32(os.Getpid()),
 			},
@@ -128,7 +128,7 @@ func TestWrite(t *testing.T) {
 					event.NewParam(params.UserSID, params.WbemSID, params.Bin([]byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0})),
 					event.NewParam(params.StartTime, params.Time, params.Timestamp(time.Now())),
 					event.NewParam(params.SessionID, params.Uint32, params.U32(uint32(1))),
-					event.NewParam(params.ProcessFlags, params.Flags, params.U32(uint32(0x00000010))),
+					event.NewParam(params.ProcessFlags, params.Flags32, params.U32(uint32(0x00000010))),
 				),
 			},
 			&pstypes.PS{
@@ -228,7 +228,7 @@ func TestWriteInternalEventsEnrichment(t *testing.T) {
 						event.NewParam(params.Cmdline, params.String, params.Str(`svchost.exe -k LocalSystemNetworkRestricted -p -s NcbService`)),
 						event.NewParam(params.UserSID, params.WbemSID, params.Bin([]byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0})),
 						event.NewParam(params.SessionID, params.Uint32, params.U32(uint32(1))),
-						event.NewParam(params.ProcessFlags, params.Flags, params.U32(uint32(0x00000010))),
+						event.NewParam(params.ProcessFlags, params.Flags32, params.U32(uint32(0x00000010))),
 					),
 				},
 				{
@@ -279,7 +279,7 @@ func TestWriteInternalEventsEnrichment(t *testing.T) {
 						event.NewParam(params.Cmdline, params.String, params.Str(`svchost.exe -k LocalSystemNetworkRestricted -p -s NcbService`)),
 						event.NewParam(params.UserSID, params.WbemSID, params.Bin([]byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0})),
 						event.NewParam(params.SessionID, params.Uint32, params.U32(uint32(1))),
-						event.NewParam(params.ProcessFlags, params.Flags, params.U32(uint32(0x00000010))),
+						event.NewParam(params.ProcessFlags, params.Flags32, params.U32(uint32(0x00000010))),
 					),
 				},
 			},
@@ -307,7 +307,7 @@ func TestWriteInternalEventsEnrichment(t *testing.T) {
 						event.NewParam(params.Cmdline, params.String, params.Str(`svchost.exe -k LocalSystemNetworkRestricted -p -s NcbService`)),
 						event.NewParam(params.UserSID, params.WbemSID, params.Bin([]byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0})),
 						event.NewParam(params.SessionID, params.Uint32, params.U32(uint32(1))),
-						event.NewParam(params.ProcessFlags, params.Flags, params.U32(uint32(0x00000010))),
+						event.NewParam(params.ProcessFlags, params.Flags32, params.U32(uint32(0x00000010))),
 					),
 				},
 			},
@@ -357,7 +357,7 @@ func TestRemove(t *testing.T) {
 					event.NewParam(params.UserSID, params.WbemSID, params.Bin([]byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0})),
 					event.NewParam(params.StartTime, params.Time, params.Timestamp(time.Now())),
 					event.NewParam(params.SessionID, params.Uint32, params.U32(uint32(1))),
-					event.NewParam(params.ProcessFlags, params.Flags, params.U32(uint32(0x00000010))),
+					event.NewParam(params.ProcessFlags, params.Flags32, params.U32(uint32(0x00000010))),
 				),
 			},
 			false,
@@ -397,7 +397,7 @@ func TestAddThread(t *testing.T) {
 			event.NewParam(params.UserSID, params.WbemSID, params.Bin([]byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0})),
 			event.NewParam(params.StartTime, params.Time, params.Timestamp(time.Now())),
 			event.NewParam(params.SessionID, params.Uint32, params.U32(uint32(1))),
-			event.NewParam(params.ProcessFlags, params.Flags, params.U32(uint32(0x00000010))),
+			event.NewParam(params.ProcessFlags, params.Flags32, params.U32(uint32(0x00000010))),
 		),
 	}
 	require.NoError(t, psnap.Write(evt))
@@ -478,7 +478,7 @@ func TestRemoveThread(t *testing.T) {
 			event.NewParam(params.UserSID, params.WbemSID, params.Bin([]byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0})),
 			event.NewParam(params.StartTime, params.Time, params.Timestamp(time.Now())),
 			event.NewParam(params.SessionID, params.Uint32, params.U32(uint32(1))),
-			event.NewParam(params.ProcessFlags, params.Flags, params.U32(uint32(0x00000010))),
+			event.NewParam(params.ProcessFlags, params.Flags32, params.U32(uint32(0x00000010))),
 		),
 	}
 	require.NoError(t, psnap.Write(pevt))
@@ -526,7 +526,7 @@ func TestAddModule(t *testing.T) {
 			event.NewParam(params.UserSID, params.WbemSID, params.Bin([]byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0})),
 			event.NewParam(params.StartTime, params.Time, params.Timestamp(time.Now())),
 			event.NewParam(params.SessionID, params.Uint32, params.U32(uint32(1))),
-			event.NewParam(params.ProcessFlags, params.Flags, params.U32(uint32(0x00000010))),
+			event.NewParam(params.ProcessFlags, params.Flags32, params.U32(uint32(0x00000010))),
 		),
 	}
 	require.NoError(t, psnap.Write(evt))
@@ -591,7 +591,7 @@ func TestRemoveModule(t *testing.T) {
 			event.NewParam(params.UserSID, params.WbemSID, params.Bin([]byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0})),
 			event.NewParam(params.StartTime, params.Time, params.Timestamp(time.Now())),
 			event.NewParam(params.SessionID, params.Uint32, params.U32(uint32(1))),
-			event.NewParam(params.ProcessFlags, params.Flags, params.U32(uint32(0x00000010))),
+			event.NewParam(params.ProcessFlags, params.Flags32, params.U32(uint32(0x00000010))),
 		),
 	}
 	require.NoError(t, psnap.Write(pevt))
@@ -632,7 +632,7 @@ func TestOverrideProcExecutable(t *testing.T) {
 			event.NewParam(params.UserSID, params.WbemSID, params.Bin([]byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0})),
 			event.NewParam(params.StartTime, params.Time, params.Timestamp(time.Now())),
 			event.NewParam(params.SessionID, params.Uint32, params.U32(uint32(1))),
-			event.NewParam(params.ProcessFlags, params.Flags, params.U32(uint32(0x00000010))),
+			event.NewParam(params.ProcessFlags, params.Flags32, params.U32(uint32(0x00000010))),
 		),
 	}
 	require.NoError(t, psnap.Write(evt))
@@ -708,7 +708,7 @@ func TestReapDeadProcesses(t *testing.T) {
 				event.NewParam(params.UserSID, params.WbemSID, params.Bin([]byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0})),
 				event.NewParam(params.StartTime, params.Time, params.Timestamp(time.Now())),
 				event.NewParam(params.SessionID, params.Uint32, params.U32(uint32(1))),
-				event.NewParam(params.ProcessFlags, params.Flags, params.U32(uint32(0x00000010))),
+				event.NewParam(params.ProcessFlags, params.Flags32, params.U32(uint32(0x00000010))),
 			),
 		},
 		{
@@ -722,7 +722,7 @@ func TestReapDeadProcesses(t *testing.T) {
 				event.NewParam(params.UserSID, params.WbemSID, params.Bin([]byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0})),
 				event.NewParam(params.StartTime, params.Time, params.Timestamp(time.Now())),
 				event.NewParam(params.SessionID, params.Uint32, params.U32(uint32(1))),
-				event.NewParam(params.ProcessFlags, params.Flags, params.U32(uint32(0x00000010))),
+				event.NewParam(params.ProcessFlags, params.Flags32, params.U32(uint32(0x00000010))),
 			),
 		},
 	}

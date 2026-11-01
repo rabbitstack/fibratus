@@ -155,8 +155,8 @@ func TestProcessCallstackPeExports(t *testing.T) {
 			event.NewParam(params.FileObject, params.Uint64, params.U64(uint64(12456738026482168384))),
 			event.NewParam(params.FilePath, params.String, params.Str("C:\\Windows\\system32\\mimi.dll")),
 			event.NewParam(params.FileType, params.String, params.Str("file")),
-			event.NewParam(params.FileOperation, params.Enum, params.U32(uint32(2)), event.WithEnum(fs.FileCreateDispositions)),
-			event.NewParam(params.Callstack, params.Slice, event.Addresses([]va.Address{0x7ffb5c1d0396, 0x7ffb5d8e61f4, 0x7ffb3138592e, 0x7ffb313853b2, 0x2638e59e0a5})),
+			event.NewParam(params.FileOperation, params.Enum, params.U32(uint32(2)), params.WithEnum(fs.FileCreateDispositions)),
+			event.NewParam(params.Callstack, params.Slice, params.Addresses([]va.Address{0x7ffb5c1d0396, 0x7ffb5d8e61f4, 0x7ffb3138592e, 0x7ffb313853b2, 0x2638e59e0a5})),
 		),
 		PS: proc,
 	}
@@ -267,7 +267,7 @@ func TestProcessCallstack(t *testing.T) {
 		Params: event.ParamsOf(
 			event.NewParam(params.ProcessParentID, params.PID, params.U32((uint32(os.Getpid())))),
 			event.NewParam(params.ProcessRealParentID, params.PID, params.U32((uint32(os.Getpid())))),
-			event.NewParam(params.Callstack, params.Slice, event.Addresses([]va.Address{0x7ffb5c1d0396, 0x7ffb5d8e61f4, 0x7ffb3138592e, 0x7ffb313853b2, 0x2638e59e0a5})),
+			event.NewParam(params.Callstack, params.Slice, params.Addresses([]va.Address{0x7ffb5c1d0396, 0x7ffb5d8e61f4, 0x7ffb3138592e, 0x7ffb313853b2, 0x2638e59e0a5})),
 		),
 		PS: proc,
 	}
@@ -355,7 +355,7 @@ func TestKernelCallstackSymbolizationFromDriverStore(t *testing.T) {
 		Params: event.ParamsOf(
 			event.NewParam(params.ProcessParentID, params.PID, params.U32(uint32(os.Getpid()))),
 			event.NewParam(params.ProcessRealParentID, params.PID, params.U32(uint32(os.Getpid()))),
-			event.NewParam(params.Callstack, params.Slice, event.Addresses([]va.Address{
+			event.NewParam(params.Callstack, params.Slice, params.Addresses([]va.Address{
 				0xFFFFF80000100000, // ntoskrnl.exe
 				0xFFFFF80000810000, // hal.dll
 				0xFFFFF80001010000, // fltMgr.sys
@@ -453,7 +453,7 @@ func TestSymbolizeEventParamAddress(t *testing.T) {
 		Timestamp: time.Now(),
 		Host:      "archrabbit",
 		Params: event.ParamsOf(
-			event.NewParam(params.Callstack, params.Slice, event.Addresses([]va.Address{0x7ffb5c1d0396, 0x7ffb5d8e61f4, 0x7ffb3138592e, 0x7ffb313853b2, 0x2638e59e0a5})),
+			event.NewParam(params.Callstack, params.Slice, params.Addresses([]va.Address{0x7ffb5c1d0396, 0x7ffb5d8e61f4, 0x7ffb3138592e, 0x7ffb313853b2, 0x2638e59e0a5})),
 			event.NewParam(params.StartAddress, params.Address, params.U64(uint64(0x7ffb3138592e))),
 			event.NewParam(params.ProcessID, params.PID, params.U32(uint32(os.Getpid()))),
 		),
@@ -502,7 +502,7 @@ func TestProcessCallstackProcsTTL(t *testing.T) {
 			Params: event.ParamsOf(
 				event.NewParam(params.ProcessParentID, params.PID, params.U32((uint32(os.Getpid())))),
 				event.NewParam(params.ProcessRealParentID, params.PID, params.U32((uint32(os.Getpid())))),
-				event.NewParam(params.Callstack, params.Slice, event.Addresses([]va.Address{0x7ffb5c1d0396, 0x7ffb5d8e61f4, 0x7ffb3138592e, 0x7ffb313853b2, 0x2638e59e0a5})),
+				event.NewParam(params.Callstack, params.Slice, params.Addresses([]va.Address{0x7ffb5c1d0396, 0x7ffb5d8e61f4, 0x7ffb3138592e, 0x7ffb313853b2, 0x2638e59e0a5})),
 			),
 		}
 		_, _ = s.ProcessEvent(e)

@@ -52,7 +52,7 @@ func TestMemProcessor(t *testing.T) {
 				Params: event.ParamsOf(
 					event.NewParam(params.MemRegionSize, params.Uint64, params.U64(uint64(1024))),
 					event.NewParam(params.MemBaseAddress, params.Address, params.U64(uint64(base))),
-					event.NewParam(params.MemAllocType, params.Flags, params.U32(uint32(0x00001000|0x00002000)), event.WithFlags(event.MemAllocationFlags)),
+					event.NewParam(params.MemAllocType, params.Flags32, params.U32(uint32(0x00001000|0x00002000)), params.WithFlags(params.MemAllocationFlags)),
 					event.NewParam(params.ProcessID, params.PID, params.U32(uint32(os.Getpid()))),
 				),
 			},
@@ -77,7 +77,7 @@ func TestMemProcessor(t *testing.T) {
 				Params: event.ParamsOf(
 					event.NewParam(params.MemRegionSize, params.Uint64, params.U64(uint64(1024))),
 					event.NewParam(params.MemBaseAddress, params.Address, params.U64(uint64(base))),
-					event.NewParam(params.MemAllocType, params.Flags, params.U32(uint32(0x00008000)), event.WithFlags(event.MemAllocationFlags)),
+					event.NewParam(params.MemAllocType, params.Flags32, params.U32(uint32(0x00008000)), params.WithFlags(params.MemAllocationFlags)),
 					event.NewParam(params.ProcessID, params.PID, params.U32(uint32(os.Getpid()))),
 				),
 			},

@@ -49,8 +49,8 @@ func TestModuleProcessor(t *testing.T) {
 					event.NewParam(params.ProcessID, params.PID, params.U32(uint32(1023))),
 					event.NewParam(params.ModuleCheckSum, params.Uint32, params.U32(uint32(2323432))),
 					event.NewParam(params.ModuleBase, params.Address, params.U64(uint64(0x7ffb313833a3))),
-					event.NewParam(params.ModuleSignatureType, params.Enum, params.U32(uint32(1)), event.WithEnum(signature.Types)),
-					event.NewParam(params.ModuleSignatureLevel, params.Enum, params.U32(uint32(4)), event.WithEnum(signature.Levels)),
+					event.NewParam(params.ModuleSignatureType, params.Enum, params.U32(uint32(1)), params.WithEnum(signature.Types)),
+					event.NewParam(params.ModuleSignatureLevel, params.Enum, params.U32(uint32(4)), params.WithEnum(signature.Levels)),
 				),
 			},
 			func() *ps.SnapshotterMock {
@@ -74,8 +74,8 @@ func TestModuleProcessor(t *testing.T) {
 					event.NewParam(params.ProcessID, params.PID, params.U32(uint32(1023))),
 					event.NewParam(params.ModuleCheckSum, params.Uint32, params.U32(uint32(2323432))),
 					event.NewParam(params.ModuleBase, params.Address, params.U64(uint64(0x7ffb313833a3))),
-					event.NewParam(params.ModuleSignatureType, params.Enum, params.U32(uint32(1)), event.WithEnum(signature.Types)),
-					event.NewParam(params.ModuleSignatureLevel, params.Enum, params.U32(uint32(4)), event.WithEnum(signature.Levels)),
+					event.NewParam(params.ModuleSignatureType, params.Enum, params.U32(uint32(1)), params.WithEnum(signature.Types)),
+					event.NewParam(params.ModuleSignatureLevel, params.Enum, params.U32(uint32(4)), params.WithEnum(signature.Levels)),
 				),
 			},
 			func() *ps.SnapshotterMock {
@@ -96,8 +96,8 @@ func TestModuleProcessor(t *testing.T) {
 					event.NewParam(params.ProcessName, params.String, params.Str("csrss.exe")),
 					event.NewParam(params.ProcessID, params.PID, params.U32(uint32(676))),
 					event.NewParam(params.ModuleBase, params.Address, params.U64(uint64(0xfffb313833a3))),
-					event.NewParam(params.ModuleSignatureType, params.Enum, params.U32(uint32(0)), event.WithEnum(signature.Types)),
-					event.NewParam(params.ModuleSignatureLevel, params.Enum, params.U32(uint32(0)), event.WithEnum(signature.Levels)),
+					event.NewParam(params.ModuleSignatureType, params.Enum, params.U32(uint32(0)), params.WithEnum(signature.Types)),
+					event.NewParam(params.ModuleSignatureLevel, params.Enum, params.U32(uint32(0)), params.WithEnum(signature.Levels)),
 				),
 			},
 			func() *ps.SnapshotterMock {

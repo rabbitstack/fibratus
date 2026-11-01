@@ -235,7 +235,7 @@ func TestRunSequenceRule(t *testing.T) {
 		},
 		Params: event.ParamsOf(
 			event.NewParam(params.FilePath, params.String, params.Str("C:\\Temp\\dropper.exe")),
-			event.NewParam(params.FileOperation, params.Enum, params.U32(uint32(2)), event.WithEnum(fs.FileCreateDispositions)),
+			event.NewParam(params.FileOperation, params.Enum, params.U32(uint32(2)), params.WithEnum(fs.FileCreateDispositions)),
 		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
@@ -321,7 +321,7 @@ func TestRunSequenceRuleWithPsUUIDLink(t *testing.T) {
 		},
 		Params: event.ParamsOf(
 			event.NewParam(params.FilePath, params.String, params.Str("C:\\Temp\\dropper.exe")),
-			event.NewParam(params.FileOperation, params.Enum, params.U32(uint32(2)), event.WithEnum(fs.FileCreateDispositions)),
+			event.NewParam(params.FileOperation, params.Enum, params.U32(uint32(2)), params.WithEnum(fs.FileCreateDispositions)),
 		),
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}

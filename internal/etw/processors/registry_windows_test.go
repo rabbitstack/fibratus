@@ -184,7 +184,7 @@ func TestRegistryProcessor(t *testing.T) {
 						Params: event.ParamsOf(
 							event.NewParam(params.RegPath, params.Key, params.Str(`\SessionId`)),
 							event.NewParam(params.RegData, params.String, params.Str("{ABD9EA10-87F6-11EB-9ED5-645D86501328}")),
-							event.NewParam(params.RegValueType, params.Enum, params.U32(uint32(1)), event.WithEnum(key.RegistryValueTypes)),
+							event.NewParam(params.RegValueType, params.Enum, params.U32(uint32(1)), params.WithEnum(key.RegistryValueTypes)),
 							event.NewParam(params.RegKCB, params.Uint64, params.U64(uint64(0))),
 						),
 					},
@@ -194,7 +194,7 @@ func TestRegistryProcessor(t *testing.T) {
 						Params: event.ParamsOf(
 							event.NewParam(params.RegPath, params.Key, params.Str(`\Directory`)),
 							event.NewParam(params.RegData, params.String, params.Str("%SYSTEMROOT%")),
-							event.NewParam(params.RegValueType, params.Enum, params.U32(uint32(2)), event.WithEnum(key.RegistryValueTypes)),
+							event.NewParam(params.RegValueType, params.Enum, params.U32(uint32(2)), params.WithEnum(key.RegistryValueTypes)),
 							event.NewParam(params.RegKCB, params.Uint64, params.U64(uint64(0))),
 						),
 					},
