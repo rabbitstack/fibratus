@@ -84,7 +84,7 @@ type Probe struct {
 
 	// stores pending I/O request packets
 	enqueuedIORequests    map[uint64]ioRequest
-	enquededDeleteOnClose map[uint64]struct{}
+	enqueuedDeleteOnClose map[uint64]struct{}
 
 	ioRequestsPurger *periodical.Periodical
 
