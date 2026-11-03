@@ -528,7 +528,7 @@ func (c *Cat) ParseCertificate() (*Cert, error) {
 
 	v, _ := catalogGroup.Do(fmt.Sprint(key), func() (any, error) {
 		if e, ok := lookupCert(key); ok {
-			return e.cert, e.err
+			return e, e.err
 		}
 		cert, err := parseCatalogCert(path)
 		e := &certEntry{cert: cert, err: err}
