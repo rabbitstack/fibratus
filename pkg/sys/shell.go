@@ -51,8 +51,11 @@ const (
 	NotifyIconRespectQuietTimeFlag = 0x00000080
 )
 
-// SystrayIconGUID identifies the systray icon
-var SystrayIconGUID = windows.GUID{Data1: 0x52cf1171, Data2: 0xfe06, Data3: 0xb859, Data4: [8]byte{0x9d, 0xda, 0x36, 0xc0, 0x4f, 0xd7, 0xba, 0xb9}}
+// SystrayIconGUID identifies the systray icon. The shell binds a GUID
+// to the path of the executable that registered it, so this value must
+// change whenever the executable hosting the icon changes. It was rotated
+// when the standalone fibratus-systray.exe was folded into `fibratus systray`.
+var SystrayIconGUID = windows.GUID{Data1: 0x7c6493dc, Data2: 0xaf23, Data3: 0x49cb, Data4: [8]byte{0x8e, 0x90, 0xd3, 0xb4, 0x1e, 0xab, 0x4e, 0x71}}
 
 // NotifyIconMessage defines message types that
 // can be sent to the taskbar status area.

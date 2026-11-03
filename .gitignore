@@ -2,8 +2,6 @@
 cmd/fibratus/fibratus.exe
 cmd/fibratus/fibratus.syso
 cmd/fibratus/fibratus
-cmd/systray/fibratus-systray.exe
-cmd/systray/fibratus-systray.syso
 
 # Resource message table
 pkg/util/eventlog/mc/*

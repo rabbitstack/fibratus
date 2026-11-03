@@ -1,6 +1,0 @@
-#define RC_FILE_VERSION RC_VER,0
-
-#define STRINGIFY(x) #x
-#define TO_STRING(x) STRINGIFY(x)
-
-#define FILE_VERSION_STRING TO_STRING(VER)
