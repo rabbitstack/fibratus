@@ -31,6 +31,7 @@ import (
 
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/secDre4mer/pkcs7"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -65,6 +66,13 @@ var pkcs7ParseMu sync.Mutex
 func parsePKCS7(data []byte) (*pkcs7.PKCS7, error) {
 	pkcs7ParseMu.Lock()
 	defer pkcs7ParseMu.Unlock()
+
+	defer func() {
+		if r := recover(); r != nil {
+			log.Warnf("panic in PKCS7 parsing: %v", r)
+		}
+	}()
+
 	return pkcs7.Parse(data)
 }
 
