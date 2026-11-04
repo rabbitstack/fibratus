@@ -19,6 +19,7 @@
 package processors
 
 import (
+	"errors"
 	"expvar"
 	"fmt"
 	"os"
@@ -190,6 +191,15 @@ func (r *registryProcessor) processEvent(e *event.Event) (*event.Event, error) {
 		readValueOps.Add(1)
 		typ, val, err := key.ReadValue(path, e.GetParamAsString(params.RegValue))
 		if err != nil {
+			// Sandboxed hives such as \Registry\WC have no root that the registry
+			// API can address: key.splitKey maps them to Invalid and ReadValue
+			// refuses before opening anything. That is unreadable by design, not
+			// broken, so emit the event without the value the way a missing or
+			// access-denied value is already handled below. Returning an error
+			// here logged a line per value on hosts running packaged apps.
+			if errors.Is(err, key.ErrInvalidRoot) {
+				return e, nil
+			}
 			errno, ok := err.(windows.Errno)
 			if ok && (errno.Is(os.ErrNotExist) || err == windows.ERROR_ACCESS_DENIED) {
 				return e, nil
