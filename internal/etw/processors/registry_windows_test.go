@@ -167,6 +167,31 @@ func TestRegistryProcessor(t *testing.T) {
 			},
 		},
 		{
+			// Sandboxed hives such as \Registry\WC have no root the registry API
+			// can open, so key.ReadValue refuses before touching anything. That is
+			// a value we cannot read, not a failure: the event must still come out
+			// of the processor instead of surfacing `invalid root key` per value.
+			"skip value from unaddressable hive root",
+			&event.Event{
+				Type: event.RegSetValue,
+				PID:  23234,
+				Params: event.Params{
+					params.RegPath: {Name: params.RegPath, Type: params.Key, Value: `\REGISTRY\WC\S-1-5-21-1004\Software\Contoso\Settings`},
+					params.RegKCB:  {Name: params.RegKCB, Type: params.Uint64, Value: uint64(0)},
+				},
+			},
+			nil,
+			func() *handle.SnapshotterMock {
+				hsnap := new(handle.SnapshotterMock)
+				return hsnap
+			},
+			func(e *event.Event, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
+				// the runner already asserts no error; the value simply isn't there
+				assert.Empty(t, e.GetParamAsString(params.RegValueType))
+				assert.Empty(t, e.GetParamAsString(params.RegData))
+			},
+		},
+		{
 			"process registry set value from internal event",
 			&event.Event{
 				Type: event.RegSetValue,
