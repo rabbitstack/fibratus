@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-present by Nedim Sabic Sabic
+ * Copyright 2026 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -152,16 +152,14 @@ func TestDecodeFile(t *testing.T) {
 		{
 			name: "CreateFile", opcode: CreateFileID,
 			assertions: func(t *testing.T, e *Event) {
-				assert.Equal(t, 10, e.Params.Len())
+				assert.Equal(t, 9, e.Params.Len())
 				assert.Equal(t, uint64(0xffffd78d965e07c8), e.Params.GetUint64ByName(params.FileIrpPtr))
 				assert.Equal(t, uint64(0xffffd78d920b6650), e.Params.GetUint64ByName(params.FileObject))
 				assert.Equal(t, `\Device\HarddiskVolume3\WINDOWS\AppCompat\Programs\Amcache.hve`, e.Params.GetStringByName(params.FilePath))
 				assert.Equal(t, "NORMAL", e.GetParamAsString(params.FileAttributes))
 				assert.Equal(t, "SEQUENTIAL_ONLY|SYNCHRONOUS_IO_NONALERT|NO_COMPRESSION", e.GetParamAsString(params.FileCreateOptions))
 				assert.Equal(t, uint32(6536), e.Params.GetTid())
-				assert.Equal(t, "SUPERSEDE", e.GetParamAsString(params.FileOperation))
-				assert.Equal(t, "Success", e.GetParamAsString(params.NTStatus))
-				assert.Contains(t, e.Params, params.Callstack)
+				assert.Equal(t, "OPEN_IF", e.GetParamAsString(params.FileOperation))
 			},
 			event: &Event{Params: NewParams(CreateFile), Type: CreateFile},
 			buf: []byte{
@@ -194,26 +192,26 @@ func TestDecodeFile(t *testing.T) {
 				0, 0,
 			},
 		},
-		// {
-		// 	name: "FileOpEnd", opcode: FileOpEndID,
-		// 	assertions: func(t *testing.T, e *Event) {
-		// 		assert.Equal(t, 3, e.Params.Len())
-		// 		assert.Equal(t, uint64(0xffffd78d973df0f8), e.Params.GetUint64ByName(params.FileIrpPtr))
-		// 		assert.Equal(t, uint32(0), e.Params.GetUint32ByName(params.NTStatus))
-		// 		assert.Equal(t, uint64(0x28), e.Params.GetUint64ByName(params.FileExtraInfo))
-		// 	},
-		// 	event: &Event{Params: Params{}, Type: FileOpEnd},
-		// 	buf: []byte{
-		// 		248, 240, 61, 151, 141, 215, 255, 255,
-		// 		40, 0, 0, 0,
-		// 		0, 0, 0, 0,
-		// 		0, 0, 0, 0,
-		// 	},
-		// },
+		{
+			name: "FileOpEnd", opcode: FileOpEndID,
+			assertions: func(t *testing.T, e *Event) {
+				assert.Equal(t, 3, e.Params.Len())
+				assert.Equal(t, uint64(0xffffd78d973df0f8), e.Params.GetUint64ByName(params.FileIrpPtr))
+				assert.Equal(t, uint32(0), e.Params.GetUint32ByName(params.NTStatus))
+				assert.Equal(t, uint64(0x28), e.Params.GetUint64ByName(params.FileExtraInfo))
+			},
+			event: &Event{Params: NewParams(FileOpEnd), Type: FileOpEnd},
+			buf: []byte{
+				248, 240, 61, 151, 141, 215, 255, 255,
+				40, 0, 0, 0,
+				0, 0, 0, 0,
+				0, 0, 0, 0,
+			},
+		},
 		{
 			name: "MapViewOfSection", opcode: MapViewOfSectionID,
 			assertions: func(t *testing.T, e *Event) {
-				assert.Equal(t, 7, e.Params.Len())
+				assert.Equal(t, 8, e.Params.Len())
 				assert.Equal(t, uint64(0xffffb58b75fb7e10), e.Params.GetUint64ByName(params.FileKey))
 				assert.Equal(t, uint64(0), e.Params.GetUint64ByName(params.FileOffset))
 				assert.Equal(t, uint32(1716), e.Params.GetUint32ByName(params.ProcessID))
@@ -235,7 +233,7 @@ func TestDecodeFile(t *testing.T) {
 		{
 			name: "UnmapViewOfSection", opcode: UnmapViewOfSectionID,
 			assertions: func(t *testing.T, e *Event) {
-				assert.Equal(t, 7, e.Params.Len())
+				assert.Equal(t, 8, e.Params.Len())
 				assert.Equal(t, uint64(0xffffb58bc1f91010), e.Params.GetUint64ByName(params.FileKey))
 				assert.Equal(t, uint64(0), e.Params.GetUint64ByName(params.FileOffset))
 				assert.Equal(t, uint32(12448), e.Params.GetUint32ByName(params.ProcessID))
@@ -244,7 +242,7 @@ func TestDecodeFile(t *testing.T) {
 				assert.Equal(t, uint64(0x1675e410000), e.Params.GetUint64ByName(params.FileViewBase))
 				assert.Equal(t, uint64(921600), e.Params.GetUint64ByName(params.FileViewSize))
 			},
-			event: &Event{Params: Params{}, Type: UnmapViewOfSection},
+			event: &Event{Params: NewParams(UnmapViewOfSection), Type: UnmapViewOfSection},
 			buf: []byte{
 				0, 0, 65, 94, 103, 1, 0, 0,
 				16, 16, 249, 193, 139, 181, 255, 255,
@@ -254,169 +252,169 @@ func TestDecodeFile(t *testing.T) {
 				160, 48, 0, 0,
 			},
 		},
-		// {
-		// 	name: "SetFileInformation", opcode: SetFileInformationID,
-		// 	assertions: func(t *testing.T, e *Event) {
-		// 		assert.Equal(t, 6, e.Params.Len())
-		// 		assert.Equal(t, "Allocation", e.GetParamAsString(params.FileInfoClass))
-		// 		assert.Equal(t, uint64(524288), e.Params.GetUint64ByName(params.FileExtraInfo))
-		// 		assert.Equal(t, uint64(0xffffb58b80ccc180), e.Params.GetUint64ByName(params.FileKey))
-		// 		assert.Equal(t, uint64(0xffffd78d76403780), e.Params.GetUint64ByName(params.FileObject))
-		// 		assert.Equal(t, uint64(0xffffd78d9b6470f8), e.Params.GetUint64ByName(params.FileIrpPtr))
-		// 		assert.Equal(t, uint32(16404), e.Params.GetTid())
-		// 	},
-		// 	event: &Event{Params: Params{}, Type: SetFileInformation},
-		// 	buf: []byte{
-		// 		248, 112, 100, 155, 141, 215, 255, 255,
-		// 		128, 55, 64, 118, 141, 215, 255, 255,
-		// 		128, 193, 204, 128, 139, 181, 255, 255,
-		// 		0, 0, 8, 0, 0, 0, 0, 0,
-		// 		20, 64, 0, 0,
-		// 		19, 0, 0, 0,
-		// 	},
-		// },
-		// {
-		// 	name: "DeleteFile", opcode: DeleteFileID,
-		// 	assertions: func(t *testing.T, e *Event) {
-		// 		assert.Equal(t, 6, e.Params.Len())
-		// 		assert.Equal(t, "Disposition Extended", e.GetParamAsString(params.FileInfoClass))
-		// 		assert.Equal(t, uint64(1), e.Params.GetUint64ByName(params.FileExtraInfo))
-		// 		assert.Equal(t, uint64(0xffffb58bc5e64180), e.Params.GetUint64ByName(params.FileKey))
-		// 		assert.Equal(t, uint64(0xffffd78d9b6c7d80), e.Params.GetUint64ByName(params.FileObject))
-		// 		assert.Equal(t, uint64(0xffffd78d7c5860f8), e.Params.GetUint64ByName(params.FileIrpPtr))
-		// 		assert.Equal(t, uint32(13656), e.Params.GetTid())
-		// 	},
-		// 	event: &Event{Params: Params{}, Type: DeleteFile},
-		// 	buf: []byte{
-		// 		248, 96, 88, 124, 141, 215, 255, 255,
-		// 		128, 125, 108, 155, 141, 215, 255, 255,
-		// 		128, 65, 230, 197, 139, 181, 255, 255,
-		// 		1, 0, 0, 0, 0, 0, 0, 0,
-		// 		88, 53, 0, 0,
-		// 		64, 0, 0, 0,
-		// 	},
-		// },
-		// {
-		// 	name: "ReleaseFile", opcode: ReleaseFileID,
-		// 	assertions: func(t *testing.T, e *Event) {
-		// 		assert.Equal(t, 4, e.Params.Len())
-		// 		assert.Equal(t, uint64(0xffffb58b9268d180), e.Params.GetUint64ByName(params.FileKey))
-		// 		assert.Equal(t, uint64(0xffffd78d9b4552b0), e.Params.GetUint64ByName(params.FileObject))
-		// 		assert.Equal(t, uint64(0xffffd78d7ca0b0f8), e.Params.GetUint64ByName(params.FileIrpPtr))
-		// 		assert.Equal(t, uint32(3096), e.Params.GetTid())
-		// 	},
-		// 	event: &Event{Params: Params{}, Type: ReleaseFile},
-		// 	buf: []byte{
-		// 		248, 176, 160, 124, 141, 215, 255, 255,
-		// 		176, 82, 69, 155, 141, 215, 255, 255,
-		// 		128, 209, 104, 146, 139, 181, 255, 255,
-		// 		24, 12, 0, 0,
-		// 	},
-		// },
-		// {
-		// 	name: "WriteFile", opcode: WriteFileID,
-		// 	assertions: func(t *testing.T, e *Event) {
-		// 		assert.Equal(t, 6, e.Params.Len())
-		// 		assert.Equal(t, uint64(0xffffb58b74e78b10), e.Params.GetUint64ByName(params.FileKey))
-		// 		assert.Equal(t, uint64(0xffffd78d6970ae80), e.Params.GetUint64ByName(params.FileObject))
-		// 		assert.Equal(t, uint64(0xffffd78d9a786a08), e.Params.GetUint64ByName(params.FileIrpPtr))
-		// 		assert.Equal(t, uint32(392), e.Params.GetTid())
-		// 		assert.Equal(t, uint64(573440), e.Params.GetUint64ByName(params.FileOffset))
-		// 		assert.Equal(t, uint32(81920), e.Params.GetUint32ByName(params.FileIoSize))
-		// 	},
-		// 	event: &Event{Params: Params{}, Type: WriteFile},
-		// 	buf: []byte{
-		// 		0, 192, 8, 0, 0, 0, 0, 0,
-		// 		8, 106, 120, 154, 141, 215, 255, 255,
-		// 		128, 174, 112, 105, 141, 215, 255, 255,
-		// 		16, 139, 231, 116, 139, 181, 255, 255,
-		// 		136, 1, 0, 0,
-		// 		0, 64, 1, 0,
-		// 		1, 10, 6, 0,
-		// 		0, 0, 0, 0,
-		// 	},
-		// },
-		// {name: "EnumDirectory", opcode: EnumDirectoryID,
-		// 	assertions: func(t *testing.T, e *Event) {
-		// 		assert.Equal(t, 6, e.Params.Len())
-		// 		assert.Equal(t, uint64(0xffffde0dfb917590), e.Params.GetUint64ByName(params.FileKey))
-		// 		assert.Equal(t, uint64(0xffff8084cb43c990), e.Params.GetUint64ByName(params.FileObject))
-		// 		assert.Equal(t, `git"*`, e.Params.GetStringByName(params.FilePath))
-		// 		assert.Equal(t, uint64(0xffff8084da3e7788), e.Params.GetUint64ByName(params.FileIrpPtr))
-		// 		assert.Equal(t, uint32(12860), e.Params.GetTid())
-		// 	},
-		// 	event: &Event{Params: Params{}, Type: EnumDirectory},
-		// 	buf: []byte{
-		// 		136, 119, 62, 218, 132, 128, 255, 255,
-		// 		144, 201, 67, 203, 132, 128, 255, 255,
-		// 		144, 117, 145, 251, 13, 222, 255, 255,
-		// 		60, 50, 0, 0, 116, 2, 0, 0,
-		// 		79, 0, 0, 0, 0, 0, 0, 0,
-		// 		103, 0, 105, 0, 116, 0, 34, 0, 42, 0, 0, 0,
-		// 	},
-		// },
-		// {
-		// 	name: "FileRundown", opcode: FileRundownID,
-		// 	assertions: func(t *testing.T, e *Event) {
-		// 		assert.Equal(t, 2, e.Params.Len())
-		// 		assert.Equal(t, `\Device\HarddiskVolume3\Windows\System32\CatRoot\{F750E6C3-38EE-11D1-85E5-00C04FC295EE}\Microsoft-Windows-TerminalServices-AppServerClient-Opt-WOW64-Package~31bf3856ad364e35~wow64~~10.0.26100.8115.cat`, e.Params.GetStringByName(params.FilePath))
-		// 	},
-		// 	event: &Event{Params: Params{}, Type: FileRundown},
-		// 	buf: []byte{
-		// 		80, 71, 18, 158, 139, 181, 255, 255,
-		// 		92, 0, 68, 0, 101, 0, 118, 0,
-		// 		105, 0, 99, 0, 101, 0, 92, 0,
-		// 		72, 0, 97, 0, 114, 0, 100, 0,
-		// 		100, 0, 105, 0, 115, 0, 107, 0,
-		// 		86, 0, 111, 0, 108, 0, 117, 0,
-		// 		109, 0, 101, 0, 51, 0, 92, 0,
-		// 		87, 0, 105, 0, 110, 0, 100, 0,
-		// 		111, 0, 119, 0, 115, 0, 92, 0,
-		// 		83, 0, 121, 0, 115, 0, 116, 0,
-		// 		101, 0, 109, 0, 51, 0, 50, 0,
-		// 		92, 0, 67, 0, 97, 0, 116, 0,
-		// 		82, 0, 111, 0, 111, 0, 116, 0,
-		// 		92, 0,
-		// 		123, 0, 70, 0, 55, 0, 53, 0, 48, 0,
-		// 		69, 0, 54, 0, 67, 0, 51, 0, 45, 0,
-		// 		51, 0, 56, 0, 69, 0, 69, 0, 45, 0,
-		// 		49, 0, 49, 0, 68, 0, 49, 0, 45, 0,
-		// 		56, 0, 53, 0, 69, 0, 53, 0, 45, 0,
-		// 		48, 0, 48, 0, 67, 0, 48, 0, 52, 0,
-		// 		70, 0, 67, 0, 50, 0, 57, 0, 53, 0,
-		// 		69, 0, 69, 0, 125, 0,
-		// 		92, 0,
-		// 		77, 0, 105, 0, 99, 0, 114, 0, 111, 0,
-		// 		115, 0, 111, 0, 102, 0, 116, 0, 45, 0,
-		// 		87, 0, 105, 0, 110, 0, 100, 0, 111, 0,
-		// 		119, 0, 115, 0, 45, 0,
-		// 		84, 0, 101, 0, 114, 0, 109, 0, 105, 0,
-		// 		110, 0, 97, 0, 108, 0,
-		// 		83, 0, 101, 0, 114, 0, 118, 0, 105, 0,
-		// 		99, 0, 101, 0, 115, 0, 45, 0,
-		// 		65, 0, 112, 0, 112, 0, 83, 0, 101, 0,
-		// 		114, 0, 118, 0, 101, 0, 114, 0,
-		// 		67, 0, 108, 0, 105, 0, 101, 0, 110, 0,
-		// 		116, 0, 45, 0,
-		// 		79, 0, 112, 0, 116, 0, 45, 0,
-		// 		87, 0, 79, 0, 87, 0, 54, 0, 52, 0,
-		// 		45, 0,
-		// 		80, 0, 97, 0, 99, 0, 107, 0, 97, 0,
-		// 		103, 0, 101, 0,
-		// 		126, 0, 51, 0, 49, 0, 98, 0, 102, 0,
-		// 		51, 0, 56, 0, 53, 0, 54, 0, 97, 0,
-		// 		100, 0, 51, 0, 54, 0, 52, 0, 101, 0,
-		// 		51, 0, 53, 0, 126, 0,
-		// 		119, 0, 111, 0, 119, 0, 54, 0, 52, 0,
-		// 		126, 0, 126, 0,
-		// 		49, 0, 48, 0, 46, 0, 48, 0, 46, 0,
-		// 		50, 0, 54, 0, 49, 0, 48, 0, 48, 0,
-		// 		46, 0, 56, 0, 49, 0, 49, 0, 53, 0,
-		// 		46, 0,
-		// 		99, 0, 97, 0, 116, 0,
-		// 		0, 0,
-		// 	},
-		// },
+		{
+			name: "SetFileInformation", opcode: SetFileInformationID,
+			assertions: func(t *testing.T, e *Event) {
+				assert.Equal(t, 6, e.Params.Len())
+				assert.Equal(t, "Allocation", e.GetParamAsString(params.FileInfoClass))
+				assert.Equal(t, uint64(524288), e.Params.GetUint64ByName(params.FileExtraInfo))
+				assert.Equal(t, uint64(0xffffb58b80ccc180), e.Params.GetUint64ByName(params.FileKey))
+				assert.Equal(t, uint64(0xffffd78d76403780), e.Params.GetUint64ByName(params.FileObject))
+				assert.Equal(t, uint64(0xffffd78d9b6470f8), e.Params.GetUint64ByName(params.FileIrpPtr))
+				assert.Equal(t, uint32(16404), e.Params.GetTid())
+			},
+			event: &Event{Params: NewParams(SetFileInformation), Type: SetFileInformation},
+			buf: []byte{
+				248, 112, 100, 155, 141, 215, 255, 255,
+				128, 55, 64, 118, 141, 215, 255, 255,
+				128, 193, 204, 128, 139, 181, 255, 255,
+				0, 0, 8, 0, 0, 0, 0, 0,
+				20, 64, 0, 0,
+				19, 0, 0, 0,
+			},
+		},
+		{
+			name: "DeleteFile", opcode: DeleteFileID,
+			assertions: func(t *testing.T, e *Event) {
+				assert.Equal(t, 6, e.Params.Len())
+				assert.Equal(t, "Disposition Extended", e.GetParamAsString(params.FileInfoClass))
+				assert.Equal(t, uint64(1), e.Params.GetUint64ByName(params.FileExtraInfo))
+				assert.Equal(t, uint64(0xffffb58bc5e64180), e.Params.GetUint64ByName(params.FileKey))
+				assert.Equal(t, uint64(0xffffd78d9b6c7d80), e.Params.GetUint64ByName(params.FileObject))
+				assert.Equal(t, uint64(0xffffd78d7c5860f8), e.Params.GetUint64ByName(params.FileIrpPtr))
+				assert.Equal(t, uint32(13656), e.Params.GetTid())
+			},
+			event: &Event{Params: NewParams(DeleteFile), Type: DeleteFile},
+			buf: []byte{
+				248, 96, 88, 124, 141, 215, 255, 255,
+				128, 125, 108, 155, 141, 215, 255, 255,
+				128, 65, 230, 197, 139, 181, 255, 255,
+				1, 0, 0, 0, 0, 0, 0, 0,
+				88, 53, 0, 0,
+				64, 0, 0, 0,
+			},
+		},
+		{
+			name: "ReleaseFile", opcode: ReleaseFileID,
+			assertions: func(t *testing.T, e *Event) {
+				assert.Equal(t, 4, e.Params.Len())
+				assert.Equal(t, uint64(0xffffb58b9268d180), e.Params.GetUint64ByName(params.FileKey))
+				assert.Equal(t, uint64(0xffffd78d9b4552b0), e.Params.GetUint64ByName(params.FileObject))
+				assert.Equal(t, uint64(0xffffd78d7ca0b0f8), e.Params.GetUint64ByName(params.FileIrpPtr))
+				assert.Equal(t, uint32(3096), e.Params.GetTid())
+			},
+			event: &Event{Params: NewParams(ReleaseFile), Type: ReleaseFile},
+			buf: []byte{
+				248, 176, 160, 124, 141, 215, 255, 255,
+				176, 82, 69, 155, 141, 215, 255, 255,
+				128, 209, 104, 146, 139, 181, 255, 255,
+				24, 12, 0, 0,
+			},
+		},
+		{
+			name: "WriteFile", opcode: WriteFileID,
+			assertions: func(t *testing.T, e *Event) {
+				assert.Equal(t, 6, e.Params.Len())
+				assert.Equal(t, uint64(0xffffb58b74e78b10), e.Params.GetUint64ByName(params.FileKey))
+				assert.Equal(t, uint64(0xffffd78d6970ae80), e.Params.GetUint64ByName(params.FileObject))
+				assert.Equal(t, uint64(0xffffd78d9a786a08), e.Params.GetUint64ByName(params.FileIrpPtr))
+				assert.Equal(t, uint32(392), e.Params.GetTid())
+				assert.Equal(t, uint64(573440), e.Params.GetUint64ByName(params.FileOffset))
+				assert.Equal(t, uint32(81920), e.Params.GetUint32ByName(params.FileIoSize))
+			},
+			event: &Event{Params: NewParams(WriteFile), Type: WriteFile},
+			buf: []byte{
+				0, 192, 8, 0, 0, 0, 0, 0,
+				8, 106, 120, 154, 141, 215, 255, 255,
+				128, 174, 112, 105, 141, 215, 255, 255,
+				16, 139, 231, 116, 139, 181, 255, 255,
+				136, 1, 0, 0,
+				0, 64, 1, 0,
+				1, 10, 6, 0,
+				0, 0, 0, 0,
+			},
+		},
+		{name: "EnumDirectory", opcode: EnumDirectoryID,
+			assertions: func(t *testing.T, e *Event) {
+				assert.Equal(t, 6, e.Params.Len())
+				assert.Equal(t, uint64(0xffffde0dfb917590), e.Params.GetUint64ByName(params.FileKey))
+				assert.Equal(t, uint64(0xffff8084cb43c990), e.Params.GetUint64ByName(params.FileObject))
+				assert.Equal(t, `git"*`, e.Params.GetStringByName(params.FileName))
+				assert.Equal(t, uint64(0xffff8084da3e7788), e.Params.GetUint64ByName(params.FileIrpPtr))
+				assert.Equal(t, uint32(12860), e.Params.GetTid())
+			},
+			event: &Event{Params: NewParams(EnumDirectory), Type: EnumDirectory},
+			buf: []byte{
+				136, 119, 62, 218, 132, 128, 255, 255,
+				144, 201, 67, 203, 132, 128, 255, 255,
+				144, 117, 145, 251, 13, 222, 255, 255,
+				60, 50, 0, 0, 116, 2, 0, 0,
+				79, 0, 0, 0, 0, 0, 0, 0,
+				103, 0, 105, 0, 116, 0, 34, 0, 42, 0, 0, 0,
+			},
+		},
+		{
+			name: "FileRundown", opcode: FileRundownID,
+			assertions: func(t *testing.T, e *Event) {
+				assert.Equal(t, 2, e.Params.Len())
+				assert.Equal(t, `\Device\HarddiskVolume3\Windows\System32\CatRoot\{F750E6C3-38EE-11D1-85E5-00C04FC295EE}\Microsoft-Windows-TerminalServices-AppServerClient-Opt-WOW64-Package~31bf3856ad364e35~wow64~~10.0.26100.8115.cat`, e.Params.GetStringByName(params.FilePath))
+			},
+			event: &Event{Params: NewParams(FileRundown), Type: FileRundown},
+			buf: []byte{
+				80, 71, 18, 158, 139, 181, 255, 255,
+				92, 0, 68, 0, 101, 0, 118, 0,
+				105, 0, 99, 0, 101, 0, 92, 0,
+				72, 0, 97, 0, 114, 0, 100, 0,
+				100, 0, 105, 0, 115, 0, 107, 0,
+				86, 0, 111, 0, 108, 0, 117, 0,
+				109, 0, 101, 0, 51, 0, 92, 0,
+				87, 0, 105, 0, 110, 0, 100, 0,
+				111, 0, 119, 0, 115, 0, 92, 0,
+				83, 0, 121, 0, 115, 0, 116, 0,
+				101, 0, 109, 0, 51, 0, 50, 0,
+				92, 0, 67, 0, 97, 0, 116, 0,
+				82, 0, 111, 0, 111, 0, 116, 0,
+				92, 0,
+				123, 0, 70, 0, 55, 0, 53, 0, 48, 0,
+				69, 0, 54, 0, 67, 0, 51, 0, 45, 0,
+				51, 0, 56, 0, 69, 0, 69, 0, 45, 0,
+				49, 0, 49, 0, 68, 0, 49, 0, 45, 0,
+				56, 0, 53, 0, 69, 0, 53, 0, 45, 0,
+				48, 0, 48, 0, 67, 0, 48, 0, 52, 0,
+				70, 0, 67, 0, 50, 0, 57, 0, 53, 0,
+				69, 0, 69, 0, 125, 0,
+				92, 0,
+				77, 0, 105, 0, 99, 0, 114, 0, 111, 0,
+				115, 0, 111, 0, 102, 0, 116, 0, 45, 0,
+				87, 0, 105, 0, 110, 0, 100, 0, 111, 0,
+				119, 0, 115, 0, 45, 0,
+				84, 0, 101, 0, 114, 0, 109, 0, 105, 0,
+				110, 0, 97, 0, 108, 0,
+				83, 0, 101, 0, 114, 0, 118, 0, 105, 0,
+				99, 0, 101, 0, 115, 0, 45, 0,
+				65, 0, 112, 0, 112, 0, 83, 0, 101, 0,
+				114, 0, 118, 0, 101, 0, 114, 0,
+				67, 0, 108, 0, 105, 0, 101, 0, 110, 0,
+				116, 0, 45, 0,
+				79, 0, 112, 0, 116, 0, 45, 0,
+				87, 0, 79, 0, 87, 0, 54, 0, 52, 0,
+				45, 0,
+				80, 0, 97, 0, 99, 0, 107, 0, 97, 0,
+				103, 0, 101, 0,
+				126, 0, 51, 0, 49, 0, 98, 0, 102, 0,
+				51, 0, 56, 0, 53, 0, 54, 0, 97, 0,
+				100, 0, 51, 0, 54, 0, 52, 0, 101, 0,
+				51, 0, 53, 0, 126, 0,
+				119, 0, 111, 0, 119, 0, 54, 0, 52, 0,
+				126, 0, 126, 0,
+				49, 0, 48, 0, 46, 0, 48, 0, 46, 0,
+				50, 0, 54, 0, 49, 0, 48, 0, 48, 0,
+				46, 0, 56, 0, 49, 0, 49, 0, 53, 0,
+				46, 0,
+				99, 0, 97, 0, 116, 0,
+				0, 0,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -625,7 +623,7 @@ func TestDecodeModuleInternal(t *testing.T) {
 	e := &Event{Type: LoadModuleInternal, Params: NewParams(LoadModuleInternal)}
 	require.NoError(t, DecodeParams(r, e))
 
-	assert.Equal(t, 6, e.Params.Len())
+	assert.Equal(t, 7, e.Params.Len())
 	assert.Equal(t, uint64(0x7ffcfc960000), e.Params.GetUint64ByName(params.ModuleBase))
 	assert.Equal(t, uint32(556519), e.Params.GetUint32ByName(params.ModuleCheckSum))
 	assert.Equal(t, uint64(0x7ffcfc960000), e.Params.GetUint64ByName(params.ModuleDefaultBase))
@@ -849,7 +847,7 @@ func TestDecodeNetwork(t *testing.T) {
 		assertions func(t *testing.T, e *Event)
 	}{
 		{
-			name: "SendTCPv4", opcode: SendV4ID,
+			name: "Send", opcode: SendV4ID,
 			assertions: func(t *testing.T, e *Event) {
 				assert.Equal(t, 7, e.Params.Len())
 				assert.Equal(t, "172.64.148.235", e.GetParamAsString(params.NetDIP))
@@ -874,7 +872,7 @@ func TestDecodeNetwork(t *testing.T) {
 			providerID: NetworkTCPEventGUID,
 		},
 		{
-			name: "ConnectTCPv4", opcode: ConnectTCPv4ID,
+			name: "Connect", opcode: ConnectTCPv4ID,
 			assertions: func(t *testing.T, e *Event) {
 				assert.Equal(t, 7, e.Params.Len())
 				assert.Equal(t, "151.101.193.91", e.GetParamAsString(params.NetDIP))
@@ -900,7 +898,7 @@ func TestDecodeNetwork(t *testing.T) {
 			providerID: NetworkTCPEventGUID,
 		},
 		{
-			name: "RecvUDPv6", opcode: RecvV6ID,
+			name: "Recv", opcode: RecvV6ID,
 			assertions: func(t *testing.T, e *Event) {
 				assert.Equal(t, 7, e.Params.Len())
 				assert.Equal(t, "ff02::c", e.GetParamAsString(params.NetDIP))
@@ -932,7 +930,9 @@ func TestDecodeNetwork(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := initEventRecord(tt.opcode, 0, tt.buf, withProviderID(tt.providerID))
-			e := &Event{Params: Params{}}
+			typ, ok := ParseType(tt.name)
+			require.True(t, ok)
+			e := &Event{Type: typ, Params: NewParams(typ)}
 			require.NoError(t, DecodeParams(r, e))
 			tt.assertions(t, e)
 		})

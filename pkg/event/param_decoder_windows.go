@@ -299,11 +299,7 @@ func (d *ParamDecoder) Decode(r *etw.EventRecord, e *Event) error {
 		case params.WireU16:
 			e.Params.Set(i, params.U32(uint32(d.cur.U16())))
 		case params.WireU32:
-			n := d.cur.U32()
-			if p.BitField != nil {
-				n = p.BitField.Extract(n)
-			}
-			e.Params.Set(i, params.U32(n))
+			e.Params.Set(i, params.U32(d.cur.U32()))
 		case params.WireU64:
 			e.Params.Set(i, params.U64(d.cur.U64()))
 		case params.WireU32Bool:
@@ -350,12 +346,19 @@ func (d *ParamDecoder) Decode(r *etw.EventRecord, e *Event) error {
 			e.Params.Set(i, params.Timestamp(filetime.ToEpoch(uint64(ft.Nanoseconds()))))
 		case params.WireAddrs:
 			e.Params.Set(i, params.Addresses(d.cur.Addresses(va.GetCallstack())))
+		case params.WireU32Bits:
+			v := d.cur.U32()
+			e.Params.Set(i, params.U32(v))
+			l := e.Params.Len()
+			for j, derive := range p.Derives {
+				e.Params.Set(l+j, params.U32(derive.ExtractU32(v)))
+			}
 		case params.WireU64Bits:
 			v := d.cur.U64()
-			i := e.Params.Len()
-			for j := range p.Derives {
-				f := &p.Derives[j]
-				e.Params.Set(i+j, params.U32(f.Extract(uint32(v))))
+			e.Params.Set(i, params.U64(v))
+			l := e.Params.Len()
+			for j, derive := range p.Derives {
+				e.Params.Set(l+j, params.U32(derive.ExtractU64(v)))
 			}
 		}
 		if d.cur.Err() != nil {

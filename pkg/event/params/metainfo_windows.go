@@ -58,6 +58,7 @@ const (
 	WirePort
 	WireFileTime
 	WireAddrs   // call stack return addresses
+	WireU32Bits // one uint32 that encodes several parameters
 	WireU64Bits // one uint64 that encodes several parameters
 )
 
@@ -70,38 +71,46 @@ const (
 	ShiftLeft
 )
 
+type Unsigned interface {
+	~uint32 | ~uint64
+}
+
 type BitField struct {
 	Shift uint8
 	Dir   ShiftDir
-	Mask  uint32
+	Mask  uint64
 }
 
-type DerivedBitFieldParamInfo struct {
-	ParamInfo
-	BitField
-}
-
-// Extract applies the field to a raw value.
+// extract applies the bit field to a raw value of any unsigned width.
 // Right shift: shift, then mask (pull a field out of the high bits).
 // Left shift:  mask, then shift (so bits aren't lost before masking).
-func (b *BitField) Extract(n uint32) uint32 {
+func extract[T, V Unsigned](b *BitField, n T) V {
+	mask := T(b.Mask) // truncates to the width of T
 	switch b.Dir {
 	case ShiftRight:
 		n >>= b.Shift
-		if b.Mask != 0 {
-			n &= b.Mask
+		if mask != 0 {
+			n &= mask
 		}
 	case ShiftLeft:
-		if b.Mask != 0 {
-			n &= b.Mask
+		if mask != 0 {
+			n &= mask
 		}
 		n <<= b.Shift
 	default:
-		if b.Mask != 0 {
-			n &= b.Mask
+		if mask != 0 {
+			n &= mask
 		}
 	}
-	return n
+	return V(n)
+}
+
+func (b *BitField) ExtractU32(n uint32) uint32 {
+	return extract[uint32, uint32](b, n)
+}
+
+func (b *BitField) ExtractU64(n uint64) uint32 {
+	return extract[uint64, uint32](b, n)
 }
 
 type ParamInfo struct {
@@ -127,12 +136,11 @@ type ParamInfo struct {
 	// Sanitize apply sanitization/transformation on the input string.
 	Sanitize func(s string) Value
 
-	// BitField describes the bit layout for packed parameter types. The
-	// shift and mask extract the value by applying bitwise operations.
-	BitField *BitField
-
-	// Derives are extra params sliced out of the same encoded value
-	Derives []DerivedBitFieldParamInfo
+	// Derives are extra params sliced out of the same encoded value. Their
+	// parameter info descriptors must be declared next to the value from
+	// whose they're derived. BitField describes the bit layout for packed
+	// parameter types.
+	Derives []*BitField
 }
 
 // Parameter schemas. The parameters are declared in the order in which they are decoded from the
@@ -382,7 +390,7 @@ var LoadModuleDescriptor = []ParamInfo{
 	{Name: ModuleTimeDateStamp, Type: Uint32, WireFormat: WireU32},
 	{Name: ModuleSignatureLevel, Type: Enum, WireFormat: WireU8, Enum: signature.Levels},
 	{Name: ModuleSignatureType, Type: Enum, WireFormat: WireU8, Enum: signature.Types},
-	{WireFormat: WireSkip, Size: 1},
+	{WireFormat: WireSkip, Size: 2},
 	{Name: ModuleDefaultBase, Type: Address, WireFormat: WireU64},
 	{WireFormat: WireSkip, Size: 4},
 	{WireFormat: WireSkip, Size: 4},
@@ -405,7 +413,7 @@ var UnloadModuleDescriptor = []ParamInfo{
 	{Name: ModuleTimeDateStamp, Type: Uint32, WireFormat: WireU32},
 	{Name: ModuleSignatureLevel, Type: Enum, WireFormat: WireU8, Enum: signature.Levels},
 	{Name: ModuleSignatureType, Type: Enum, WireFormat: WireU8, Enum: signature.Types},
-	{WireFormat: WireSkip, Size: 1},
+	{WireFormat: WireSkip, Size: 2},
 	{Name: ModuleDefaultBase, Type: Address, WireFormat: WireU64},
 	{WireFormat: WireSkip, Size: 4},
 	{WireFormat: WireSkip, Size: 4},
@@ -514,23 +522,37 @@ var RegSetValueInternalDescriptor = []ParamInfo{
 		case registry.QWORD:
 			return U64(key.Uint(b, binary.LittleEndian))
 		default:
-			// BINARY, NONE, RESOURCE_*, and any undefined/custom type
+			// BINARY, NONE, RESOURCE_*, and any undefined type
 			return Bin(b)
 		}
 	}, Selector: RegValueType, Into: RegData},
 }
 
 // CreateFileDescriptor is the parameters schema for CreateFile events.
+//
+//	typedef struct _PERFINFO_FILE_CREATE {
+//		    LONG_PTR Irp;
+//		    ULONG_PTR FileObject;
+//		    ULONG IssuingThreadId;
+//		    ULONG Options;
+//		    ULONG Attributes;
+//		    ULONG ShareAccess;
+//		    WCHAR OpenPath[1];
+//		} PERFINFO_FILE_CREATE, *PPERFINFO_FILE_CREATE;
 var CreateFileDescriptor = []ParamInfo{
 	{Name: FileIrpPtr, Type: Address, WireFormat: WireU64},
 	{Name: FileObject, Type: Address, WireFormat: WireU64},
 	{Name: ThreadID, Type: TID, WireFormat: WireU32},
-	{Name: FileCreateOptions, Type: Flags32, WireFormat: WireU32, Flags: FileCreateOptionsFlags, BitField: &BitField{Mask: 0xFFFFFF}},
+	{Name: FileOptions, Type: Uint32, WireFormat: WireU32Bits, Derives: []*BitField{
+		{Mask: 0xFF, Shift: 24, Dir: ShiftRight}, // disposition
+		{Mask: 0xFFFFFF},                         // create options
+	}},
+	{Name: FileOperation, Type: Enum, Enum: fs.FileCreateDispositions},
+	{Name: FileCreateOptions, Type: Flags32, Flags: FileCreateOptionsFlags},
 	{Name: FileAttributes, Type: Flags32, WireFormat: WireU32, Flags: FileAttributeFlags},
 	{Name: FileShareMask, Type: Flags32, WireFormat: WireU32, Flags: FileShareModeFlags},
 	{Name: FilePath, Type: DOSPath, WireFormat: WireUTF16Trailer},
 	{Name: NTStatus, Type: Status},
-	{Name: FileOperation, Type: Enum, Enum: fs.FileCreateDispositions},
 	{Name: FileType, Type: Enum, Enum: fs.FileTypes},
 	{Name: Callstack, Type: Slice},
 }
@@ -642,7 +664,7 @@ var EnumDirectoryDescriptor = []ParamInfo{
 
 var FileRundownDescriptor = []ParamInfo{
 	{Name: FileObject, Type: Address, WireFormat: WireU64},
-	{Name: FileName, Type: String, WireFormat: WireUTF16Trailer},
+	{Name: FilePath, Type: DOSPath, WireFormat: WireUTF16Trailer},
 }
 
 //	typedef struct _PERFINFO_FILE_OPERATION_END {
@@ -715,10 +737,12 @@ var ReplyDNSDescriptor = []ParamInfo{
 var MapViewOfSectionDescriptor = []ParamInfo{
 	{Name: FileViewBase, Type: Address, WireFormat: WireU64},
 	{Name: FileKey, Type: Address, WireFormat: WireU64},
-	{Name: FileExtraInfo, Type: Uint64, WireFormat: WireU64Bits, Derives: []DerivedBitFieldParamInfo{
-		{BaseParamInfo: BaseParamInfo{Name: MemProtect, Type: Flags32, Flags: ViewProtectionFlags}, BitField: BitField{Shift: 32, Dir: ShiftLeft}},
-		{BaseParamInfo: BaseParamInfo{Name: FileViewSectionType, Type: Enum, Enum: ViewSectionTypes}, BitField: BitField{Shift: 52, Dir: ShiftLeft}},
+	{Name: FileExtraInfo, Type: Uint64, WireFormat: WireU64Bits, Derives: []*BitField{
+		{Shift: 32, Dir: ShiftRight}, // view section protection
+		{Shift: 52, Dir: ShiftRight}, // view section type
 	}},
+	{Name: MemProtect, Type: Flags32, Flags: ViewProtectionFlags},
+	{Name: FileViewSectionType, Type: Enum, Enum: ViewSectionTypes},
 	{Name: FileViewSize, Type: Uint64, WireFormat: WireU64},
 	{Name: FileOffset, Type: Uint64, WireFormat: WireU64},
 	{Name: ProcessID, Type: PID, WireFormat: WireU32},
