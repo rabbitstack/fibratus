@@ -137,9 +137,6 @@ func (r *registryProcessor) processEvent(e *event.Event) (*event.Event, error) {
 		// key handles contain the partial key name. In this case we assume
 		// the correct key is encountered.
 		path := e.Params.GetStringByName(params.RegPath)
-		if e.IsRegSetValue() {
-			e.SetParam(params.RegValue, params.Str(path))
-		}
 		if kcb != 0 {
 			if baseKey, ok := r.keys[kcb]; ok {
 				path = baseKey + `\` + path
@@ -147,7 +144,12 @@ func (r *registryProcessor) processEvent(e *event.Event) (*event.Event, error) {
 				kcbMissCount.Add(1)
 				path = r.findMatchingKey(e.PID, path)
 			}
-			e.SetParam(params.RegPath, params.Str(path))
+			if e.IsRegSetValue() {
+				path = filepath.Join(path, e.GetParamAsString(params.RegValue))
+				e.SetParam(params.RegPath, params.Str(path))
+			} else {
+				e.SetParam(params.RegPath, params.Str(path))
+			}
 		}
 
 		if e.IsRegSetValue() {

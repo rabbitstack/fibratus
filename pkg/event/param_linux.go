@@ -58,14 +58,14 @@ func (p Param) String() string {
 			return ""
 		}
 		return enum[v.Uint32()]
-	case params.Flags, params.Flags64:
+	case params.Flags32, params.Flags64:
 		flags := p.Flags()
 		if flags == nil || v.Kind() != params.KindUint {
 			return ""
 		}
 		return flags.String(v.Uint64())
 	default:
-		return formatValue(v)
+		return v.String()
 	}
 }
 
@@ -86,7 +86,7 @@ func (p Param) CaptureType() params.Type {
 func (pars *Params) setFromCapture(name string, typ params.Type, v params.Value) {
 	i := pars.Index(name)
 	if i < 0 {
-		*pars = append(*pars, Param{Value: v, info: &ParamInfo{Name: name, Type: typ}})
+		*pars = append(*pars, Param{Value: v, info: &params.ParamInfo{Name: name, Type: typ}})
 		return
 	}
 	(*pars)[i].Value = v
