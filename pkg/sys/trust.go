@@ -447,16 +447,21 @@ var (
 	pkcs7ParseMu sync.Mutex
 )
 
-// parsePKCS7 parses the DER/BER encoded PKCS#7 package. It is a goroutine-safe
-// wrapper around pkcs7.Parse. Always use it instead of calling pkcs7.Parse
-// directly.
-func parsePKCS7(data []byte) (*pkcs7.PKCS7, error) {
+// ParsePKCS7 parses the DER/BER encoded PKCS#7 package. It is the single
+// goroutine-safe wrapper around pkcs7.Parse for the whole process: the archived
+// go.mozilla.org/pkcs7 is not concurrency-safe, so every caller must go through
+// this mutex rather than keeping a lock of its own next to a direct call.
+//
+// A panic is reported as an error. Returning the zero values instead would hand
+// the caller a nil *PKCS7 with a nil error, and the next field access on it
+// would fault somewhere unrelated to the real cause.
+func ParsePKCS7(data []byte) (p7 *pkcs7.PKCS7, err error) {
 	pkcs7ParseMu.Lock()
 	defer pkcs7ParseMu.Unlock()
 
 	defer func() {
 		if r := recover(); r != nil {
-			log.Warnf("panic in PKCS7 parsing: %v", r)
+			p7, err = nil, fmt.Errorf("panic in PKCS#7 parsing: %v", r)
 		}
 	}()
 
@@ -487,7 +492,7 @@ func parseCatalogCert(path string) (*Cert, error) {
 	if err != nil {
 		return nil, err
 	}
-	pkcs, err := parsePKCS7(crt)
+	pkcs, err := ParsePKCS7(crt)
 	if err != nil {
 		return nil, err
 	}

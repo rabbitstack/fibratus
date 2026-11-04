@@ -27,11 +27,8 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"sync"
 
 	"github.com/rabbitstack/fibratus/pkg/sys"
-	"github.com/secDre4mer/pkcs7"
-	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -56,25 +53,6 @@ const (
 	dataDirEntrySize       = 8
 	dataDirSecurity        = 4 // IMAGE_DIRECTORY_ENTRY_SECURITY
 )
-
-// pkcs7ParseMu serializes every call into pkcs7.Parse in the process.
-var pkcs7ParseMu sync.Mutex
-
-// ParsePKCS7 parses the DER/BER encoded PKCS#7 package. It is a goroutine-safe
-// wrapper around pkcs7.Parse. Always use it instead of calling pkcs7.Parse
-// directly.
-func parsePKCS7(data []byte) (*pkcs7.PKCS7, error) {
-	pkcs7ParseMu.Lock()
-	defer pkcs7ParseMu.Unlock()
-
-	defer func() {
-		if r := recover(); r != nil {
-			log.Warnf("panic in PKCS7 parsing: %v", r)
-		}
-	}()
-
-	return pkcs7.Parse(data)
-}
 
 // errNotPE is wrapped by the errors returned for files that aren't PE images.
 var errNotPE = errors.New("not a PE image")
@@ -247,8 +225,9 @@ func readSignerCert(r io.ReaderAt, off, size int64) (*sys.Cert, error) {
 		return nil, fmt.Errorf("read certificate blob: %w", err)
 	}
 
-	// pkcs7.Parse isn't goroutine-safe, so it must go through the shared wrapper
-	p7, err := parsePKCS7(blob)
+	// pkcs7.Parse isn't goroutine-safe, so it must go through the one wrapper
+	// in pkg/sys that serialises every caller against the same mutex.
+	p7, err := sys.ParsePKCS7(blob)
 	if err != nil {
 		return nil, fmt.Errorf("parse PKCS#7 signature: %w", err)
 	}
