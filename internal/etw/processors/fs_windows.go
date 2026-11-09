@@ -92,32 +92,29 @@ func (f *fsProcessor) processEvent(e *event.Event) (*event.Event, error) {
 		// in internal state in order to augment the rest of file events
 		// that lack the file path field
 		filepath := e.GetParamAsString(params.FilePath)
-		fileObject, err := e.Params.GetUint64(params.FileObject)
-		if err != nil {
-			return nil, err
-		}
+		fileObject := e.Params.GetUint64ByName(params.FileObject)
 		if _, ok := f.files[fileObject]; !ok {
 			totalRundownFiles.Add(1)
 			f.files[fileObject] = &FileInfo{Name: filepath, Type: fs.GetFileType(filepath, 0)}
 		}
 	case event.MapViewOfSection:
-		fileKey := e.Params.MustGetUint64(params.FileKey)
+		fileKey := e.Params.GetUint64ByName(params.FileKey)
 		fileinfo := f.files[fileKey]
 
 		if fileinfo != nil {
 			totalMapRundownFiles.Add(1)
-			e.AppendParam(params.FilePath, params.Path, fileinfo.Name)
+			e.SetParam(params.FilePath, params.Str(fileinfo.Name))
 		}
 
 		return e, f.psnap.AddMmap(e)
 	case event.CreateFile:
-		fileObject := e.Params.MustGetUint64(params.FileObject)
+		fileObject := e.Params.GetUint64ByName(params.FileObject)
 
 		// try to get extended file info. If the file object is already
 		// present in the map, we'll reuse the existing file information
 		fileinfo, ok := f.files[fileObject]
 		if !ok {
-			opts := e.Params.MustGetUint32(params.FileCreateOptions)
+			opts := e.Params.GetUint32ByName(params.FileCreateOptions)
 			opts &= 0xFFFFFF
 			filepath := e.GetParamAsString(params.FilePath)
 			fileinfo = f.getFileInfo(filepath, opts)
@@ -125,7 +122,7 @@ func (f *fsProcessor) processEvent(e *event.Event) (*event.Event, error) {
 		}
 
 		if fileinfo.Type != fs.Unknown {
-			e.AppendEnum(params.FileType, uint32(fileinfo.Type), fs.FileTypes)
+			e.SetParam(params.FileType, params.U32(uint32(fileinfo.Type)))
 		}
 
 		// invalidate signature cache / file metadata
@@ -142,15 +139,15 @@ func (f *fsProcessor) processEvent(e *event.Event) (*event.Event, error) {
 	case event.ReleaseFile:
 		fileReleaseCount.Add(1)
 		// delete file metadata by file object address
-		fileObject := e.Params.MustGetUint64(params.FileObject)
+		fileObject := e.Params.GetUint64ByName(params.FileObject)
 		delete(f.files, fileObject)
 	case event.UnmapViewOfSection:
 		ok, proc := f.psnap.Find(e.PID)
-		addr := e.Params.TryGetAddress(params.FileViewBase)
+		addr := e.Params.GetAddressByName(params.FileViewBase)
 		if ok {
 			mmap := proc.FindMmap(addr)
 			if mmap != nil {
-				e.AppendParam(params.FilePath, params.Path, mmap.File)
+				e.SetParam(params.FilePath, params.Str(mmap.File))
 			}
 		}
 
@@ -161,10 +158,10 @@ func (f *fsProcessor) processEvent(e *event.Event) (*event.Event, error) {
 		return e, nil
 	default:
 		var fileObject uint64
-		fileKey := e.Params.MustGetUint64(params.FileKey)
+		fileKey := e.Params.GetUint64ByName(params.FileKey)
 
 		if !e.IsMapViewOfSection() {
-			fileObject = e.Params.MustGetUint64(params.FileObject)
+			fileObject = e.Params.GetUint64ByName(params.FileObject)
 		}
 
 		// attempt to get the file by file key. If there is no such file referenced
@@ -192,16 +189,16 @@ func (f *fsProcessor) processEvent(e *event.Event) (*event.Event, error) {
 		}
 		if e.IsEnumDirectory() {
 			if fileinfo != nil {
-				e.AppendParam(params.FileDirectory, params.Path, fileinfo.Name)
+				e.SetParam(params.FileDirectory, params.Str(fileinfo.Name))
 			}
 			return e, nil
 		}
 
 		if fileinfo != nil {
 			if fileinfo.Type != fs.Unknown {
-				e.AppendEnum(params.FileType, uint32(fileinfo.Type), fs.FileTypes)
+				e.SetParam(params.FileType, params.U32(uint32(fileinfo.Type)))
 			}
-			e.AppendParam(params.FilePath, params.Path, fileinfo.Name)
+			e.SetParam(params.FilePath, params.Str(fileinfo.Name))
 		}
 
 		if e.IsMapViewOfSection() {

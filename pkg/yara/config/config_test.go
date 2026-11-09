@@ -115,7 +115,9 @@ func TestAlertTitle(t *testing.T) {
 		},
 		{
 			&event.Event{Type: event.CreateFile,
-				Params: event.Params{params.FilePath: {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\System32\\wusa.exe"}},
+				Params: event.ParamsOf(
+					event.NewParam(params.FilePath, params.String, params.Str("C:\\Windows\\System32\\wusa.exe")),
+				),
 			},
 			FileThreatAlertTitle,
 		},

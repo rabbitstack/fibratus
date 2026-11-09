@@ -48,10 +48,10 @@ func TestRegistryProcessor(t *testing.T) {
 			"process KCB rundown",
 			&event.Event{
 				Type: event.RegKCBRundown,
-				Params: event.Params{
-					params.RegPath: {Name: params.RegPath, Type: params.UnicodeString, Value: `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\bthserv\Parameters`},
-					params.RegKCB:  {Name: params.RegKCB, Type: params.Uint64, Value: uint64(18446666033549154696)},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.RegPath, params.String, params.Str(`\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\bthserv\Parameters`)),
+					event.NewParam(params.RegKCB, params.Uint64, params.U64(uint64(18446666033549154696))),
+				),
 			},
 			nil,
 			func() *handle.SnapshotterMock {
@@ -68,10 +68,10 @@ func TestRegistryProcessor(t *testing.T) {
 			"process delete KCB",
 			&event.Event{
 				Type: event.RegDeleteKCB,
-				Params: event.Params{
-					params.RegPath: {Name: params.RegPath, Type: params.UnicodeString, Value: `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\bthserv\Parameters`},
-					params.RegKCB:  {Name: params.RegKCB, Type: params.Uint64, Value: uint64(18446666033549154696)},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.RegPath, params.String, params.Str(`\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\bthserv\Parameters`)),
+					event.NewParam(params.RegKCB, params.Uint64, params.U64(uint64(18446666033549154696))),
+				),
 			},
 			func(p Processor) {
 				p.(*registryProcessor).keys[18446666033549154696] = `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\bthserv\Parameters`
@@ -89,10 +89,10 @@ func TestRegistryProcessor(t *testing.T) {
 			"full key name",
 			&event.Event{
 				Type: event.RegOpenKey,
-				Params: event.Params{
-					params.RegPath: {Name: params.RegPath, Type: params.Key, Value: `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\bthserv\Parameters`},
-					params.RegKCB:  {Name: params.RegKCB, Type: params.Uint64, Value: uint64(0)},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.RegPath, params.Key, params.Str(`\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\bthserv\Parameters`)),
+					event.NewParam(params.RegKCB, params.Uint64, params.U64(uint64(0))),
+				),
 			},
 			nil,
 			func() *handle.SnapshotterMock {
@@ -107,10 +107,10 @@ func TestRegistryProcessor(t *testing.T) {
 			"incomplete key name",
 			&event.Event{
 				Type: event.RegOpenKey,
-				Params: event.Params{
-					params.RegPath: {Name: params.RegPath, Type: params.Key, Value: `Pid`},
-					params.RegKCB:  {Name: params.RegKCB, Type: params.Uint64, Value: uint64(18446666033549154696)},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.RegPath, params.Key, params.Str(`Pid`)),
+					event.NewParam(params.RegKCB, params.Uint64, params.U64(uint64(18446666033549154696))),
+				),
 			},
 			func(p Processor) {
 				p.(*registryProcessor).keys[18446666033549154696] = `\REGISTRY\MACHINE\SYSTEM\Setup`
@@ -128,10 +128,10 @@ func TestRegistryProcessor(t *testing.T) {
 			&event.Event{
 				Type: event.RegOpenKey,
 				PID:  23234,
-				Params: event.Params{
-					params.RegPath: {Name: params.RegPath, Type: params.Key, Value: `Pid`},
-					params.RegKCB:  {Name: params.RegKCB, Type: params.Uint64, Value: uint64(18446666033549154696)},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.RegPath, params.Key, params.Str(`Pid`)),
+					event.NewParam(params.RegKCB, params.Uint64, params.U64(uint64(18446666033549154696))),
+				),
 			},
 			nil,
 			func() *handle.SnapshotterMock {
@@ -150,10 +150,14 @@ func TestRegistryProcessor(t *testing.T) {
 			&event.Event{
 				Type: event.RegSetValue,
 				PID:  23234,
-				Params: event.Params{
-					params.RegPath: {Name: params.RegPath, Type: params.Key, Value: `\REGISTRY\MACHINE\SYSTEM\CurrentControlSet\Control\Windows\Directory`},
-					params.RegKCB:  {Name: params.RegKCB, Type: params.Uint64, Value: uint64(0)},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.RegPath, params.Key, params.Str(`\REGISTRY\MACHINE\SYSTEM\CurrentControlSet\Control\Windows\Directory`)),
+					event.NewParam(params.RegKCB, params.Uint64, params.U64(uint64(0))),
+					event.NewParam(params.RegValue, params.String, params.Str("Directory")),
+					event.NewParam(params.RegPath, params.Key, params.Value{}),
+					event.NewParam(params.RegData, params.Variant, params.Value{}),
+					event.NewParam(params.RegValueType, params.Enum, params.Value{}, params.WithEnum(key.RegistryValueTypes)),
+				),
 			},
 			nil,
 			func() *handle.SnapshotterMock {
@@ -167,18 +171,14 @@ func TestRegistryProcessor(t *testing.T) {
 			},
 		},
 		{
-			// Sandboxed hives such as \Registry\WC have no root the registry API
-			// can open, so key.ReadValue refuses before touching anything. That is
-			// a value we cannot read, not a failure: the event must still come out
-			// of the processor instead of surfacing `invalid root key` per value.
 			"skip value from unaddressable hive root",
 			&event.Event{
 				Type: event.RegSetValue,
 				PID:  23234,
-				Params: event.Params{
-					params.RegPath: {Name: params.RegPath, Type: params.Key, Value: `\REGISTRY\WC\S-1-5-21-1004\Software\Contoso\Settings`},
-					params.RegKCB:  {Name: params.RegKCB, Type: params.Uint64, Value: uint64(0)},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.RegPath, params.Key, params.Str(`\REGISTRY\WC\S-1-5-21-1004\Software\Contoso\Settings`)),
+					event.NewParam(params.RegKCB, params.Uint64, params.U64(uint64(0))),
+				),
 			},
 			nil,
 			func() *handle.SnapshotterMock {
@@ -186,7 +186,6 @@ func TestRegistryProcessor(t *testing.T) {
 				return hsnap
 			},
 			func(e *event.Event, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
-				// the runner already asserts no error; the value simply isn't there
 				assert.Empty(t, e.GetParamAsString(params.RegValueType))
 				assert.Empty(t, e.GetParamAsString(params.RegData))
 			},
@@ -196,30 +195,35 @@ func TestRegistryProcessor(t *testing.T) {
 			&event.Event{
 				Type: event.RegSetValue,
 				PID:  23234,
-				Params: event.Params{
-					params.RegPath: {Name: params.RegPath, Type: params.Key, Value: `\REGISTRY\MACHINE\SYSTEM\CurrentControlSet\Control\Windows\Directory`},
-					params.RegKCB:  {Name: params.RegKCB, Type: params.Uint64, Value: uint64(0)},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.RegPath, params.Key, params.Str(`\REGISTRY\MACHINE\SYSTEM\CurrentControlSet\Control\Windows\Directory`)),
+					event.NewParam(params.RegKCB, params.Uint64, params.U64(uint64(0))),
+					event.NewParam(params.RegPath, params.Key, params.Value{}),
+					event.NewParam(params.RegData, params.Variant, params.Value{}),
+					event.NewParam(params.RegValueType, params.Enum, params.Value{}, params.WithEnum(key.RegistryValueTypes)),
+				),
 			},
 			func(p Processor) {
 				p.(*registryProcessor).values[23234] = map[string]*event.Event{
 					"SessionId": {
 						Type:      event.RegSetValueInternal,
 						Timestamp: time.Now(),
-						Params: event.Params{
-							params.RegPath:      {Name: params.RegPath, Type: params.Key, Value: `\SessionId`},
-							params.RegData:      {Name: params.RegData, Type: params.UnicodeString, Value: "{ABD9EA10-87F6-11EB-9ED5-645D86501328}"},
-							params.RegValueType: {Name: params.RegValueType, Type: params.Enum, Value: uint32(1), Enum: key.RegistryValueTypes},
-							params.RegKCB:       {Name: params.RegKCB, Type: params.Uint64, Value: uint64(0)}},
+						Params: event.ParamsOf(
+							event.NewParam(params.RegPath, params.Key, params.Str(`\SessionId`)),
+							event.NewParam(params.RegData, params.String, params.Str("{ABD9EA10-87F6-11EB-9ED5-645D86501328}")),
+							event.NewParam(params.RegValueType, params.Enum, params.U32(uint32(1)), params.WithEnum(key.RegistryValueTypes)),
+							event.NewParam(params.RegKCB, params.Uint64, params.U64(uint64(0))),
+						),
 					},
 					"Directory": {
 						Type:      event.RegSetValueInternal,
 						Timestamp: time.Now(),
-						Params: event.Params{
-							params.RegPath:      {Name: params.RegPath, Type: params.Key, Value: `\Directory`},
-							params.RegData:      {Name: params.RegData, Type: params.UnicodeString, Value: "%SYSTEMROOT%"},
-							params.RegValueType: {Name: params.RegValueType, Type: params.Enum, Value: uint32(2), Enum: key.RegistryValueTypes},
-							params.RegKCB:       {Name: params.RegKCB, Type: params.Uint64, Value: uint64(0)}},
+						Params: event.ParamsOf(
+							event.NewParam(params.RegPath, params.Key, params.Str(`\Directory`)),
+							event.NewParam(params.RegData, params.String, params.Str("%SYSTEMROOT%")),
+							event.NewParam(params.RegValueType, params.Enum, params.U32(uint32(2)), params.WithEnum(key.RegistryValueTypes)),
+							event.NewParam(params.RegKCB, params.Uint64, params.U64(uint64(0))),
+						),
 					},
 				}
 			},

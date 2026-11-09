@@ -113,7 +113,8 @@ func (r *registry) Approve(rec *etw.EventRecord) (*etw.EventRecord, bool) {
 		if kcb != 0 {
 			path = r.kcbs[kcb] + `\` + path
 		}
-		r.pathLRUCache.Add(h, key.Format(path))
+		path = key.Format(path)
+		r.pathLRUCache.Add(h, path)
 	}
 
 	if r.approveKey(path) {

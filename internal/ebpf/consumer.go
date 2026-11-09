@@ -177,11 +177,10 @@ func buildPS(evt *event.Event, psnap ps.Snapshotter) *pstypes.PS {
 }
 
 func succeeded(evt *event.Event) bool {
-	ret, err := evt.Params.GetInt64(params.Retval)
-	if err != nil {
+	if !evt.Params.Contains(params.Retval) {
 		return true
 	}
-	return ret >= 0
+	return evt.Params.GetInt64ByName(params.Retval) >= 0
 }
 
 const mapAnonymous = 0x20
@@ -201,11 +200,10 @@ func retainMmap(evt *event.Event) bool {
 	if mmapKind(evt.GetParamAsUint64(params.MmapFlags)) != "file" {
 		return false
 	}
-	fd, err := evt.Params.GetInt64(params.FD)
-	if err != nil {
+	if !evt.Params.Contains(params.FD) {
 		return false
 	}
-	return fd >= 0
+	return evt.Params.GetInt64ByName(params.FD) >= 0
 }
 
 func enrichEvent(evt *event.Event) {
@@ -217,12 +215,12 @@ func enrichEvent(evt *event.Event) {
 		enrichmentMiss.Add(1)
 	}
 	if exe != "" {
-		evt.Params.Append(params.Exe, params.Path, exe)
+		evt.Params.SetByName(params.Exe, params.Str(exe))
 		if evt.GetParamAsString(params.ProcessName) == "" {
-			evt.Params.Append(params.ProcessName, params.String, baseName(exe))
+			evt.Params.SetByName(params.ProcessName, params.Str(baseName(exe)))
 		}
 	}
 	if cmdline != "" {
-		evt.Params.Append(params.Cmdline, params.String, cmdline)
+		evt.Params.SetByName(params.Cmdline, params.Str(cmdline))
 	}
 }

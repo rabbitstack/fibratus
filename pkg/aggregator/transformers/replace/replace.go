@@ -22,6 +22,7 @@ import (
 	"expvar"
 	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers"
 	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"strings"
 )
 
@@ -46,15 +47,12 @@ func initReplaceTransformer(config transformers.Config) (transformers.Transforme
 
 func (r replace) Transform(evt *event.Event) error {
 	for _, repl := range r.c.Replacements {
-		par := evt.Params.Find(repl.Param)
-		if par == nil {
+		idx := evt.Params.Index(repl.Param)
+		if !evt.Params.Has(idx) || evt.Params[idx].Value.Kind() != params.KindString {
 			continue
 		}
-		_, ok := par.Value.(string)
-		if !ok {
-			continue
-		}
-		par.Value = strings.ReplaceAll(evt.GetParamAsString(par.Name), repl.Old, repl.New)
+		par := &evt.Params[idx]
+		par.Value = params.Str(strings.ReplaceAll(par.String(), repl.Old, repl.New))
 		replaceCount.Add(1)
 	}
 	return nil

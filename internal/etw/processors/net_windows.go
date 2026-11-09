@@ -52,24 +52,24 @@ func (n *netProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, error) 
 // resolvePortName resolves the IANA service name for the particular port and transport protocol as
 // per https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.xhtml.
 func (n netProcessor) resolvePortName(e *event.Event) *event.Event {
-	dport := e.Params.TryGetUint16(params.NetDport)
-	sport := e.Params.TryGetUint16(params.NetSport)
+	dport := e.Params.GetUint16ByName(params.NetDport)
+	sport := e.Params.GetUint16ByName(params.NetSport)
 
 	if e.IsNetworkTCP() {
 		if name, ok := ports.TCPPortNames[dport]; ok {
-			e.Params.Append(params.NetDportName, params.AnsiString, name)
+			e.Params.SetByName(params.NetDportName, params.Str(name))
 		}
 		if name, ok := ports.TCPPortNames[sport]; ok {
-			e.Params.Append(params.NetSportName, params.AnsiString, name)
+			e.Params.SetByName(params.NetSportName, params.Str(name))
 		}
 		return e
 	}
 
 	if name, ok := ports.UDPPortNames[dport]; ok {
-		e.Params.Append(params.NetDportName, params.AnsiString, name)
+		e.Params.SetByName(params.NetDportName, params.Str(name))
 	}
 	if name, ok := ports.UDPPortNames[sport]; ok {
-		e.Params.Append(params.NetSportName, params.AnsiString, name)
+		e.Params.SetByName(params.NetSportName, params.Str(name))
 	}
 	return e
 }
