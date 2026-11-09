@@ -19,35 +19,25 @@
 package params
 
 const (
-	// UnicodeString is a UTF-16LE string.
-	UnicodeString Type = 1
-	// AnsiString is an 8-bit character string.
-	AnsiString Type = 2
 	// GUID is a globally unique identifier.
-	GUID Type = 15
-	// Pointer is an architecture-sized pointer value.
-	Pointer Type = 16
+	GUID Type = iota + maxType + 1
 	// SID is a Windows security identifier.
-	SID Type = 17
+	SID
 	// WbemSID is a Web-Based Enterprise Management security identifier.
-	WbemSID Type = 20
+	WbemSID
 	// DOSPath is a filesystem path in DOS device notation.
-	DOSPath Type = 30
+	DOSPath
 	// Key is a registry key.
-	Key Type = 33
+	Key
 	// HandleType is a Windows handle type.
-	HandleType Type = 37
-	// String is the future generic string type.
-	String Type = 38
+	HandleType
+	// TokeIntegrityLevel is the process token integrity mandatory label SID.
+	TokenIntegrityLevel
 )
 
 // String returns the type name.
 func (t Type) String() string {
 	switch t {
-	case UnicodeString:
-		return "unicode"
-	case AnsiString:
-		return "ansi"
 	case String:
 		return "string"
 	case SID, WbemSID:
