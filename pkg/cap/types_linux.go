@@ -18,10 +18,17 @@
 
 package cap
 
+import (
+	"context"
+
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/filter"
+)
+
 type Writer interface {
 	// Write accepts two channels. The event channel receives events pushed by the event source. When the event
 	// is peeked from the channel, it is serialized and written to the underlying byte buffer.
-	Write(chan *Event.Event, chan error) chan error
+	Write(chan *event.Event, chan error) chan error
 	// Close disposes all resources allocated by the writer.
 	Close() error
 }
@@ -30,7 +37,7 @@ type Writer interface {
 type Reader interface {
 	// Read returns two channels. The event channel is populated with event instances pulled from the cap. If
 	// any error occurs during cap processing, it is pushed to the error channel.
-	Read(ctx context.Context) (chan *Event.Event, chan error)
+	Read(ctx context.Context) (chan *event.Event, chan error)
 	// Close shutdowns the reader gracefully.
 	Close() error
 	// SetFilter sets the filter that is applied to each event coming out of the capture.

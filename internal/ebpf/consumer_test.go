@@ -42,9 +42,9 @@ func TestApplyProcessStateExecveAndPIDReuse(t *testing.T) {
 	assert.Equal(t, got.UUID(), first.PS.UUID())
 
 	reuse := sampleExecve().toEvent()
-	reuse.Params.Append(params.StartBootTime, params.Uint64, uint64(999))
-	reuse.Params.Append(params.Exe, params.Path, "/bin/sh")
-	reuse.Params.Append(params.ProcessName, params.String, "sh")
+	reuse.Params.Append(params.StartBootTime, params.Uint64, params.U64(uint64(999)))
+	reuse.Params.Append(params.Exe, params.Path, params.Str("/bin/sh"))
+	reuse.Params.Append(params.ProcessName, params.String, params.Str("sh"))
 	applyProcessState(snap, reuse)
 	ok, got = snap.Find(4242)
 	require.True(t, ok)
@@ -62,7 +62,7 @@ func TestApplyProcessStateExitRemoves(t *testing.T) {
 		PID:    4242,
 		Params: event.Params{},
 	}
-	exit.Params.Append(params.Retval, params.Int64, int64(0))
+	exit.Params.Append(params.Retval, params.Int64, params.I64(int64(0)))
 	applyProcessState(snap, exit)
 	ok, _ := snap.Find(4242)
 	assert.False(t, ok)
@@ -77,10 +77,10 @@ func TestUpsertSnapshotIgnoresAfterLiveReplacement(t *testing.T) {
 	assert.Equal(t, "snap", got.Name)
 
 	live := &event.Event{Type: event.Execve, PID: 7, Params: event.Params{}}
-	live.Params.Append(params.ProcessName, params.String, "live")
-	live.Params.Append(params.Exe, params.Path, "/bin/live")
-	live.Params.Append(params.StartBootTime, params.Uint64, uint64(9))
-	live.Params.Append(params.Retval, params.Int64, int64(0))
+	live.Params.Append(params.ProcessName, params.String, params.Str("live"))
+	live.Params.Append(params.Exe, params.Path, params.Str("/bin/live"))
+	live.Params.Append(params.StartBootTime, params.Uint64, params.U64(uint64(9)))
+	live.Params.Append(params.Retval, params.Int64, params.I64(int64(0)))
 	applyProcessState(snap, live)
 
 	upsertSnapshot(snap, &pstypes.PS{PID: 7, Name: "stale", StartBootTime: 9, Exe: "/bin/stale"})

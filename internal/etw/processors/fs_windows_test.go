@@ -47,10 +47,10 @@ func TestFsProcessor(t *testing.T) {
 			"process file rundown",
 			&event.Event{
 				Type: event.FileRundown,
-				Params: event.Params{
-					params.FileObject: {Name: params.FileObject, Type: params.Uint64, Value: uint64(124567380264)},
-					params.FilePath:   {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.FileObject, params.Uint64, params.U64(uint64(124567380264))),
+					event.NewParam(params.FilePath, params.String, params.Str("C:\\Windows\\system32\\user32.dll")),
+				),
 			},
 			nil,
 			func() *handle.SnapshotterMock {
@@ -70,12 +70,14 @@ func TestFsProcessor(t *testing.T) {
 			&event.Event{
 				PID:  10233,
 				Type: event.MapViewSectionRundown,
-				Params: event.Params{
-					params.FileKey:             {Name: params.FileKey, Type: params.Uint64, Value: uint64(124567380264)},
-					params.FileViewSize:        {Name: params.FileViewSize, Type: params.Uint64, Value: uint64(3098)},
-					params.FileViewBase:        {Name: params.FileViewBase, Type: params.Uint64, Value: uint64(0xffff23433)},
-					params.FileViewSectionType: {Name: params.FileViewSectionType, Type: params.Enum, Value: uint32(va.SectionImage), Enum: event.ViewSectionTypes},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.FileKey, params.Uint64, params.U64(uint64(124567380264))),
+					event.NewParam(params.FileViewSize, params.Uint64, params.U64(uint64(3098))),
+					event.NewParam(params.FileViewBase, params.Uint64, params.U64(uint64(0xffff23433))),
+					event.NewParam(params.FileViewSectionType, params.Enum, params.U32(uint32(va.SectionImage)), params.WithEnum(params.ViewSectionTypes)),
+					event.NewParam(params.FilePath, params.String, params.Value{}),
+					event.NewParam(params.FileType, params.Enum, params.Value{}, params.WithEnum(fs.FileTypes)),
+				),
 			},
 			func(p Processor) {
 				fsProcessor := p.(*fsProcessor)
@@ -98,10 +100,10 @@ func TestFsProcessor(t *testing.T) {
 			"release file and remove file info",
 			&event.Event{
 				Type: event.ReleaseFile,
-				Params: event.Params{
-					params.FileObject: {Name: params.FileObject, Type: params.Uint64, Value: uint64(18446738026482168384)},
-					params.FileKey:    {Name: params.FileKey, Type: params.Uint64, Value: uint64(14446538026482168384)},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.FileObject, params.Uint64, params.U64(uint64(18446738026482168384))),
+					event.NewParam(params.FileKey, params.Uint64, params.U64(uint64(14446538026482168384))),
+				),
 			},
 			func(p Processor) {
 				fsProcessor := p.(*fsProcessor)
@@ -121,12 +123,12 @@ func TestFsProcessor(t *testing.T) {
 			&event.Event{
 				PID:  10233,
 				Type: event.UnmapViewOfSection,
-				Params: event.Params{
-					params.FileKey:             {Name: params.FileKey, Type: params.Uint64, Value: uint64(124567380264)},
-					params.FileViewSize:        {Name: params.FileViewSize, Type: params.Uint64, Value: uint64(3098)},
-					params.FileViewBase:        {Name: params.FileViewBase, Type: params.Uint64, Value: uint64(0xffff23433)},
-					params.FileViewSectionType: {Name: params.FileViewSectionType, Type: params.Enum, Value: uint32(va.SectionImage), Enum: event.ViewSectionTypes},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.FileKey, params.Uint64, params.U64(uint64(124567380264))),
+					event.NewParam(params.FileViewSize, params.Uint64, params.U64(uint64(3098))),
+					event.NewParam(params.FileViewBase, params.Uint64, params.U64(uint64(0xffff23433))),
+					event.NewParam(params.FileViewSectionType, params.Enum, params.U32(uint32(va.SectionImage)), params.WithEnum(params.ViewSectionTypes)),
+				),
 			},
 			nil,
 			func() *handle.SnapshotterMock {
@@ -144,11 +146,13 @@ func TestFsProcessor(t *testing.T) {
 			"process write file",
 			&event.Event{
 				Type: event.WriteFile,
-				Params: event.Params{
-					params.FileObject: {Name: params.FileObject, Type: params.Uint64, Value: uint64(18446738026482168384)},
-					params.FileKey:    {Name: params.FileKey, Type: params.Uint64, Value: uint64(14446538026482168384)},
-					params.FileIoSize: {Name: params.FileIoSize, Type: params.Uint32, Value: uint32(1024)},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.FileObject, params.Uint64, params.U64(uint64(18446738026482168384))),
+					event.NewParam(params.FileKey, params.Uint64, params.U64(uint64(14446538026482168384))),
+					event.NewParam(params.FileIoSize, params.Uint32, params.U32(uint32(1024))),
+					event.NewParam(params.FilePath, params.String, params.Value{}),
+					event.NewParam(params.FileType, params.Enum, params.Value{}, params.WithEnum(fs.FileTypes)),
+				),
 			},
 			func(p Processor) {
 				fsProcessor := p.(*fsProcessor)
@@ -160,7 +164,6 @@ func TestFsProcessor(t *testing.T) {
 			},
 			func(e *event.Event, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
 				assert.Equal(t, event.WriteFile, e.Type)
-				assert.Contains(t, e.Params, params.FilePath, params.FileType)
 				assert.Equal(t, "C:\\Windows\\temp\\idxx.exe", e.GetParamAsString(params.FilePath))
 				assert.Equal(t, "File", e.GetParamAsString(params.FileType))
 			},
@@ -169,11 +172,13 @@ func TestFsProcessor(t *testing.T) {
 			"process write file consult handle snapshotter",
 			&event.Event{
 				Type: event.WriteFile,
-				Params: event.Params{
-					params.FileObject: {Name: params.FileObject, Type: params.Uint64, Value: uint64(18446738026482168384)},
-					params.FileKey:    {Name: params.FileKey, Type: params.Uint64, Value: uint64(14446538026482168384)},
-					params.FileIoSize: {Name: params.FileIoSize, Type: params.Uint32, Value: uint32(1024)},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.FileObject, params.Uint64, params.U64(uint64(18446738026482168384))),
+					event.NewParam(params.FileKey, params.Uint64, params.U64(uint64(14446538026482168384))),
+					event.NewParam(params.FileIoSize, params.Uint32, params.U32(uint32(1024))),
+					event.NewParam(params.FilePath, params.String, params.Value{}),
+					event.NewParam(params.FileType, params.Enum, params.Value{}, params.WithEnum(fs.FileTypes)),
+				),
 			},
 			nil,
 			func() *handle.SnapshotterMock {
@@ -184,7 +189,6 @@ func TestFsProcessor(t *testing.T) {
 			func(e *event.Event, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
 				assert.Equal(t, event.WriteFile, e.Type)
 				hsnap.AssertNumberOfCalls(t, "FindByObject", 1)
-				assert.Contains(t, e.Params, params.FilePath, params.FileType)
 				assert.Equal(t, "C:\\Windows\\temp\\doc.docx", e.GetParamAsString(params.FilePath))
 				assert.Equal(t, "File", e.GetParamAsString(params.FileType))
 			},
@@ -193,11 +197,12 @@ func TestFsProcessor(t *testing.T) {
 			"process enum directory",
 			&event.Event{
 				Type: event.EnumDirectory,
-				Params: event.Params{
-					params.FileObject: {Name: params.FileObject, Type: params.Uint64, Value: uint64(18446738026482168384)},
-					params.FileKey:    {Name: params.FileKey, Type: params.Uint64, Value: uint64(14446538026482168384)},
-					params.FilePath:   {Name: params.FilePath, Type: params.UnicodeString, Value: "*"},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.FileObject, params.Uint64, params.U64(uint64(18446738026482168384))),
+					event.NewParam(params.FileKey, params.Uint64, params.U64(uint64(14446538026482168384))),
+					event.NewParam(params.FilePath, params.String, params.Str("*")),
+					event.NewParam(params.FileDirectory, params.String, params.Value{}),
+				),
 			},
 			func(p Processor) {
 				fsProcessor := p.(*fsProcessor)
@@ -209,7 +214,6 @@ func TestFsProcessor(t *testing.T) {
 			},
 			func(e *event.Event, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
 				assert.Equal(t, event.EnumDirectory, e.Type)
-				assert.Contains(t, e.Params, params.FilePath, params.FileDirectory)
 				assert.Equal(t, "C:\\Windows\\temp", e.GetParamAsString(params.FileDirectory))
 			},
 		},

@@ -21,6 +21,7 @@ package trim
 import (
 	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers"
 	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"strings"
 )
 
@@ -42,28 +43,25 @@ func initTrimTransformer(config transformers.Config) (transformers.Transformer, 
 }
 
 func (r trim) Transform(evt *event.Event) error {
-	for _, par := range evt.Params {
+	for i := range evt.Params {
+		par := &evt.Params[i]
+		if par.Value.Kind() != params.KindString {
+			continue
+		}
+		name := par.Name()
 		// trim prefixes
 		for _, pre := range r.c.Prefixes {
-			if par.Name != pre.Name {
+			if name != pre.Name {
 				continue
 			}
-			_, ok := par.Value.(string)
-			if !ok {
-				continue
-			}
-			par.Value = strings.TrimPrefix(evt.GetParamAsString(par.Name), pre.Trim)
+			par.Value = params.Str(strings.TrimPrefix(par.String(), pre.Trim))
 		}
 		// trim suffixes
 		for _, suf := range r.c.Suffixes {
-			if par.Name != suf.Name {
+			if name != suf.Name {
 				continue
 			}
-			_, ok := par.Value.(string)
-			if !ok {
-				continue
-			}
-			par.Value = strings.TrimSuffix(evt.GetParamAsString(par.Name), suf.Trim)
+			par.Value = params.Str(strings.TrimSuffix(par.String(), suf.Trim))
 		}
 	}
 	return nil

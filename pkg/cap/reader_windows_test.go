@@ -1,5 +1,5 @@
-//go:build kcap
-// +build kcap
+//go:build cap
+// +build cap
 
 /*
  * Copyright 2019-2020 by Nedim Sabic Sabic
@@ -24,9 +24,10 @@ package cap
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestReadIncompatibleFormat(t *testing.T) {

@@ -45,7 +45,7 @@ func initRemoveTransformer(config transformers.Config) (transformers.Transformer
 
 func (r remove) Transform(evt *event.Event) error {
 	for _, par := range r.c.Params {
-		delete(evt.Params, par)
+		evt.Params.Remove(par)
 		removedCount.Add(1)
 	}
 	return nil

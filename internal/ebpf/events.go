@@ -99,18 +99,18 @@ func (r rawEvent) toEvent() *event.Event {
 		Type:      typ,
 		Host:      hostname.Get(),
 		Timestamp: time.Unix(0, int64(r.TimestampNs)),
-		Params:    event.Params{},
+		Params:    event.NewParams(typ),
 		Metadata:  make(event.Metadata),
 	}
-	evt.Params.Append(params.ProcessID, params.PID, evt.PID)
-	evt.Params.Append(params.ThreadID, params.TID, evt.Tid)
-	evt.Params.Append(params.ProcessParentID, params.PID, r.PPID)
-	evt.Params.Append(params.ProcessName, params.String, r.comm())
-	evt.Params.Append(params.UID, params.Uint32, r.UID)
-	evt.Params.Append(params.GID, params.Uint32, r.GID)
-	evt.Params.Append(params.SyscallID, params.Uint32, r.SyscallID)
-	evt.Params.Append(params.Retval, params.Int64, r.Retval)
-	evt.Params.Append(params.StartBootTime, params.Uint64, r.StartBootTime)
+	evt.Params.SetByName(params.ProcessID, params.U32(evt.PID))
+	evt.Params.SetByName(params.ThreadID, params.U32(evt.Tid))
+	evt.Params.SetByName(params.ProcessParentID, params.U32(r.PPID))
+	evt.Params.SetByName(params.ProcessName, params.Str(r.comm()))
+	evt.Params.SetByName(params.UID, params.U32(r.UID))
+	evt.Params.SetByName(params.GID, params.U32(r.GID))
+	evt.Params.SetByName(params.SyscallID, params.U32(r.SyscallID))
+	evt.Params.SetByName(params.Retval, params.I64(r.Retval))
+	evt.Params.SetByName(params.StartBootTime, params.U64(r.StartBootTime))
 
 	switch typ {
 	case event.Execve:
@@ -118,30 +118,30 @@ func (r rawEvent) toEvent() *event.Event {
 		if name == "" {
 			name = r.comm()
 		}
-		evt.Params.Append(params.Exe, params.Path, name)
-		evt.Params.Append(params.Cmdline, params.String, name)
+		evt.Params.SetByName(params.Exe, params.Str(name))
+		evt.Params.SetByName(params.Cmdline, params.Str(name))
 	case event.Exit:
-		evt.Params.Append(params.ExitStatus, params.Int64, r.Retval)
+		evt.Params.SetByName(params.ExitStatus, params.I64(r.Retval))
 	case event.Clone:
-		evt.Params.Append(params.CloneFlags, params.Uint64, r.Flags)
+		evt.Params.SetByName(params.CloneFlags, params.U64(r.Flags))
 	case event.Openat:
-		evt.Params.Append(params.DirFD, params.Int64, int64(r.Arg0))
-		evt.Params.Append(params.FilePath, params.Path, r.filename())
-		evt.Params.Append(params.FileFlags, params.Uint64, r.Flags)
-		evt.Params.Append(params.FileMode, params.Uint64, r.Arg1)
+		evt.Params.SetByName(params.DirFD, params.I64(int64(r.Arg0)))
+		evt.Params.SetByName(params.FilePath, params.Str(r.filename()))
+		evt.Params.SetByName(params.FileFlags, params.U64(r.Flags))
+		evt.Params.SetByName(params.FileMode, params.U64(r.Arg1))
 		if r.Retval >= 0 {
-			evt.Params.Append(params.FD, params.Int64, r.Retval)
+			evt.Params.SetByName(params.FD, params.I64(r.Retval))
 		}
 	case event.Unlink:
-		evt.Params.Append(params.DirFD, params.Int64, int64(r.Arg0))
-		evt.Params.Append(params.FilePath, params.Path, r.filename())
-		evt.Params.Append(params.FileFlags, params.Uint64, r.Flags)
+		evt.Params.SetByName(params.DirFD, params.I64(int64(r.Arg0)))
+		evt.Params.SetByName(params.FilePath, params.Str(r.filename()))
+		evt.Params.SetByName(params.FileFlags, params.U64(r.Flags))
 	case event.Rename:
-		evt.Params.Append(params.DirFD, params.Int64, int64(r.Arg0))
-		evt.Params.Append(params.NewDirFD, params.Int64, int64(r.Arg1))
-		evt.Params.Append(params.FilePath, params.Path, r.filename())
-		evt.Params.Append(params.FileNewPath, params.Path, r.aux())
-		evt.Params.Append(params.FileFlags, params.Uint64, r.Flags)
+		evt.Params.SetByName(params.DirFD, params.I64(int64(r.Arg0)))
+		evt.Params.SetByName(params.NewDirFD, params.I64(int64(r.Arg1)))
+		evt.Params.SetByName(params.FilePath, params.Str(r.filename()))
+		evt.Params.SetByName(params.FileNewPath, params.Str(r.aux()))
+		evt.Params.SetByName(params.FileFlags, params.U64(r.Flags))
 	case event.Connect, event.Accept:
 		appendSockParams(evt, r)
 	case event.Mmap:
@@ -149,30 +149,30 @@ func (r rawEvent) toEvent() *event.Event {
 		if r.Retval >= 0 {
 			addr = uint64(r.Retval)
 		}
-		evt.Params.Append(params.MemBaseAddress, params.Address, addr)
-		evt.Params.Append(params.MemRegionSize, params.Uint64, r.Arg1)
-		evt.Params.Append(params.MemProtect, params.Uint32, uint32(r.Arg2))
-		evt.Params.Append(params.MmapFlags, params.Uint64, r.Flags)
-		evt.Params.Append(params.FD, params.Int64, int64(r.Arg3))
-		evt.Params.Append(params.MmapOffset, params.Uint64, r.Arg0)
+		evt.Params.SetByName(params.MemBaseAddress, params.U64(addr))
+		evt.Params.SetByName(params.MemRegionSize, params.U64(r.Arg1))
+		evt.Params.SetByName(params.MemProtect, params.U32(uint32(r.Arg2)))
+		evt.Params.SetByName(params.MmapFlags, params.U64(r.Flags))
+		evt.Params.SetByName(params.FD, params.I64(int64(r.Arg3)))
+		evt.Params.SetByName(params.MmapOffset, params.U64(r.Arg0))
 	case event.ProcessVMRead, event.ProcessVMWrite:
-		evt.Params.Append(params.TargetProcessID, params.Int64, int64(int32(r.Arg0)))
-		evt.Params.Append(params.MemBaseAddress, params.Address, r.Arg2)
-		evt.Params.Append(params.MemRegionSize, params.Uint64, r.Arg3)
-		evt.Params.Append(params.MmapFlags, params.Uint64, r.Flags)
+		evt.Params.SetByName(params.TargetProcessID, params.I64(int64(int32(r.Arg0))))
+		evt.Params.SetByName(params.MemBaseAddress, params.U64(r.Arg2))
+		evt.Params.SetByName(params.MemRegionSize, params.U64(r.Arg3))
+		evt.Params.SetByName(params.MmapFlags, params.U64(r.Flags))
 	case event.Kill:
-		evt.Params.Append(params.TargetProcessID, params.Int64, int64(int32(r.Arg0)))
-		evt.Params.Append(params.Signal, params.Int32, int32(r.Arg1))
+		evt.Params.SetByName(params.TargetProcessID, params.I64(int64(int32(r.Arg0))))
+		evt.Params.SetByName(params.Signal, params.I32(int32(r.Arg1)))
 	case event.Ptrace:
-		evt.Params.Append(params.PtraceRequest, params.Int64, int64(r.Arg0))
-		evt.Params.Append(params.TargetProcessID, params.Int64, int64(int32(r.Arg1)))
-		evt.Params.Append(params.PtraceAddr, params.Address, r.Arg2)
-		evt.Params.Append(params.PtraceData, params.Uint64, r.Arg3)
+		evt.Params.SetByName(params.PtraceRequest, params.I64(int64(r.Arg0)))
+		evt.Params.SetByName(params.TargetProcessID, params.I64(int64(int32(r.Arg1))))
+		evt.Params.SetByName(params.PtraceAddr, params.U64(r.Arg2))
+		evt.Params.SetByName(params.PtraceData, params.U64(r.Arg3))
 	case event.Prctl:
-		evt.Params.Append(params.PrctlOption, params.Int64, int64(r.Arg0))
+		evt.Params.SetByName(params.PrctlOption, params.I64(int64(r.Arg0)))
 	}
 	if r.Truncated != 0 {
-		evt.Params.Append(params.Truncated, params.Uint32, r.Truncated)
+		evt.Params.SetByName(params.Truncated, params.U32(r.Truncated))
 	}
 	return evt
 }

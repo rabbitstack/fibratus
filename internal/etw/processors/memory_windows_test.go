@@ -49,12 +49,17 @@ func TestMemProcessor(t *testing.T) {
 			"virtual alloc",
 			&event.Event{
 				Type: event.VirtualAlloc,
-				Params: event.Params{
-					params.MemRegionSize:  {Name: params.MemRegionSize, Type: params.Uint64, Value: uint64(1024)},
-					params.MemBaseAddress: {Name: params.MemBaseAddress, Type: params.Address, Value: uint64(base)},
-					params.MemAllocType:   {Name: params.MemAllocType, Type: params.Flags, Value: uint32(0x00001000 | 0x00002000), Flags: event.MemAllocationFlags},
-					params.ProcessID:      {Name: params.ProcessID, Type: params.PID, Value: uint32(os.Getpid())},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.MemRegionSize, params.Uint64, params.U64(uint64(1024))),
+					event.NewParam(params.MemBaseAddress, params.Address, params.U64(uint64(base))),
+					event.NewParam(params.MemAllocType, params.Flags32, params.U32(uint32(0x00001000|0x00002000)), params.WithFlags(params.MemAllocationFlags)),
+					event.NewParam(params.ProcessID, params.PID, params.U32(uint32(os.Getpid()))),
+					event.NewParam(params.MemPageType, params.Enum, params.Value{}, params.WithEnum(params.MemPageTypes)),
+					event.NewParam(params.MemProtect, params.Flags32, params.Value{}, params.WithFlags(params.MemProtectionFlags)),
+					event.NewParam(params.MemProtectMask, params.String, params.Value{}),
+					event.NewParam(params.ProcessName, params.String, params.Value{}),
+					event.NewParam(params.Exe, params.String, params.Value{}),
+				),
 			},
 			func() *ps.SnapshotterMock {
 				psnap := new(ps.SnapshotterMock)
@@ -74,12 +79,14 @@ func TestMemProcessor(t *testing.T) {
 			"virtual free",
 			&event.Event{
 				Type: event.VirtualFree,
-				Params: event.Params{
-					params.MemRegionSize:  {Name: params.MemRegionSize, Type: params.Uint64, Value: uint64(1024)},
-					params.MemBaseAddress: {Name: params.MemBaseAddress, Type: params.Address, Value: uint64(base)},
-					params.MemAllocType:   {Name: params.MemAllocType, Type: params.Flags, Value: uint32(0x00008000), Flags: event.MemAllocationFlags},
-					params.ProcessID:      {Name: params.ProcessID, Type: params.PID, Value: uint32(os.Getpid())},
-				},
+				Params: event.ParamsOf(
+					event.NewParam(params.MemRegionSize, params.Uint64, params.U64(uint64(1024))),
+					event.NewParam(params.MemBaseAddress, params.Address, params.U64(uint64(base))),
+					event.NewParam(params.MemAllocType, params.Flags32, params.U32(uint32(0x00008000)), params.WithFlags(params.MemAllocationFlags)),
+					event.NewParam(params.ProcessID, params.PID, params.U32(uint32(os.Getpid()))),
+					event.NewParam(params.ProcessName, params.String, params.Value{}),
+					event.NewParam(params.Exe, params.String, params.Value{}),
+				),
 			},
 			func() *ps.SnapshotterMock {
 				psnap := new(ps.SnapshotterMock)
