@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-present by Nedim Sabic Sabic
+ * Copyright 2026 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -19,15 +19,562 @@
 package event
 
 import (
+	"bytes"
+	"encoding/binary"
+	"net"
 	"testing"
+	"unicode/utf16"
 	"unsafe"
 
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
 )
+
+func buildBuf(parts ...any) []byte {
+	var b bytes.Buffer
+	for _, p := range parts {
+		switch v := p.(type) {
+		case []byte:
+			b.Write(v)
+		case string:
+			u := append(utf16.Encode([]rune(v)), 0)
+			_ = binary.Write(&b, binary.LittleEndian, u)
+		default:
+			_ = binary.Write(&b, binary.LittleEndian, v)
+		}
+	}
+	return b.Bytes()
+}
+
+func newTestCursor(buf []byte) *Cursor {
+	if len(buf) == 0 {
+		// initEventRecord indexes buf[0]; with no data the record is never
+		// touched because need() fails first
+		return NewCursor(nil, 0)
+	}
+	return NewCursor(initEventRecord(0, 0, buf), uint16(len(buf)))
+}
+
+func TestCursorScalars(t *testing.T) {
+	buf := []byte{
+		0xAB,
+		0x34, 0x12,
+		0x78, 0x56, 0x34, 0x12,
+		0xF0, 0xDE, 0xBC, 0x9A, 0x78, 0x56, 0x34, 0x12,
+	}
+	c := newTestCursor(buf)
+
+	assert.Equal(t, uint16(15), c.Remaining())
+	assert.Equal(t, uint8(0xAB), c.U8())
+	assert.Equal(t, uint16(1), c.Offset())
+	assert.Equal(t, uint16(0x1234), c.U16())
+	assert.Equal(t, uint16(3), c.Offset())
+	assert.Equal(t, uint32(0x12345678), c.U32())
+	assert.Equal(t, uint16(7), c.Offset())
+	assert.Equal(t, uint64(0x123456789ABCDEF0), c.U64())
+	assert.Equal(t, uint16(15), c.Offset())
+	assert.Equal(t, uint16(0), c.Remaining())
+	assert.NoError(t, c.Err())
+}
+
+func TestCursorEmptyBuffer(t *testing.T) {
+	c := newTestCursor(nil)
+	assert.Equal(t, uint16(0), c.Remaining())
+	assert.Equal(t, uint8(0), c.U8())
+	assert.ErrorIs(t, c.Err(), ErrShortBuffer)
+}
+
+func TestCursorShortReads(t *testing.T) {
+	tests := []struct {
+		name string
+		size int
+		read func(c *Cursor) any
+		zero any
+	}{
+		{"U8", 0, func(c *Cursor) any { return c.U8() }, uint8(0)},
+		{"U16", 1, func(c *Cursor) any { return c.U16() }, uint16(0)},
+		{"U32", 3, func(c *Cursor) any { return c.U32() }, uint32(0)},
+		{"U64", 7, func(c *Cursor) any { return c.U64() }, uint64(0)},
+		{"Ansi", 0, func(c *Cursor) any { return c.Ansi() }, ""},
+		{"UTF16", 1, func(c *Cursor) any { return c.UTF16() }, ""},
+		{"UTF16Trailer", 1, func(c *Cursor) any { return c.UTF16Trailer() }, ""},
+		{"NTUnicode", 1, func(c *Cursor) any { return c.NTUnicode() }, ""},
+		{"SID", 0, func(c *Cursor) any { return c.SID(false) }, []byte(nil)},
+		{"Bytes", 3, func(c *Cursor) any { return c.Bytes(4) }, []byte(nil)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := newTestCursor(make([]byte, tt.size))
+			assert.Equal(t, tt.zero, tt.read(c))
+			assert.ErrorIs(t, c.Err(), ErrShortBuffer)
+			assert.Equal(t, uint16(0), c.Offset(), "offset must not move on a failed read")
+		})
+	}
+}
+
+func TestCursorErrorIsSticky(t *testing.T) {
+	c := newTestCursor([]byte{1, 2, 3, 4, 5})
+
+	require.Equal(t, uint32(0x04030201), c.U32())
+	require.NoError(t, c.Err())
+
+	// only one byte left, a U16 must fail
+	assert.Equal(t, uint16(0), c.U16())
+	assert.ErrorIs(t, c.Err(), ErrShortBuffer)
+	off := c.Offset()
+
+	// even though one byte is still available, every later read is a no-op
+	assert.Equal(t, uint8(0), c.U8())
+	assert.Equal(t, uint32(0), c.U32())
+	assert.Nil(t, c.Bytes(1))
+	c.Skip(1)
+	assert.Equal(t, off, c.Offset())
+	assert.ErrorIs(t, c.Err(), ErrShortBuffer)
+}
+
+func TestCursorSeek(t *testing.T) {
+	c := newTestCursor([]byte{10, 20, 30, 40})
+
+	c.Seek(2)
+	assert.Equal(t, uint8(30), c.U8())
+
+	// seeking back is allowed
+	c.Seek(0)
+	assert.Equal(t, uint8(10), c.U8())
+
+	// seeking to exactly size is legal (nothing left to read)
+	c.Seek(4)
+	assert.Equal(t, uint16(0), c.Remaining())
+	assert.NoError(t, c.Err())
+
+	// past the end is not
+	c.Seek(5)
+	assert.ErrorIs(t, c.Err(), ErrShortBuffer)
+	assert.Equal(t, uint16(4), c.Offset())
+}
+
+func TestCursorSkip(t *testing.T) {
+	c := newTestCursor([]byte{1, 2, 3, 4, 5, 6})
+	c.Skip(0)
+	assert.Equal(t, uint16(0), c.Offset())
+	c.Skip(4)
+	assert.Equal(t, uint16(4), c.Offset())
+	assert.Equal(t, uint8(5), c.U8())
+	c.Skip(2) // only 1 left
+	assert.ErrorIs(t, c.Err(), ErrShortBuffer)
+	assert.Equal(t, uint16(5), c.Offset())
+}
+
+func TestCursorAlign(t *testing.T) {
+	tests := []struct {
+		name    string
+		start   uint16
+		align   uint16
+		want    uint16
+		wantErr bool
+	}{
+		{"already aligned", 8, 8, 8, false},
+		{"offset 1 to 8", 1, 8, 8, false},
+		{"offset 7 to 8", 7, 8, 8, false},
+		{"offset 9 to 8", 9, 8, 16, false},
+		{"offset 3 to 4", 3, 4, 4, false},
+		{"offset 0", 0, 8, 0, false},
+		{"align 1 is a no-op", 5, 1, 5, false},
+		{"align 0 is a no-op", 5, 0, 5, false},
+		{"padding past the end", 17, 8, 17, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := newTestCursor(make([]byte, 20))
+			c.Seek(tt.start)
+			require.NoError(t, c.Err())
+			c.Align(tt.align)
+			assert.Equal(t, tt.want, c.Offset())
+			if tt.wantErr {
+				assert.ErrorIs(t, c.Err(), ErrShortBuffer)
+			} else {
+				assert.NoError(t, c.Err())
+			}
+		})
+	}
+}
+
+// Layout taken from TestDecodeNetwork/Send (SendV4).
+func TestCursorNetworkSendV4(t *testing.T) {
+	buf := []byte{
+		160, 48, 0, 0,
+		28, 0, 0, 0,
+		172, 64, 148, 235,
+		192, 168, 1, 44,
+		1, 187, 240, 112,
+		106, 198, 40, 0,
+		107, 198, 40, 0,
+		0, 0, 0, 0,
+		0, 0, 0, 0,
+	}
+	c := newTestCursor(buf)
+
+	assert.Equal(t, uint32(12448), c.U32())
+	assert.Equal(t, uint32(28), c.U32())
+	assert.Equal(t, "172.64.148.235", net.IP(c.Bytes(4)).String())
+	assert.Equal(t, "192.168.1.44", net.IP(c.Bytes(4)).String())
+	// ports are in network byte order
+	assert.Equal(t, uint16(443), binary.BigEndian.Uint16(c.Bytes(2)))
+	assert.Equal(t, uint16(61552), binary.BigEndian.Uint16(c.Bytes(2)))
+
+	assert.Equal(t, uint16(20), c.Offset())
+	assert.Equal(t, uint16(16), c.Remaining())
+	c.Skip(c.Remaining())
+	assert.Equal(t, uint16(0), c.Remaining())
+	assert.NoError(t, c.Err())
+}
+
+// Layout taken from TestDecodeNetwork/Recv (RecvV6).
+func TestCursorNetworkRecvV6(t *testing.T) {
+	buf := []byte{
+		8, 20, 0, 0,
+		127, 0, 0, 0,
+		255, 2, 0, 0,
+		0, 0, 0, 0,
+		0, 0, 0, 0,
+		0, 0, 0, 12,
+		254, 128, 0, 0,
+		0, 0, 0, 0,
+		0, 0, 0, 0,
+		0, 0, 0, 1, 7, 108,
+		221, 221, 0, 0, 0, 0,
+		0, 0, 0, 0,
+	}
+	c := newTestCursor(buf)
+
+	assert.Equal(t, uint32(5128), c.U32())
+	assert.Equal(t, uint32(127), c.U32())
+	assert.Equal(t, "ff02::c", net.IP(c.Bytes(16)).String())
+	assert.Equal(t, "fe80::1", net.IP(c.Bytes(16)).String())
+	assert.Equal(t, uint16(1900), binary.BigEndian.Uint16(c.Bytes(2)))
+	assert.Equal(t, uint16(56797), binary.BigEndian.Uint16(c.Bytes(2)))
+	assert.Equal(t, uint16(8), c.Remaining())
+	assert.NoError(t, c.Err())
+}
+
+// Layout taken from TestDecodeNetwork/Connect (ConnectTCPv4).
+func TestCursorNetworkConnectV4Truncated(t *testing.T) {
+	buf := []byte{
+		160, 48, 0, 0,
+		0, 0, 0, 0,
+		151, 101, 193, 91,
+		192, 168, 1, 44,
+		1, 187, 241, 235,
+		0, 0, 1, 0,
+		255, 255, 0, 0,
+		8, 0, 9, 0,
+		0, 0, 0, 0,
+		0, 0, 0, 0,
+	}
+	c := newTestCursor(buf)
+	assert.Equal(t, uint32(12448), c.U32())
+	c.Skip(4)
+	assert.Equal(t, "151.101.193.91", net.IP(c.Bytes(4)).String())
+
+	// a truncated copy of the same record must fail cleanly
+	short := newTestCursor(buf[:10])
+	short.Skip(8)
+	assert.Nil(t, short.Bytes(4))
+	assert.ErrorIs(t, short.Err(), ErrShortBuffer)
+}
+
+// Layout taken from TestDecodeFile/CreateFile.
+func TestCursorFileCreate(t *testing.T) {
+	const path = `\Device\HarddiskVolume3\WINDOWS\AppCompat\Programs\Amcache.hve`
+	buf := buildBuf(
+		uint64(0xffffd78d965e07c8), // irp
+		uint64(0xffffd78d920b6650), // file object
+		uint32(6536),               // tid
+		uint32(0x03008024),         // create options
+		uint32(128),                // attributes
+		uint32(0),                  // share access
+		path,
+	)
+	c := newTestCursor(buf)
+
+	assert.Equal(t, uint64(0xffffd78d965e07c8), c.U64())
+	assert.Equal(t, uint64(0xffffd78d920b6650), c.U64())
+	assert.Equal(t, uint32(6536), c.U32())
+	assert.Equal(t, uint32(0x03008024), c.U32())
+	assert.Equal(t, uint32(128), c.U32())
+	assert.Equal(t, uint32(0), c.U32())
+	assert.Equal(t, path, c.UTF16())
+	assert.Equal(t, uint16(0), c.Remaining(), "cursor must advance past the NUL terminator")
+	assert.NoError(t, c.Err())
+}
+
+func TestCursorUTF16MultipleStrings(t *testing.T) {
+	c := newTestCursor(buildBuf("first", "", "third", uint8(0x7F)))
+
+	assert.Equal(t, "first", c.UTF16())
+	assert.Equal(t, "", c.UTF16())
+	assert.Equal(t, "third", c.UTF16())
+	assert.Equal(t, uint8(0x7F), c.U8())
+	assert.NoError(t, c.Err())
+}
+
+// Layout taken from TestDecodeFile/FileRundown: a key followed by a trailer string.
+func TestCursorUTF16Trailer(t *testing.T) {
+	const path = `\Device\HarddiskVolume3\Windows\System32\CatRoot\foo.cat`
+	buf := buildBuf(uint64(0xffffb58b9e124750), path)
+	c := newTestCursor(buf)
+
+	assert.Equal(t, uint64(0xffffb58b9e124750), c.U64())
+	assert.Equal(t, path, c.UTF16Trailer())
+	assert.Equal(t, uint16(0), c.Remaining(), "trailer consumes everything up to the end")
+	assert.Equal(t, uint16(len(buf)), c.Offset())
+	assert.NoError(t, c.Err())
+}
+
+func TestCursorAnsi(t *testing.T) {
+	c := newTestCursor([]byte{'a', 'b', 'c', 0, 'x', 0, 0xFF})
+
+	assert.Equal(t, "abc", c.Ansi())
+	assert.Equal(t, uint16(4), c.Offset())
+	assert.Equal(t, "x", c.Ansi())
+	assert.Equal(t, uint16(6), c.Offset())
+	assert.Equal(t, uint8(0xFF), c.U8())
+	assert.NoError(t, c.Err())
+}
+
+func TestCursorSID(t *testing.T) {
+	// S-1-5-18 (LocalSystem): revision 1, 1 sub-authority, NT authority, sub-authority 18
+	sid := []byte{1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0}
+	c := newTestCursor(append(append([]byte{}, sid...), 0xAA))
+
+	got := c.SID(false)
+	assert.Equal(t, sid, got)
+	assert.Equal(t, uint16(len(sid)), c.Offset())
+	assert.Equal(t, uint8(0xAA), c.U8())
+	assert.NoError(t, c.Err())
+}
+
+func TestCursorBytesAreCopied(t *testing.T) {
+	c := newTestCursor([]byte{1, 2, 3, 4})
+
+	b := c.Bytes(4)
+	require.Equal(t, []byte{1, 2, 3, 4}, b)
+	b[0] = 99
+
+	// scribbling over the returned slice must not touch the event buffer
+	c.Seek(0)
+	assert.Equal(t, []byte{1, 2, 3, 4}, c.Bytes(4))
+}
+
+func TestCursorBytesZeroLength(t *testing.T) {
+	c := newTestCursor([]byte{1})
+	b := c.Bytes(0)
+	assert.Empty(t, b)
+	assert.NoError(t, c.Err())
+	assert.Equal(t, uint16(0), c.Offset())
+}
+
+func TestCursorBytesU16(t *testing.T) {
+	t.Run("length prefixed", func(t *testing.T) {
+		c := newTestCursor(buildBuf(uint16(3), []byte{7, 8, 9}, uint8(1)))
+		assert.Equal(t, []byte{7, 8, 9}, c.BytesU16())
+		assert.Equal(t, uint16(5), c.Offset())
+		assert.Equal(t, uint8(1), c.U8())
+		assert.NoError(t, c.Err())
+	})
+	t.Run("zero length", func(t *testing.T) {
+		c := newTestCursor(buildBuf(uint16(0), uint8(1)))
+		assert.Nil(t, c.BytesU16())
+		assert.NoError(t, c.Err())
+		assert.Equal(t, uint16(2), c.Offset())
+	})
+	t.Run("length exceeds buffer", func(t *testing.T) {
+		c := newTestCursor(buildBuf(uint16(10), []byte{1, 2}))
+		assert.Nil(t, c.BytesU16())
+		assert.ErrorIs(t, c.Err(), ErrShortBuffer)
+	})
+	t.Run("missing length", func(t *testing.T) {
+		c := newTestCursor([]byte{5})
+		assert.Nil(t, c.BytesU16())
+		assert.ErrorIs(t, c.Err(), ErrShortBuffer)
+	})
+}
+
+// Layout taken from TestDecodeStackWalk: timestamp, pid, tid, then return addresses.
+func TestCursorAddresses(t *testing.T) {
+	addrs := []va.Address{0xfffff805bdfe0c94, 0xfffff805bde589af, 0x7ffd09724514, 0x7ff6249225e3}
+	buf := buildBuf(uint64(250273540393), uint32(3852), uint32(7584))
+	for _, a := range addrs {
+		buf = append(buf, buildBuf(uint64(a))...)
+	}
+	c := newTestCursor(buf)
+
+	assert.Equal(t, uint64(250273540393), c.U64())
+	assert.Equal(t, uint32(3852), c.U32())
+	assert.Equal(t, uint32(7584), c.U32())
+
+	var cs va.Callstack
+	got := c.Addresses(cs)
+	assert.Equal(t, addrs, got)
+	assert.Equal(t, uint16(0), c.Remaining())
+	assert.NoError(t, c.Err())
+}
+
+func TestCursorReset(t *testing.T) {
+	c := newTestCursor([]byte{1, 2})
+	c.v6 = true
+	c.U32() // fails
+	require.Error(t, c.Err())
+
+	r := initEventRecord(0, 0, []byte{9, 8, 7, 6})
+	c.Reset(r, 4)
+
+	assert.NoError(t, c.Err())
+	assert.False(t, c.v6)
+	assert.Equal(t, uint16(0), c.Offset())
+	assert.Equal(t, uint16(4), c.Remaining())
+	assert.Equal(t, uint32(0x06070809), c.U32())
+	assert.NoError(t, c.Err())
+}
+
+func TestCursorRelease(t *testing.T) {
+	c := newTestCursor([]byte{1, 2, 3, 4})
+	c.U16()
+	c.Release()
+
+	assert.Nil(t, c.r)
+	assert.Equal(t, uint16(0), c.Offset())
+	assert.Equal(t, uint16(0), c.Remaining())
+	assert.NoError(t, c.Err())
+
+	// a released cursor must fail safely instead of dereferencing the nil record
+	assert.NotPanics(t, func() { _ = c.U8() })
+	assert.ErrorIs(t, c.Err(), ErrShortBuffer)
+}
+
+func TestCursorPooledReuse(t *testing.T) {
+	c := NewCursor(nil, 0)
+	for i := 0; i < 3; i++ {
+		buf := buildBuf(uint32(i), "x")
+		c.Reset(initEventRecord(0, 0, buf), uint16(len(buf)))
+		assert.Equal(t, uint32(i), c.U32())
+		assert.Equal(t, "x", c.UTF16())
+		assert.NoError(t, c.Err())
+		c.Release()
+	}
+}
+
+func TestCursorScalarReadsDoNotAllocate(t *testing.T) {
+	buf := make([]byte, 15)
+	r := initEventRecord(0, 0, buf)
+	c := NewCursor(r, uint16(len(buf)))
+
+	allocs := testing.AllocsPerRun(100, func() {
+		c.Reset(r, uint16(len(buf)))
+		_ = c.U8()
+		_ = c.U16()
+		_ = c.U32()
+		_ = c.U64()
+	})
+	assert.Zero(t, allocs)
+}
+
+// need() computes c.off+n in uint16. With a buffer close to the 64K limit the
+// sum wraps around, the bounds check passes, and the cursor offset wraps too.
+// This test documents the expected behavior and fails until need()/Skip() do
+// the arithmetic in a wider type (or compare n > size-off).
+func TestCursorOffsetOverflow(t *testing.T) {
+	c := NewCursor(nil, 0xFFFF)
+	c.Skip(2)
+	require.NoError(t, c.Err())
+
+	c.Skip(0xFFFF)
+	assert.ErrorIs(t, c.Err(), ErrShortBuffer)
+	assert.Equal(t, uint16(2), c.Offset())
+}
+
+func stackWalkBuf(addrs []va.Address) []byte {
+	buf := buildBuf(uint64(250273540393), uint32(3852), uint32(7584))
+	for _, a := range addrs {
+		buf = append(buf, buildBuf(uint64(a))...)
+	}
+	return buf
+}
+
+func TestCursorAddressesFullStackWalk(t *testing.T) {
+	addrs := []va.Address{
+		0xfffff805bdfe0c94, 0xfffff805bde589af, 0xfffff805bdf22f86, 0xfffff80550ff6d24,
+		0xfffff8054f82baaf, 0xfffff8054f82b1a0, 0xfffff8054f8968e0, 0xfffff805bdfa953b,
+		0xfffff805bdfa94b3, 0xfffff805be49a83b, 0xfffff805be4988da, 0xfffff805be4965e3,
+		0xfffff805be49cac4, 0xfffff805be2bd955,
+		0x7ffd09724514, 0x7ffd0619331f, 0x7ff6248a6069, 0x7ff62492256d, 0x7ff6249225e3,
+	}
+	buf := stackWalkBuf(addrs)
+	c := newTestCursor(buf)
+	c.Skip(16)
+
+	var cs va.Callstack
+	got := c.Addresses(cs)
+
+	assert.Equal(t, addrs, got)
+	assert.Equal(t, uint16(16+19*8), c.Offset())
+	assert.Equal(t, uint16(0), c.Remaining())
+	assert.NoError(t, c.Err())
+}
+
+func TestCursorAddressesNoFrames(t *testing.T) {
+	c := newTestCursor(stackWalkBuf(nil))
+	c.Skip(16)
+
+	var cs va.Callstack
+	got := c.Addresses(cs)
+
+	assert.Empty(t, got)
+	assert.Equal(t, uint16(16), c.Offset())
+	assert.NoError(t, c.Err())
+}
+
+func TestCursorAddressesReusesPooledSlice(t *testing.T) {
+	addrs := []va.Address{0xfffff805bdfe0c94, 0x7ff6249225e3}
+	c := newTestCursor(stackWalkBuf(addrs))
+	c.Skip(16)
+
+	cs := make(va.Callstack, 0, 32)
+	got := c.Addresses(cs)
+
+	require.Equal(t, addrs, got)
+	assert.Same(t, &cs[:1][0], &got[0], "returned slice must share the pooled backing array")
+}
+
+func TestCursorAddressesAfterError(t *testing.T) {
+	c := newTestCursor(stackWalkBuf([]va.Address{0xfffff805bdfe0c94}))
+	c.Skip(100) // fails
+	require.ErrorIs(t, c.Err(), ErrShortBuffer)
+
+	var cs va.Callstack
+	assert.Nil(t, c.Addresses(cs))
+	assert.Equal(t, uint16(0), c.Offset())
+	assert.ErrorIs(t, c.Err(), ErrShortBuffer)
+}
+
+func TestCursorAddressesPastDeclaredSize(t *testing.T) {
+	addrs := []va.Address{0xfffff805bdfe0c94, 0xfffff805bde589af, 0x7ffd09724514, 0x7ff6249225e3}
+	buf := stackWalkBuf(addrs)
+	r := initEventRecord(0, 0, buf)
+
+	// only the header and the first two frames are declared
+	c := NewCursor(r, 16+2*8)
+	c.Skip(16)
+
+	var cs va.Callstack
+	assert.Nil(t, c.Addresses(cs))
+	assert.ErrorIs(t, c.Err(), ErrShortBuffer)
+	assert.LessOrEqual(t, c.Offset(), uint16(16+2*8), "offset must never pass the declared size")
+}
 
 func TestDecodeRegistry(t *testing.T) {
 	var tests = []struct {
@@ -37,10 +584,10 @@ func TestDecodeRegistry(t *testing.T) {
 	}{
 		{name: "RegSetValue",
 			assertions: func(t *testing.T, e *Event) {
-				assert.Len(t, e.Params, 3)
-				assert.Equal(t, "StartTime", e.Params.MustGetString(params.RegPath))
-				assert.Equal(t, uint32(0), e.Params.MustGetUint32(params.NTStatus))
-				assert.Equal(t, uint64(0xffffde0e05e45330), e.Params.MustGetUint64(params.RegKCB))
+				assert.Equal(t, 3, e.Params.Len())
+				assert.Equal(t, "StartTime", e.Params.GetStringByName(params.RegValue))
+				assert.Equal(t, uint32(0), e.Params.GetUint32ByName(params.NTStatus))
+				assert.Equal(t, uint64(0xffffde0e05e45330), e.Params.GetUint64ByName(params.RegKCB))
 			},
 			buf: []byte{
 				116, 104, 52, 53, 29, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -51,10 +598,10 @@ func TestDecodeRegistry(t *testing.T) {
 		{
 			name: "RegCreateKey",
 			assertions: func(t *testing.T, e *Event) {
-				assert.Len(t, e.Params, 3)
-				assert.Equal(t, `Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\Capabilities`, e.Params.MustGetString(params.RegPath))
-				assert.Equal(t, uint32(0), e.Params.MustGetUint32(params.NTStatus))
-				assert.Equal(t, uint64(0xffffb58b742ff990), e.Params.MustGetUint64(params.RegKCB))
+				assert.Equal(t, 3, e.Params.Len())
+				assert.Equal(t, `Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\Capabilities`, e.Params.GetStringByName(params.RegPath))
+				assert.Equal(t, uint32(0), e.Params.GetUint32ByName(params.NTStatus))
+				assert.Equal(t, uint64(0xffffb58b742ff990), e.Params.GetUint64ByName(params.RegKCB))
 			},
 			buf: []byte{
 				248, 104, 16, 11, 5, 0, 0, 0,
@@ -89,8 +636,10 @@ func TestDecodeRegistry(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := initEventRecord(0, 0, tt.buf)
-			e := &Event{Params: make(Params)}
-			paramDecoder.DecodeRegistry(r, e)
+			typ, ok := ParseType(tt.name)
+			require.True(t, ok)
+			e := &Event{Type: typ, Params: NewParams(typ)}
+			require.NoError(t, DecodeParams(r, e))
 			tt.assertions(t, e)
 		})
 	}
@@ -127,15 +676,15 @@ func TestDecodeRegSetValueInternal(t *testing.T) {
 	}
 
 	r := initEventRecord(0, 0, buf)
-	e := &Event{Params: make(Params)}
-	paramDecoder.DecodeRegSetValueInternal(r, e)
+	e := &Event{Type: RegSetValueInternal, Params: NewParams(RegSetValueInternal)}
+	require.NoError(t, DecodeParams(r, e))
 
-	assert.Len(t, e.Params, 5)
-	assert.Equal(t, "URI", e.Params.MustGetString(params.RegPath))
-	assert.Equal(t, uint32(0), e.Params.MustGetUint32(params.NTStatus))
-	assert.Equal(t, `\Microsoft\Windows\Flighting\OneSettings\RefreshCache`, e.Params.MustGetString(params.RegData))
+	assert.Equal(t, 6, e.Params.Len())
+	assert.Equal(t, "URI", e.Params.GetStringByName(params.RegValue))
+	assert.Equal(t, uint32(0), e.Params.GetUint32ByName(params.NTStatus))
+	assert.Equal(t, `\Microsoft\Windows\Flighting\OneSettings\RefreshCache`, e.Params.GetStringByName(params.RegData))
 	assert.Equal(t, "REG_SZ", e.GetParamAsString(params.RegValueType))
-	assert.Equal(t, uint64(0xffffb58bc4d2eee0), e.Params.MustGetUint64(params.RegKeyHandle))
+	assert.Equal(t, uint64(0xffffb58bc4d2eee0), e.Params.GetUint64ByName(params.RegKeyHandle))
 }
 
 func TestDecodeFile(t *testing.T) {
@@ -149,18 +698,16 @@ func TestDecodeFile(t *testing.T) {
 		{
 			name: "CreateFile", opcode: CreateFileID,
 			assertions: func(t *testing.T, e *Event) {
-				assert.Len(t, e.Params, 10)
-				assert.Equal(t, uint64(0xffffd78d965e07c8), e.Params.MustGetUint64(params.FileIrpPtr))
-				assert.Equal(t, uint64(0xffffd78d920b6650), e.Params.MustGetUint64(params.FileObject))
-				assert.Equal(t, `\Device\HarddiskVolume3\WINDOWS\AppCompat\Programs\Amcache.hve`, e.Params.MustGetString(params.FilePath))
+				assert.Equal(t, 9, e.Params.Len())
+				assert.Equal(t, uint64(0xffffd78d965e07c8), e.Params.GetUint64ByName(params.FileIrpPtr))
+				assert.Equal(t, uint64(0xffffd78d920b6650), e.Params.GetUint64ByName(params.FileObject))
+				assert.Equal(t, `\Device\HarddiskVolume3\WINDOWS\AppCompat\Programs\Amcache.hve`, e.Params.GetStringByName(params.FilePath))
 				assert.Equal(t, "NORMAL", e.GetParamAsString(params.FileAttributes))
 				assert.Equal(t, "SEQUENTIAL_ONLY|SYNCHRONOUS_IO_NONALERT|NO_COMPRESSION", e.GetParamAsString(params.FileCreateOptions))
-				assert.Equal(t, uint32(6536), e.Params.MustGetTid())
-				assert.Equal(t, "SUPERSEDE", e.GetParamAsString(params.FileOperation))
-				assert.Equal(t, "Success", e.GetParamAsString(params.NTStatus))
-				assert.Contains(t, e.Params, params.Callstack)
+				assert.Equal(t, uint32(6536), e.Params.GetTid())
+				assert.Equal(t, "OPEN_IF", e.GetParamAsString(params.FileOperation))
 			},
-			event: &Event{Params: make(Params), Type: CreateFile},
+			event: &Event{Params: NewParams(CreateFile), Type: CreateFile},
 			buf: []byte{
 				200, 7, 94, 150, 141, 215, 255, 255,
 				80, 102, 11, 146, 141, 215, 255, 255,
@@ -194,12 +741,12 @@ func TestDecodeFile(t *testing.T) {
 		{
 			name: "FileOpEnd", opcode: FileOpEndID,
 			assertions: func(t *testing.T, e *Event) {
-				assert.Len(t, e.Params, 3)
-				assert.Equal(t, uint64(0xffffd78d973df0f8), e.Params.MustGetUint64(params.FileIrpPtr))
-				assert.Equal(t, uint32(0), e.Params.MustGetUint32(params.NTStatus))
-				assert.Equal(t, uint64(0x28), e.Params.MustGetUint64(params.FileExtraInfo))
+				assert.Equal(t, 3, e.Params.Len())
+				assert.Equal(t, uint64(0xffffd78d973df0f8), e.Params.GetUint64ByName(params.FileIrpPtr))
+				assert.Equal(t, uint32(0), e.Params.GetUint32ByName(params.NTStatus))
+				assert.Equal(t, uint64(0x28), e.Params.GetUint64ByName(params.FileExtraInfo))
 			},
-			event: &Event{Params: make(Params), Type: FileOpEnd},
+			event: &Event{Params: NewParams(FileOpEnd), Type: FileOpEnd},
 			buf: []byte{
 				248, 240, 61, 151, 141, 215, 255, 255,
 				40, 0, 0, 0,
@@ -210,16 +757,16 @@ func TestDecodeFile(t *testing.T) {
 		{
 			name: "MapViewOfSection", opcode: MapViewOfSectionID,
 			assertions: func(t *testing.T, e *Event) {
-				assert.Len(t, e.Params, 7)
-				assert.Equal(t, uint64(0xffffb58b75fb7e10), e.Params.MustGetUint64(params.FileKey))
-				assert.Equal(t, uint64(0), e.Params.MustGetUint64(params.FileOffset))
-				assert.Equal(t, uint32(1716), e.Params.MustGetUint32(params.ProcessID))
+				assert.Equal(t, 8, e.Params.Len())
+				assert.Equal(t, uint64(0xffffb58b75fb7e10), e.Params.GetUint64ByName(params.FileKey))
+				assert.Equal(t, uint64(0), e.Params.GetUint64ByName(params.FileOffset))
+				assert.Equal(t, uint32(1716), e.Params.GetUint32ByName(params.ProcessID))
 				assert.Equal(t, "READONLY", e.GetParamAsString(params.MemProtect))
 				assert.Equal(t, "PAGEFILE", e.GetParamAsString(params.FileViewSectionType))
-				assert.Equal(t, uint64(0x191ab210000), e.Params.MustGetUint64(params.FileViewBase))
-				assert.Equal(t, uint64(4096), e.Params.MustGetUint64(params.FileViewSize))
+				assert.Equal(t, uint64(0x191ab210000), e.Params.GetUint64ByName(params.FileViewBase))
+				assert.Equal(t, uint64(4096), e.Params.GetUint64ByName(params.FileViewSize))
 			},
-			event: &Event{Params: make(Params), Type: MapViewOfSection},
+			event: &Event{Params: NewParams(MapViewOfSection), Type: MapViewOfSection},
 			buf: []byte{
 				0, 0, 33, 171, 145, 1, 0, 0,
 				16, 126, 251, 117, 139, 181, 255, 255,
@@ -232,16 +779,16 @@ func TestDecodeFile(t *testing.T) {
 		{
 			name: "UnmapViewOfSection", opcode: UnmapViewOfSectionID,
 			assertions: func(t *testing.T, e *Event) {
-				assert.Len(t, e.Params, 7)
-				assert.Equal(t, uint64(0xffffb58bc1f91010), e.Params.MustGetUint64(params.FileKey))
-				assert.Equal(t, uint64(0), e.Params.MustGetUint64(params.FileOffset))
-				assert.Equal(t, uint32(12448), e.Params.MustGetUint32(params.ProcessID))
+				assert.Equal(t, 8, e.Params.Len())
+				assert.Equal(t, uint64(0xffffb58bc1f91010), e.Params.GetUint64ByName(params.FileKey))
+				assert.Equal(t, uint64(0), e.Params.GetUint64ByName(params.FileOffset))
+				assert.Equal(t, uint32(12448), e.Params.GetUint32ByName(params.ProcessID))
 				assert.Equal(t, "READWRITE", e.GetParamAsString(params.MemProtect))
 				assert.Equal(t, "PAGEFILE", e.GetParamAsString(params.FileViewSectionType))
-				assert.Equal(t, uint64(0x1675e410000), e.Params.MustGetUint64(params.FileViewBase))
-				assert.Equal(t, uint64(921600), e.Params.MustGetUint64(params.FileViewSize))
+				assert.Equal(t, uint64(0x1675e410000), e.Params.GetUint64ByName(params.FileViewBase))
+				assert.Equal(t, uint64(921600), e.Params.GetUint64ByName(params.FileViewSize))
 			},
-			event: &Event{Params: make(Params), Type: UnmapViewOfSection},
+			event: &Event{Params: NewParams(UnmapViewOfSection), Type: UnmapViewOfSection},
 			buf: []byte{
 				0, 0, 65, 94, 103, 1, 0, 0,
 				16, 16, 249, 193, 139, 181, 255, 255,
@@ -254,15 +801,15 @@ func TestDecodeFile(t *testing.T) {
 		{
 			name: "SetFileInformation", opcode: SetFileInformationID,
 			assertions: func(t *testing.T, e *Event) {
-				assert.Len(t, e.Params, 6)
+				assert.Equal(t, 6, e.Params.Len())
 				assert.Equal(t, "Allocation", e.GetParamAsString(params.FileInfoClass))
-				assert.Equal(t, uint64(524288), e.Params.MustGetUint64(params.FileExtraInfo))
-				assert.Equal(t, uint64(0xffffb58b80ccc180), e.Params.MustGetUint64(params.FileKey))
-				assert.Equal(t, uint64(0xffffd78d76403780), e.Params.MustGetUint64(params.FileObject))
-				assert.Equal(t, uint64(0xffffd78d9b6470f8), e.Params.MustGetUint64(params.FileIrpPtr))
-				assert.Equal(t, uint32(16404), e.Params.MustGetTid())
+				assert.Equal(t, uint64(524288), e.Params.GetUint64ByName(params.FileExtraInfo))
+				assert.Equal(t, uint64(0xffffb58b80ccc180), e.Params.GetUint64ByName(params.FileKey))
+				assert.Equal(t, uint64(0xffffd78d76403780), e.Params.GetUint64ByName(params.FileObject))
+				assert.Equal(t, uint64(0xffffd78d9b6470f8), e.Params.GetUint64ByName(params.FileIrpPtr))
+				assert.Equal(t, uint32(16404), e.Params.GetTid())
 			},
-			event: &Event{Params: make(Params), Type: SetFileInformation},
+			event: &Event{Params: NewParams(SetFileInformation), Type: SetFileInformation},
 			buf: []byte{
 				248, 112, 100, 155, 141, 215, 255, 255,
 				128, 55, 64, 118, 141, 215, 255, 255,
@@ -275,15 +822,15 @@ func TestDecodeFile(t *testing.T) {
 		{
 			name: "DeleteFile", opcode: DeleteFileID,
 			assertions: func(t *testing.T, e *Event) {
-				assert.Len(t, e.Params, 6)
+				assert.Equal(t, 6, e.Params.Len())
 				assert.Equal(t, "Disposition Extended", e.GetParamAsString(params.FileInfoClass))
-				assert.Equal(t, uint64(1), e.Params.MustGetUint64(params.FileExtraInfo))
-				assert.Equal(t, uint64(0xffffb58bc5e64180), e.Params.MustGetUint64(params.FileKey))
-				assert.Equal(t, uint64(0xffffd78d9b6c7d80), e.Params.MustGetUint64(params.FileObject))
-				assert.Equal(t, uint64(0xffffd78d7c5860f8), e.Params.MustGetUint64(params.FileIrpPtr))
-				assert.Equal(t, uint32(13656), e.Params.MustGetTid())
+				assert.Equal(t, uint64(1), e.Params.GetUint64ByName(params.FileExtraInfo))
+				assert.Equal(t, uint64(0xffffb58bc5e64180), e.Params.GetUint64ByName(params.FileKey))
+				assert.Equal(t, uint64(0xffffd78d9b6c7d80), e.Params.GetUint64ByName(params.FileObject))
+				assert.Equal(t, uint64(0xffffd78d7c5860f8), e.Params.GetUint64ByName(params.FileIrpPtr))
+				assert.Equal(t, uint32(13656), e.Params.GetTid())
 			},
-			event: &Event{Params: make(Params), Type: DeleteFile},
+			event: &Event{Params: NewParams(DeleteFile), Type: DeleteFile},
 			buf: []byte{
 				248, 96, 88, 124, 141, 215, 255, 255,
 				128, 125, 108, 155, 141, 215, 255, 255,
@@ -296,13 +843,13 @@ func TestDecodeFile(t *testing.T) {
 		{
 			name: "ReleaseFile", opcode: ReleaseFileID,
 			assertions: func(t *testing.T, e *Event) {
-				assert.Len(t, e.Params, 4)
-				assert.Equal(t, uint64(0xffffb58b9268d180), e.Params.MustGetUint64(params.FileKey))
-				assert.Equal(t, uint64(0xffffd78d9b4552b0), e.Params.MustGetUint64(params.FileObject))
-				assert.Equal(t, uint64(0xffffd78d7ca0b0f8), e.Params.MustGetUint64(params.FileIrpPtr))
-				assert.Equal(t, uint32(3096), e.Params.MustGetTid())
+				assert.Equal(t, 4, e.Params.Len())
+				assert.Equal(t, uint64(0xffffb58b9268d180), e.Params.GetUint64ByName(params.FileKey))
+				assert.Equal(t, uint64(0xffffd78d9b4552b0), e.Params.GetUint64ByName(params.FileObject))
+				assert.Equal(t, uint64(0xffffd78d7ca0b0f8), e.Params.GetUint64ByName(params.FileIrpPtr))
+				assert.Equal(t, uint32(3096), e.Params.GetTid())
 			},
-			event: &Event{Params: make(Params), Type: ReleaseFile},
+			event: &Event{Params: NewParams(ReleaseFile), Type: ReleaseFile},
 			buf: []byte{
 				248, 176, 160, 124, 141, 215, 255, 255,
 				176, 82, 69, 155, 141, 215, 255, 255,
@@ -313,15 +860,15 @@ func TestDecodeFile(t *testing.T) {
 		{
 			name: "WriteFile", opcode: WriteFileID,
 			assertions: func(t *testing.T, e *Event) {
-				assert.Len(t, e.Params, 6)
-				assert.Equal(t, uint64(0xffffb58b74e78b10), e.Params.MustGetUint64(params.FileKey))
-				assert.Equal(t, uint64(0xffffd78d6970ae80), e.Params.MustGetUint64(params.FileObject))
-				assert.Equal(t, uint64(0xffffd78d9a786a08), e.Params.MustGetUint64(params.FileIrpPtr))
-				assert.Equal(t, uint32(392), e.Params.MustGetTid())
-				assert.Equal(t, uint64(573440), e.Params.MustGetUint64(params.FileOffset))
-				assert.Equal(t, uint32(1073741824), e.Params.MustGetUint32(params.FileIoSize))
+				assert.Equal(t, 6, e.Params.Len())
+				assert.Equal(t, uint64(0xffffb58b74e78b10), e.Params.GetUint64ByName(params.FileKey))
+				assert.Equal(t, uint64(0xffffd78d6970ae80), e.Params.GetUint64ByName(params.FileObject))
+				assert.Equal(t, uint64(0xffffd78d9a786a08), e.Params.GetUint64ByName(params.FileIrpPtr))
+				assert.Equal(t, uint32(392), e.Params.GetTid())
+				assert.Equal(t, uint64(573440), e.Params.GetUint64ByName(params.FileOffset))
+				assert.Equal(t, uint32(81920), e.Params.GetUint32ByName(params.FileIoSize))
 			},
-			event: &Event{Params: make(Params), Type: WriteFile},
+			event: &Event{Params: NewParams(WriteFile), Type: WriteFile},
 			buf: []byte{
 				0, 192, 8, 0, 0, 0, 0, 0,
 				8, 106, 120, 154, 141, 215, 255, 255,
@@ -335,14 +882,14 @@ func TestDecodeFile(t *testing.T) {
 		},
 		{name: "EnumDirectory", opcode: EnumDirectoryID,
 			assertions: func(t *testing.T, e *Event) {
-				assert.Len(t, e.Params, 6)
-				assert.Equal(t, uint64(0xffffde0dfb917590), e.Params.MustGetUint64(params.FileKey))
-				assert.Equal(t, uint64(0xffff8084cb43c990), e.Params.MustGetUint64(params.FileObject))
-				assert.Equal(t, `git"*`, e.Params.MustGetString(params.FilePath))
-				assert.Equal(t, uint64(0xffff8084da3e7788), e.Params.MustGetUint64(params.FileIrpPtr))
-				assert.Equal(t, uint32(12860), e.Params.MustGetTid())
+				assert.Equal(t, 6, e.Params.Len())
+				assert.Equal(t, uint64(0xffffde0dfb917590), e.Params.GetUint64ByName(params.FileKey))
+				assert.Equal(t, uint64(0xffff8084cb43c990), e.Params.GetUint64ByName(params.FileObject))
+				assert.Equal(t, `git"*`, e.Params.GetStringByName(params.FileName))
+				assert.Equal(t, uint64(0xffff8084da3e7788), e.Params.GetUint64ByName(params.FileIrpPtr))
+				assert.Equal(t, uint32(12860), e.Params.GetTid())
 			},
-			event: &Event{Params: make(Params), Type: EnumDirectory},
+			event: &Event{Params: NewParams(EnumDirectory), Type: EnumDirectory},
 			buf: []byte{
 				136, 119, 62, 218, 132, 128, 255, 255,
 				144, 201, 67, 203, 132, 128, 255, 255,
@@ -355,10 +902,10 @@ func TestDecodeFile(t *testing.T) {
 		{
 			name: "FileRundown", opcode: FileRundownID,
 			assertions: func(t *testing.T, e *Event) {
-				assert.Len(t, e.Params, 2)
-				assert.Equal(t, `\Device\HarddiskVolume3\Windows\System32\CatRoot\{F750E6C3-38EE-11D1-85E5-00C04FC295EE}\Microsoft-Windows-TerminalServices-AppServerClient-Opt-WOW64-Package~31bf3856ad364e35~wow64~~10.0.26100.8115.cat`, e.Params.MustGetString(params.FilePath))
+				assert.Equal(t, 2, e.Params.Len())
+				assert.Equal(t, `\Device\HarddiskVolume3\Windows\System32\CatRoot\{F750E6C3-38EE-11D1-85E5-00C04FC295EE}\Microsoft-Windows-TerminalServices-AppServerClient-Opt-WOW64-Package~31bf3856ad364e35~wow64~~10.0.26100.8115.cat`, e.Params.GetStringByName(params.FilePath))
 			},
-			event: &Event{Params: make(Params), Type: FileRundown},
+			event: &Event{Params: NewParams(FileRundown), Type: FileRundown},
 			buf: []byte{
 				80, 71, 18, 158, 139, 181, 255, 255,
 				92, 0, 68, 0, 101, 0, 118, 0,
@@ -419,7 +966,7 @@ func TestDecodeFile(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := initEventRecord(tt.opcode, 0, tt.buf)
-			paramDecoder.DecodeFile(r, tt.event)
+			require.NoError(t, DecodeParams(r, tt.event))
 			tt.assertions(t, tt.event)
 		})
 	}
@@ -457,19 +1004,19 @@ func TestDecodeProcess(t *testing.T) {
 	}
 
 	r := initEventRecord(0, 0, buf)
-	e := &Event{Params: make(Params)}
-	paramDecoder.DecodeProcess(r, e)
+	e := &Event{Type: CreateProcess, Params: NewParams(CreateProcess)}
+	require.NoError(t, DecodeParams(r, e))
 
-	assert.Len(t, e.Params, 11)
-	assert.Equal(t, `\??\C:\WINDOWS\system32\conhost.exe 0xfffffff -ForceV1`, e.Params.MustGetString(params.Cmdline))
-	assert.Equal(t, uint64(0x344e76000), e.Params.MustGetUint64(params.DTB))
-	assert.Equal(t, uint32(0x103), e.Params.MustGetUint32(params.ExitStatus))
-	assert.Equal(t, uint64(0xffffd78d7ca130c0), e.Params.MustGetUint64(params.ProcessObject))
-	assert.Equal(t, "conhost.exe", e.Params.MustGetString(params.ProcessName))
-	assert.Equal(t, uint32(20092), e.Params.MustGetPid())
-	assert.Equal(t, uint32(13440), e.Params.MustGetPpid())
-	assert.Equal(t, uint32(13440), e.Params.MustGetUint32(params.ProcessRealParentID))
-	assert.Equal(t, uint32(1), e.Params.MustGetUint32(params.SessionID))
+	assert.Equal(t, 11, e.Params.Len())
+	assert.Equal(t, `\??\C:\WINDOWS\system32\conhost.exe 0xfffffff -ForceV1`, e.Params.GetStringByName(params.Cmdline))
+	assert.Equal(t, uint64(0x344e76000), e.Params.GetUint64ByName(params.DTB))
+	assert.Equal(t, uint32(0x103), e.Params.GetUint32ByName(params.ExitStatus))
+	assert.Equal(t, uint64(0xffffd78d7ca130c0), e.Params.GetUint64ByName(params.ProcessObject))
+	assert.Equal(t, "conhost.exe", e.Params.GetStringByName(params.ProcessName))
+	assert.Equal(t, uint32(20092), e.Params.GetPid())
+	assert.Equal(t, uint32(13440), e.Params.GetPpid())
+	assert.Equal(t, uint32(13440), e.Params.GetUint32ByName(params.ProcessRealParentID))
+	assert.Equal(t, uint32(1), e.Params.GetUint32ByName(params.SessionID))
 	assert.Equal(t, "S-1-5-21-599738850-1144877205-2995667500-1002", e.GetParamAsString(params.UserSID))
 }
 
@@ -525,18 +1072,19 @@ func TestDecodeProcessInternal(t *testing.T) {
 	}
 
 	r := initEventRecord(0, 0, buf)
-	e := &Event{Params: make(Params)}
-	paramDecoder.DecodeProcessInternal(r, e)
+	e := &Event{Type: CreateProcessInternal, Params: NewParams(CreateProcessInternal)}
+	require.NoError(t, DecodeParams(r, e))
 
-	assert.Len(t, e.Params, 10)
-	assert.Equal(t, `\Device\HarddiskVolume3\Program Files\Git\mingw64\bin\git.exe`, e.Params.MustGetString(params.Exe))
-	assert.Equal(t, uint64(0xc30d), e.Params.MustGetUint64(params.ProcessObject))
-	assert.Equal(t, uint32(19800), e.Params.MustGetPid())
-	assert.Equal(t, uint32(6828), e.Params.MustGetPpid())
-	assert.Equal(t, uint32(1), e.Params.MustGetUint32(params.SessionID))
+	assert.Equal(t, 11, e.Params.Len())
+	assert.Equal(t, `\Device\HarddiskVolume3\Program Files\Git\mingw64\bin\git.exe`, e.Params.GetStringByName(params.Exe))
+	assert.Equal(t, uint64(0xc30d), e.Params.GetUint64ByName(params.ProcessSequenceNumber))
+	assert.Equal(t, uint64(0xc30b), e.Params.GetUint64ByName(params.ParentProcessSequenceNumber))
+	assert.Equal(t, uint32(19800), e.Params.GetPid())
+	assert.Equal(t, uint32(6828), e.Params.GetPpid())
+	assert.Equal(t, uint32(1), e.Params.GetUint32ByName(params.SessionID))
 	assert.Equal(t, "FULL", e.GetParamAsString(params.ProcessTokenElevationType))
 	assert.Equal(t, "HIGH", e.GetParamAsString(params.ProcessTokenIntegrityLevel))
-	assert.True(t, e.Params.MustGetBool(params.ProcessTokenIsElevated))
+	assert.True(t, e.Params.GetBoolByName(params.ProcessTokenIsElevated))
 }
 
 func TestDecodeModule(t *testing.T) {
@@ -573,16 +1121,16 @@ func TestDecodeModule(t *testing.T) {
 	}
 
 	r := initEventRecord(0, 0, buf)
-	e := &Event{Params: make(Params)}
-	paramDecoder.DecodeModule(r, e)
+	e := &Event{Type: LoadModule, Params: NewParams(LoadModule)}
+	require.NoError(t, DecodeParams(r, e))
 
-	assert.Len(t, e.Params, 9)
-	assert.Equal(t, uint64(0x7ffd09200000), e.Params.MustGetUint64(params.ModuleBase))
-	assert.Equal(t, uint32(48733), e.Params.MustGetUint32(params.ModuleCheckSum))
-	assert.Equal(t, uint64(0x7ffd09200000), e.Params.MustGetUint64(params.ModuleDefaultBase))
-	assert.Equal(t, `\Device\HarddiskVolume3\Windows\System32\normaliz.dll`, e.Params.MustGetString(params.ModulePath))
-	assert.Equal(t, uint64(32768), e.Params.MustGetUint64(params.ModuleSize))
-	assert.Equal(t, uint32(5544), e.Params.MustGetPid())
+	assert.Equal(t, 9, e.Params.Len())
+	assert.Equal(t, uint64(0x7ffd09200000), e.Params.GetUint64ByName(params.ModuleBase))
+	assert.Equal(t, uint32(48733), e.Params.GetUint32ByName(params.ModuleCheckSum))
+	assert.Equal(t, uint64(0x7ffd09200000), e.Params.GetUint64ByName(params.ModuleDefaultBase))
+	assert.Equal(t, `\Device\HarddiskVolume3\Windows\System32\normaliz.dll`, e.Params.GetStringByName(params.ModulePath))
+	assert.Equal(t, uint64(32768), e.Params.GetUint64ByName(params.ModuleSize))
+	assert.Equal(t, uint32(5544), e.Params.GetPid())
 	assert.Equal(t, "WINDOWS", e.GetParamAsString(params.ModuleSignatureLevel))
 	assert.Equal(t, "FILE_VERIFIED", e.GetParamAsString(params.ModuleSignatureType))
 }
@@ -618,16 +1166,16 @@ func TestDecodeModuleInternal(t *testing.T) {
 	}
 
 	r := initEventRecord(0, 0, buf)
-	e := &Event{Params: make(Params)}
-	paramDecoder.DecodeModuleInternal(r, e)
+	e := &Event{Type: LoadModuleInternal, Params: NewParams(LoadModuleInternal)}
+	require.NoError(t, DecodeParams(r, e))
 
-	assert.Len(t, e.Params, 6)
-	assert.Equal(t, uint64(0x7ffcfc960000), e.Params.MustGetUint64(params.ModuleBase))
-	assert.Equal(t, uint32(556519), e.Params.MustGetUint32(params.ModuleCheckSum))
-	assert.Equal(t, uint64(0x7ffcfc960000), e.Params.MustGetUint64(params.ModuleDefaultBase))
-	assert.Equal(t, `\Device\HarddiskVolume3\Windows\System32\FWPUCLNT.DLL`, e.Params.MustGetString(params.ModulePath))
-	assert.Equal(t, uint64(548864), e.Params.MustGetUint64(params.ModuleSize))
-	assert.Equal(t, uint32(17504), e.Params.MustGetPid())
+	assert.Equal(t, 7, e.Params.Len())
+	assert.Equal(t, uint64(0x7ffcfc960000), e.Params.GetUint64ByName(params.ModuleBase))
+	assert.Equal(t, uint32(556519), e.Params.GetUint32ByName(params.ModuleCheckSum))
+	assert.Equal(t, uint64(0x7ffcfc960000), e.Params.GetUint64ByName(params.ModuleDefaultBase))
+	assert.Equal(t, `\Device\HarddiskVolume3\Windows\System32\FWPUCLNT.DLL`, e.Params.GetStringByName(params.ModulePath))
+	assert.Equal(t, uint64(548864), e.Params.GetUint64ByName(params.ModuleSize))
+	assert.Equal(t, uint32(17504), e.Params.GetPid())
 }
 
 func TestDecodeOpenProcess(t *testing.T) {
@@ -638,13 +1186,13 @@ func TestDecodeOpenProcess(t *testing.T) {
 	}
 
 	r := initEventRecord(0, 0, buf)
-	e := &Event{Params: make(Params)}
-	paramDecoder.DecodeOpenProcess(r, e)
+	e := &Event{Type: OpenProcess, Params: NewParams(OpenProcess)}
+	require.NoError(t, DecodeParams(r, e))
 
-	assert.Len(t, e.Params, 4)
+	assert.Equal(t, 4, e.Params.Len())
 	assert.Equal(t, "QUERY_LIMITED_INFORMATION", e.GetParamAsString(params.DesiredAccess))
-	assert.Equal(t, uint32(5744), e.Params.MustGetPid())
-	assert.Equal(t, uint32(0), e.Params.MustGetUint32(params.NTStatus))
+	assert.Equal(t, uint32(5744), e.Params.GetPid())
+	assert.Equal(t, uint32(0), e.Params.GetUint32ByName(params.NTStatus))
 }
 
 func TestDecodeThread(t *testing.T) {
@@ -667,21 +1215,21 @@ func TestDecodeThread(t *testing.T) {
 	}
 
 	r := initEventRecord(0, 0, buf)
-	e := &Event{Params: make(Params)}
-	paramDecoder.DecodeThread(r, e)
+	e := &Event{Type: CreateThread, Params: NewParams(CreateThread)}
+	require.NoError(t, DecodeParams(r, e))
 
-	assert.Len(t, e.Params, 11)
-	assert.Equal(t, uint8(2), e.Params.MustGetUint8(params.BasePrio))
-	assert.Equal(t, uint8(0), e.Params.MustGetUint8(params.IOPrio))
-	assert.Equal(t, uint8(0), e.Params.MustGetUint8(params.PagePrio))
-	assert.Equal(t, uint64(0xfffffc0a0c808000), e.Params.MustGetUint64(params.KstackBase))
-	assert.Equal(t, uint64(0xfffffc0a0c801000), e.Params.MustGetUint64(params.KstackLimit))
-	assert.Equal(t, uint32(5128), e.Params.MustGetPid())
-	assert.Equal(t, uint32(1764), e.Params.MustGetTid())
-	assert.Equal(t, uint64(0xf00000007ffd0963), e.Params.MustGetUint64(params.StartAddress))
-	assert.Equal(t, uint64(0x58cde9), e.Params.MustGetUint64(params.TEB))
-	assert.Equal(t, uint64(0x58ce100000), e.Params.MustGetUint64(params.UstackBase))
-	assert.Equal(t, uint64(0x58ce0f8000), e.Params.MustGetUint64(params.UstackLimit))
+	assert.Equal(t, 11, e.Params.Len())
+	assert.Equal(t, uint8(2), e.Params.GetUint8ByName(params.BasePrio))
+	assert.Equal(t, uint8(0), e.Params.GetUint8ByName(params.IOPrio))
+	assert.Equal(t, uint8(0), e.Params.GetUint8ByName(params.PagePrio))
+	assert.Equal(t, uint64(0xfffffc0a0c808000), e.Params.GetUint64ByName(params.KstackBase))
+	assert.Equal(t, uint64(0xfffffc0a0c801000), e.Params.GetUint64ByName(params.KstackLimit))
+	assert.Equal(t, uint32(5128), e.Params.GetPid())
+	assert.Equal(t, uint32(1764), e.Params.GetTid())
+	assert.Equal(t, uint64(0xf00000007ffd0963), e.Params.GetUint64ByName(params.StartAddress))
+	assert.Equal(t, uint64(0x58cde9), e.Params.GetUint64ByName(params.TEB))
+	assert.Equal(t, uint64(0x58ce100000), e.Params.GetUint64ByName(params.UstackBase))
+	assert.Equal(t, uint64(0x58ce0f8000), e.Params.GetUint64ByName(params.UstackLimit))
 }
 
 func TestDecodeOpenThread(t *testing.T) {
@@ -693,14 +1241,14 @@ func TestDecodeOpenThread(t *testing.T) {
 	}
 
 	r := initEventRecord(0, 0, buf)
-	e := &Event{Params: make(Params)}
-	paramDecoder.DecodeOpenThread(r, e)
+	e := &Event{Type: OpenThread, Params: NewParams(OpenThread)}
+	require.NoError(t, DecodeParams(r, e))
 
-	assert.Len(t, e.Params, 5)
+	assert.Equal(t, 5, e.Params.Len())
 	assert.Equal(t, "ALL_ACCESS", e.GetParamAsString(params.DesiredAccess))
-	assert.Equal(t, uint32(4456), e.Params.MustGetPid())
-	assert.Equal(t, uint32(12108), e.Params.MustGetTid())
-	assert.Equal(t, uint32(0), e.Params.MustGetUint32(params.NTStatus))
+	assert.Equal(t, uint32(4456), e.Params.GetPid())
+	assert.Equal(t, uint32(12108), e.Params.GetTid())
+	assert.Equal(t, uint32(0), e.Params.GetUint32ByName(params.NTStatus))
 }
 
 func TestDecodeSetThreadContext(t *testing.T) {
@@ -708,11 +1256,11 @@ func TestDecodeSetThreadContext(t *testing.T) {
 		0, 0, 0, 0,
 	}
 	r := initEventRecord(0, 0, buf)
-	e := &Event{Params: make(Params)}
-	paramDecoder.DecodeSetThreadContext(r, e)
+	e := &Event{Type: SetThreadContext, Params: NewParams(SetThreadContext)}
+	require.NoError(t, DecodeParams(r, e))
 
-	assert.Len(t, e.Params, 2)
-	assert.Equal(t, uint32(0), e.Params.MustGetUint32(params.NTStatus))
+	assert.Equal(t, 2, e.Params.Len())
+	assert.Equal(t, uint32(0), e.Params.GetUint32ByName(params.NTStatus))
 }
 
 func TestDecodeCreateSymbolicLinkObject(t *testing.T) {
@@ -768,14 +1316,14 @@ func TestDecodeCreateSymbolicLinkObject(t *testing.T) {
 	}
 
 	r := initEventRecord(0, 0, buf)
-	e := &Event{Params: make(Params)}
-	paramDecoder.DecodeCreateSymbolicLinkObject(r, e)
+	e := &Event{Type: CreateSymbolicLinkObject, Params: NewParams(CreateSymbolicLinkObject)}
+	require.NoError(t, DecodeParams(r, e))
 
-	assert.Len(t, e.Params, 5)
+	assert.Equal(t, 5, e.Params.Len())
 	assert.Equal(t, "DELETE|READ_CONTROL|WRITE_DAC|WRITE_OWNER", e.GetParamAsString(params.DesiredAccess))
 	assert.Equal(t, "Session", e.GetParamAsString(params.LinkSource))
 	assert.Equal(t, `\Sessions\1\AppContainerNamedObjects\S-1-15-2-1609473798-1231923017-684268153-4268514328-882773646-2760585773-1760938157`, e.GetParamAsString(params.LinkTarget))
-	assert.Equal(t, uint32(0), e.Params.MustGetUint32(params.NTStatus))
+	assert.Equal(t, uint32(0), e.Params.GetUint32ByName(params.NTStatus))
 }
 
 func TestDecodeStackWalk(t *testing.T) {
@@ -807,14 +1355,14 @@ func TestDecodeStackWalk(t *testing.T) {
 	}
 
 	r := initEventRecord(0, 0, buf)
-	e := &Event{Params: make(Params)}
-	paramDecoder.DecodeStackwalk(r, e)
+	e := &Event{Type: StackWalk, Params: NewParams(StackWalk)}
+	require.NoError(t, DecodeParams(r, e))
 
-	assert.Len(t, e.Params, 4)
-	assert.Equal(t, uint64(250273540393), e.Params.MustGetUint64(params.CallstackTimestamp))
-	assert.Equal(t, uint32(3852), e.Params.MustGetPid())
-	assert.Equal(t, uint32(7584), e.Params.MustGetTid())
-	assert.Equal(t, []va.Address{0xfffff805bdfe0c94, 0xfffff805bde589af, 0xfffff805bdf22f86, 0xfffff80550ff6d24, 0xfffff8054f82baaf, 0xfffff8054f82b1a0, 0xfffff8054f8968e0, 0xfffff805bdfa953b, 0xfffff805bdfa94b3, 0xfffff805be49a83b, 0xfffff805be4988da, 0xfffff805be4965e3, 0xfffff805be49cac4, 0xfffff805be2bd955, 0x7ffd09724514, 0x7ffd0619331f, 0x7ff6248a6069, 0x7ff62492256d, 0x7ff6249225e3}, e.Params.MustGetSlice(params.Callstack))
+	assert.Equal(t, 4, e.Params.Len())
+	assert.Equal(t, uint64(250273540393), e.Params.GetUint64ByName(params.CallstackTimestamp))
+	assert.Equal(t, uint32(3852), e.Params.GetPid())
+	assert.Equal(t, uint32(7584), e.Params.GetTid())
+	assert.Equal(t, []va.Address{0xfffff805bdfe0c94, 0xfffff805bde589af, 0xfffff805bdf22f86, 0xfffff80550ff6d24, 0xfffff8054f82baaf, 0xfffff8054f82b1a0, 0xfffff8054f8968e0, 0xfffff805bdfa953b, 0xfffff805bdfa94b3, 0xfffff805be49a83b, 0xfffff805be4988da, 0xfffff805be4965e3, 0xfffff805be49cac4, 0xfffff805be2bd955, 0x7ffd09724514, 0x7ffd0619331f, 0x7ff6248a6069, 0x7ff62492256d, 0x7ff6249225e3}, e.Params.GetAddressesByName(params.Callstack))
 }
 
 func TestDecodeMemory(t *testing.T) {
@@ -826,13 +1374,13 @@ func TestDecodeMemory(t *testing.T) {
 	}
 
 	r := initEventRecord(0, 0, buf)
-	e := &Event{Params: make(Params)}
-	paramDecoder.DecodeMemory(r, e)
+	e := &Event{Type: VirtualAlloc, Params: NewParams(VirtualAlloc)}
+	require.NoError(t, DecodeParams(r, e))
 
-	assert.Len(t, e.Params, 4)
-	assert.Equal(t, uint32(3440), e.Params.MustGetPid())
-	assert.Equal(t, uint64(4096), e.Params.MustGetUint64(params.MemRegionSize))
-	assert.Equal(t, uint64(0x26ef21bb000), e.Params.MustGetUint64(params.MemBaseAddress))
+	assert.Equal(t, 4, e.Params.Len())
+	assert.Equal(t, uint32(3440), e.Params.GetPid())
+	assert.Equal(t, uint64(4096), e.Params.GetUint64ByName(params.MemRegionSize))
+	assert.Equal(t, uint64(0x26ef21bb000), e.Params.GetUint64ByName(params.MemBaseAddress))
 	assert.Equal(t, "COMMIT", e.GetParamAsString(params.MemAllocType))
 }
 
@@ -845,15 +1393,15 @@ func TestDecodeNetwork(t *testing.T) {
 		assertions func(t *testing.T, e *Event)
 	}{
 		{
-			name: "SendTCPv4", opcode: SendV4ID,
+			name: "Send", opcode: SendV4ID,
 			assertions: func(t *testing.T, e *Event) {
-				assert.Len(t, e.Params, 7)
+				assert.Equal(t, 7, e.Params.Len())
 				assert.Equal(t, "172.64.148.235", e.GetParamAsString(params.NetDIP))
-				assert.Equal(t, uint16(443), e.Params.MustGetUint16(params.NetDport))
+				assert.Equal(t, uint16(443), e.Params.GetUint16ByName(params.NetDport))
 				assert.Equal(t, "192.168.1.44", e.GetParamAsString(params.NetSIP))
-				assert.Equal(t, uint16(61552), e.Params.MustGetUint16(params.NetSport))
-				assert.Equal(t, uint32(12448), e.Params.MustGetPid())
-				assert.Equal(t, uint32(28), e.Params.MustGetUint32(params.NetSize))
+				assert.Equal(t, uint16(61552), e.Params.GetUint16ByName(params.NetSport))
+				assert.Equal(t, uint32(12448), e.Params.GetPid())
+				assert.Equal(t, uint32(28), e.Params.GetUint32ByName(params.NetSize))
 				assert.Equal(t, "TCP", e.GetParamAsString(params.NetL4Proto))
 			},
 			buf: []byte{
@@ -870,15 +1418,15 @@ func TestDecodeNetwork(t *testing.T) {
 			providerID: NetworkTCPEventGUID,
 		},
 		{
-			name: "ConnectTCPv4", opcode: ConnectTCPv4ID,
+			name: "Connect", opcode: ConnectTCPv4ID,
 			assertions: func(t *testing.T, e *Event) {
-				assert.Len(t, e.Params, 7)
+				assert.Equal(t, 7, e.Params.Len())
 				assert.Equal(t, "151.101.193.91", e.GetParamAsString(params.NetDIP))
-				assert.Equal(t, uint16(443), e.Params.MustGetUint16(params.NetDport))
+				assert.Equal(t, uint16(443), e.Params.GetUint16ByName(params.NetDport))
 				assert.Equal(t, "192.168.1.44", e.GetParamAsString(params.NetSIP))
-				assert.Equal(t, uint16(61931), e.Params.MustGetUint16(params.NetSport))
-				assert.Equal(t, uint32(12448), e.Params.MustGetPid())
-				assert.Equal(t, uint32(0), e.Params.MustGetUint32(params.NetSize))
+				assert.Equal(t, uint16(61931), e.Params.GetUint16ByName(params.NetSport))
+				assert.Equal(t, uint32(12448), e.Params.GetPid())
+				assert.Equal(t, uint32(0), e.Params.GetUint32ByName(params.NetSize))
 				assert.Equal(t, "TCP", e.GetParamAsString(params.NetL4Proto))
 			},
 			buf: []byte{
@@ -896,15 +1444,15 @@ func TestDecodeNetwork(t *testing.T) {
 			providerID: NetworkTCPEventGUID,
 		},
 		{
-			name: "RecvUDPv6", opcode: RecvV6ID,
+			name: "Recv", opcode: RecvV6ID,
 			assertions: func(t *testing.T, e *Event) {
-				assert.Len(t, e.Params, 7)
+				assert.Equal(t, 7, e.Params.Len())
 				assert.Equal(t, "ff02::c", e.GetParamAsString(params.NetDIP))
-				assert.Equal(t, uint16(1900), e.Params.MustGetUint16(params.NetDport))
+				assert.Equal(t, uint16(1900), e.Params.GetUint16ByName(params.NetDport))
 				assert.Equal(t, "fe80::1", e.GetParamAsString(params.NetSIP))
-				assert.Equal(t, uint16(56797), e.Params.MustGetUint16(params.NetSport))
-				assert.Equal(t, uint32(5128), e.Params.MustGetPid())
-				assert.Equal(t, uint32(127), e.Params.MustGetUint32(params.NetSize))
+				assert.Equal(t, uint16(56797), e.Params.GetUint16ByName(params.NetSport))
+				assert.Equal(t, uint32(5128), e.Params.GetPid())
+				assert.Equal(t, uint32(127), e.Params.GetUint32ByName(params.NetSize))
 				assert.Equal(t, "UDP", e.GetParamAsString(params.NetL4Proto))
 			},
 			buf: []byte{
@@ -928,8 +1476,10 @@ func TestDecodeNetwork(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := initEventRecord(tt.opcode, 0, tt.buf, withProviderID(tt.providerID))
-			e := &Event{Params: make(Params)}
-			paramDecoder.DecodeNetwork(r, e)
+			typ, ok := ParseType(tt.name)
+			require.True(t, ok)
+			e := &Event{Type: typ, Params: NewParams(typ)}
+			require.NoError(t, DecodeParams(r, e))
 			tt.assertions(t, e)
 		})
 	}
@@ -967,12 +1517,12 @@ func TestDecodeDNS(t *testing.T) {
 	}
 
 	r := initEventRecord(0, ReplyDNSID, buf)
-	e := &Event{Params: make(Params)}
-	paramDecoder.DecodeDNS(r, e)
+	e := &Event{Type: ReplyDNS, Params: NewParams(ReplyDNS)}
+	require.NoError(t, DecodeParams(r, e))
 
-	assert.Len(t, e.Params, 5)
-	assert.Equal(t, []string{"2600:1901:0:e988::", ""}, e.Params.MustGetSlice(params.DNSAnswers))
-	assert.Equal(t, "img-prod.pocket.prod.cloudops.mozgcp.net", e.Params.MustGetString(params.DNSName))
+	assert.Equal(t, 5, e.Params.Len())
+	assert.Equal(t, []string{"2600:1901:0:e988::", ""}, e.Params.GetStringSliceByName(params.DNSAnswers))
+	assert.Equal(t, "img-prod.pocket.prod.cloudops.mozgcp.net", e.Params.GetStringByName(params.DNSName))
 	assert.Equal(t, "ACCEPT_TRUNCATED_RESPONSE|NO_NETBT|NO_MULTICAST|DONT_RESET_TTL_VALUES", e.GetParamAsString(params.DNSOpts))
 	assert.Equal(t, "NOERROR", e.GetParamAsString(params.DNSRcode))
 	assert.Equal(t, "AAAA", e.GetParamAsString(params.DNSRR))

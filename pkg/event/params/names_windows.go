@@ -65,6 +65,8 @@ const (
 	StartAddressModule = "start_address_module"
 	// TEB is the address of the Thread Environment Block.
 	TEB = "teb"
+	// FileOptions represents the value that encoded the options and the disposition flags.
+	FileOptions = "options"
 	// FileCreateOptions represents options passed to NtCreateFile.
 	FileCreateOptions = "create_options"
 	// FileOperation represents the file create disposition.
