@@ -345,10 +345,11 @@ func New(
 
 	// compile filter from the expression
 	if f.fexpr != "" {
-		f.filter = filter.New(f.fexpr, config)
-		if err := f.filter.Compile(); err != nil {
+		flt, err := filter.New(f.fexpr)
+		if err != nil {
 			return nil, err
 		}
+		f.filter = flt
 	}
 	// if on_interval function has been declared in the module, we'll
 	// schedule the ticker to the interval value set during filament

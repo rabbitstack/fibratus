@@ -5,10 +5,9 @@
 Repeatedly embedding such conditions can lead to verbose, boilerplate-heavy rules. From a maintenance perspective, even a small change would require updating every affected rule. Macros solve this problem by offering a convenient way to define and reuse common patterns. Fibratus includes a built-in [macros library](https://github.com/rabbitstack/fibratus/blob/master/rules/macros/macros.yml) with a variety of ready-to-use definitions. The macros library is loaded from the file system and can be organized across multiple `yaml` files. By default, macros are located in the `%PROGRAM FILES%\Fibratus\Rules\Macros` directory.
 
 ```yaml
-filters:
-  macros:
-    from-paths:
-      - C:\Program Files\Fibratus\Rules\Macros\*.yml
+rules:
+  macro-paths:
+    - C:\Program Files\Fibratus\Rules\Macros\*.yml
 ```
 
 ## Macro types

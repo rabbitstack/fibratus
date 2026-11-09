@@ -1,5 +1,3 @@
-//go:build windows
-
 /*
  * Copyright 2021-present by Nedim Sabic Sabic
  * https://www.fibratus.io
@@ -21,553 +19,543 @@
 package rules
 
 import (
+	"context"
+	"errors"
 	"net"
-	"os"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
-	"github.com/rabbitstack/fibratus/pkg/event/params"
-	"github.com/rabbitstack/fibratus/pkg/fs"
-	"github.com/rabbitstack/fibratus/pkg/ps"
-	"github.com/rabbitstack/fibratus/pkg/ps/types"
-	"github.com/rabbitstack/fibratus/pkg/sys"
-	log "github.com/sirupsen/logrus"
+	"github.com/rabbitstack/fibratus/pkg/policy"
+	"github.com/rabbitstack/fibratus/pkg/util/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/sys/windows"
 )
 
-type mockNoopSender struct{}
-type mockNoneSender struct{}
+// fakeProvider serves the policies that tests can replace at any time.
+type fakeProvider struct {
+	mu       sync.Mutex
+	policies []*policy.Policy
+	err      error
+	cb       func()
+	started  bool
+	closed   bool
+	startErr error
+}
 
-var emitAlert *alertsender.Alert
-var seqAlert *alertsender.Alert
+func (p *fakeProvider) Type() string { return "fake" }
+func (p *fakeProvider) LoadPolicies() ([]*policy.Policy, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.policies, p.err
+}
+func (p *fakeProvider) SetOnPoliciesChanged(cb func()) { p.cb = cb }
+func (p *fakeProvider) Start() error                   { p.started = true; return p.startErr }
+func (p *fakeProvider) Close() error                   { p.closed = true; return nil }
 
-func (s *mockNoopSender) Send(a alertsender.Alert) error {
-	emitAlert = &a
+// update replaces the policies and notifies the loader like a real provider.
+func (p *fakeProvider) update(err error, policies ...*policy.Policy) {
+	p.mu.Lock()
+	p.policies, p.err = policies, err
+	p.mu.Unlock()
+	p.cb()
+}
+
+type fakeActions struct {
+	mu        sync.Mutex
+	alerts    []RuleMatch
+	kills     []RuleMatch
+	isolates  [][]net.IP
+	alertErr  error
+	killErr   error
+	isolateEr error
+}
+
+func (a *fakeActions) Alert(m RuleMatch) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.alerts = append(a.alerts, m)
+	return a.alertErr
+}
+
+func (a *fakeActions) Kill(m RuleMatch) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.kills = append(a.kills, m)
+	return a.killErr
+}
+
+func (a *fakeActions) Isolate(whitelist []net.IP) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.isolates = append(a.isolates, whitelist)
+	return a.isolateEr
+}
+
+func (a *fakeActions) actions() Actions {
+	return Actions{Alerter: a, ProcessKiller: a, Isolator: a}
+}
+
+type fakeHeartbeats struct {
+	mu    sync.Mutex
+	beats []*Heartbeat
+}
+
+func (f *fakeHeartbeats) SendHeartbeat(h *Heartbeat) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.beats = append(f.beats, h)
 	return nil
 }
 
-func (s *mockNoopSender) Type() alertsender.Type {
-	return alertsender.Noop
+func (f *fakeHeartbeats) count() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return len(f.beats)
 }
 
-func (s *mockNoopSender) Shutdown() error        { return nil }
-func (s *mockNoopSender) SupportsMarkdown() bool { return true }
-
-func makeNoopSender(config alertsender.Config) (alertsender.Sender, error) {
-	return &mockNoopSender{}, nil
-}
-
-func (s *mockNoneSender) Send(a alertsender.Alert) error {
-	seqAlert = &a
-	return nil
-}
-
-func (s *mockNoneSender) Type() alertsender.Type {
-	return alertsender.None
-}
-
-func (s *mockNoneSender) Shutdown() error        { return nil }
-func (s *mockNoneSender) SupportsMarkdown() bool { return true }
-
-func makeNoneSender(config alertsender.Config) (alertsender.Sender, error) {
-	return &mockNoneSender{}, nil
-}
-
-func init() {
-	alertsender.Register(alertsender.Noop, makeNoopSender)
-	alertsender.Register(alertsender.None, makeNoneSender)
-}
-
-func newConfig(fromFiles ...string) *config.Config {
-	c := &config.Config{
-		EventSource: config.EventSourceConfig{
-			EnableNetEvents:      true,
-			EnableRegistryEvents: true,
-			EnableFileIOEvents:   true,
-			EnableModuleEvents:   true,
-			EnableThreadEvents:   true,
-		},
-		Filters: &config.Filters{
-			Rules: config.Rules{
-				FromPaths: fromFiles,
-			},
-		},
+func (f *fakeHeartbeats) last() *Heartbeat {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if len(f.beats) == 0 {
+		return nil
 	}
-	return c
+	return f.beats[len(f.beats)-1]
 }
 
-func compileRules(t *testing.T, e *Engine) {
-	rs, err := e.Compile()
-	require.NoError(t, err)
-	require.NotNil(t, rs)
+func newTestEngine(t *testing.T, matchAll bool, p *fakeProvider, actions Actions, opts ...EngineOption) *Engine {
+	t.Helper()
+	opts = append([]EngineOption{WithProviders(p), WithActions(actions)}, opts...)
+	e := NewEngine(config.RulesConfig{Enabled: true, MatchAll: matchAll}, opts...)
+	t.Cleanup(e.Stop)
+	return e
 }
 
-func wrapProcessEvent(e *event.Event, fn func(*event.Event) (bool, error)) bool {
-	match, err := fn(e)
-	if err != nil {
-		panic(err)
-	}
-	return match
+// startEngine starts the engine and returns the channel that triggers the reload.
+func startEngine(t *testing.T, e *Engine) chan struct{} {
+	t.Helper()
+	reload := make(chan struct{})
+	require.NoError(t, e.Start(context.Background(), reload))
+	return reload
 }
 
-func fireRules(t *testing.T, c *config.Config) bool {
-	e := NewEngine(new(ps.SnapshotterMock), c)
-	evt := &event.Event{
-		Type: event.Recv,
-		Tid:  2484,
-		PID:  859,
-		Params: event.Params{
-			params.NetDport: {Name: params.NetDport, Type: params.Uint16, Value: uint16(443)},
-			params.NetSport: {Name: params.NetSport, Type: params.Uint16, Value: uint16(43123)},
-			params.NetSIP:   {Name: params.NetSIP, Type: params.IPv4, Value: net.ParseIP("127.0.0.1")},
-			params.NetDIP:   {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("216.58.201.174")},
-		},
-		Metadata: make(map[event.MetadataKey]any),
-	}
-	compileRules(t, e)
-	return wrapProcessEvent(evt, e.ProcessEvent)
+func waitFor(t *testing.T, cond func() bool) {
+	t.Helper()
+	require.Eventually(t, cond, 3*time.Second, 5*time.Millisecond)
 }
 
-func TestCompileIndexableFilters(t *testing.T) {
-	e := NewEngine(new(ps.SnapshotterMock), newConfig(
-		"_fixtures/merged_filters/filter*.yml",
-		"_fixtures/default/microsoft_edge.yml",
-		"_fixtures/default/windows_error_*.yml"))
+func TestEngineStartAndHandleEvent(t *testing.T) {
+	kill := def("kill", "evt.name = 'CreateProcess' and ps.name = 'evil.exe'")
+	kill.Labels = map[string]string{"tactic.id": "TA0002"}
+	kill.Action = []policy.ActionDefinition{{Kill: &policy.KillAction{}}}
+	iso := def("isolate", "evt.name = 'CreateFile'")
+	whitelist := []net.IP{net.ParseIP("10.0.0.1")}
+	iso.Action = []policy.ActionDefinition{{Isolate: &policy.IsolateAction{Whitelist: whitelist}}}
 
-	compileRules(t, e)
+	p := &fakeProvider{policies: []*policy.Policy{behaviour("p", kill, iso, def("plain", "evt.name = 'WriteFile'"))}}
+	fa := &fakeActions{}
+	e := newTestEngine(t, true, p, fa.actions())
+	startEngine(t, e)
 
-	assert.Len(t, e.filters.types, 2)
-	assert.Len(t, e.filters.categories, 1)
+	assert.True(t, p.started)
+	assert.Equal(t, 3, e.Report().NumberRules)
+	assert.Equal(t, 3, e.Len())
 
-	var tests = []struct {
-		evt   *event.Event
-		wants int
-	}{
-		{&event.Event{Type: event.CreateProcess}, 2},
-		{&event.Event{Type: event.Recv}, 4},
-	}
+	var matched []string
+	e.RegisterMatchFunc(func(r *Rule, _ []*event.Event) { matched = append(matched, r.Name) })
 
-	for _, tt := range tests {
-		t.Run(tt.evt.Type.String(), func(t *testing.T) {
-			assert.Len(t, e.filters.collect(tt.evt), tt.wants)
-		})
-	}
+	// event that no rule is interested in
+	require.NoError(t, e.HandleEvent(testutil.MakeEvent(event.RegSetValue)))
+	assert.Empty(t, fa.alerts)
+
+	// rule with the kill action
+	evil := testutil.MakeEvent(event.CreateProcess, testutil.WithPS(testutil.MakePS(7, "evil.exe")))
+	require.NoError(t, e.HandleEvent(evil))
+	require.Len(t, fa.alerts, 1)
+	require.Len(t, fa.kills, 1)
+	assert.Empty(t, fa.isolates)
+	assert.Equal(t, "kill", fa.kills[0].Rule.Name)
+	assert.Equal(t, []string{"kill"}, matched)
+	// the matched event carries the rule name and labels
+	assert.Equal(t, "kill", evil.GetMetaAsString(event.RuleNameKey))
+	assert.Equal(t, "TA0002", evil.GetMetaAsString("tactic.id"))
+
+	// the rule with the isolate action
+	require.NoError(t, e.HandleEvent(testutil.MakeEvent(event.CreateFile)))
+	require.Len(t, fa.isolates, 1)
+	assert.Equal(t, whitelist, fa.isolates[0])
+	assert.Len(t, fa.kills, 1)
+
+	// rule without explicit actions only sends the alert
+	require.NoError(t, e.HandleEvent(testutil.MakeEvent(event.WriteFile)))
+	assert.Len(t, fa.alerts, 3)
+	assert.Len(t, fa.kills, 1)
+	assert.Len(t, fa.isolates, 1)
+
+	// the event that doesn't satisfy the rule condition isn't marked
+	benign := testutil.MakeEvent(event.CreateProcess, testutil.WithPS(testutil.MakePS(8, "good.exe")))
+	require.NoError(t, e.HandleEvent(benign))
+	assert.Empty(t, benign.GetMetaAsString(event.RuleNameKey))
 }
 
-func TestRunSimpleRules(t *testing.T) {
-	var tests = []struct {
-		config  *config.Config
-		matches bool
-	}{
-		{newConfig("_fixtures/simple_matches.yml"), true},
-		{newConfig("_fixtures/simple_matches/filter*.yml"), true},
-	}
+func TestEngineRuleMatchIsRuleSetListener(t *testing.T) {
+	p := &fakeProvider{policies: []*policy.Policy{behaviour("p", def("a", "evt.name = 'CreateFile'"))}}
+	fa := &fakeActions{}
+	e := newTestEngine(t, true, p, fa.actions())
+	startEngine(t, e)
 
-	for i, tt := range tests {
-		matches := fireRules(t, tt.config)
-		if matches != tt.matches {
-			t.Errorf("%d. %v process rules mismatch: exp=%t got=%t", i, tt.config.Filters, tt.matches, matches)
+	rule := e.GetRuleSet().GetRuleByID("id-a")
+	evt := testutil.MakeEvent(event.CreateFile)
+	// the engine always lets the other listeners be notified
+	assert.True(t, e.RuleMatch(rule, []*event.Event{evt}))
+	assert.Len(t, fa.alerts, 1)
+	assert.Equal(t, "a", evt.GetMetaAsString(event.RuleNameKey))
+}
+
+func TestEngineMatchAll(t *testing.T) {
+	policies := []*policy.Policy{behaviour("p", def("a", "evt.name = 'CreateFile'"), def("b", "evt.name = 'CreateFile'"))}
+
+	for _, matchAll := range []bool{true, false} {
+		p := &fakeProvider{policies: policies}
+		fa := &fakeActions{}
+		e := newTestEngine(t, matchAll, p, fa.actions())
+		startEngine(t, e)
+		require.NoError(t, e.HandleEvent(testutil.MakeEvent(event.CreateFile)))
+		if matchAll {
+			assert.Len(t, fa.alerts, 2)
+		} else {
+			assert.Len(t, fa.alerts, 1)
 		}
 	}
 }
 
-func TestSharedSemanticRuleFixtures(t *testing.T) {
-	e := NewEngine(new(ps.SnapshotterMock), newConfig("_fixtures/shared/*.yml"))
-	compileRules(t, e)
-
-	proc := &event.Event{
-		Type:     event.CreateProcess,
-		PID:      859,
-		Params:   event.Params{},
-		Metadata: make(map[event.MetadataKey]any),
+func TestEngineActionFailuresDontStopOtherActions(t *testing.T) {
+	r := def("r", "evt.name = 'CreateFile'")
+	r.Action = []policy.ActionDefinition{{Kill: &policy.KillAction{}}, {Isolate: &policy.IsolateAction{}}}
+	p := &fakeProvider{policies: []*policy.Policy{behaviour("p", r)}}
+	fa := &fakeActions{
+		alertErr:  errors.New("no senders"),
+		killErr:   errors.New("access denied"),
+		isolateEr: errors.New("wfp"),
 	}
-	netevt := &event.Event{
-		Type: event.Recv,
-		PID:  859,
-		Params: event.Params{
-			params.NetDport: {Name: params.NetDport, Type: params.Uint16, Value: uint16(443)},
-		},
-		Metadata: make(map[event.MetadataKey]any),
-	}
+	e := newTestEngine(t, true, p, fa.actions())
+	startEngine(t, e)
 
-	require.True(t, wrapProcessEvent(proc, e.ProcessEvent))
-	require.True(t, wrapProcessEvent(netevt, e.ProcessEvent))
+	evt := testutil.MakeEvent(event.CreateFile)
+	require.NoError(t, e.HandleEvent(evt))
+	assert.Len(t, fa.alerts, 1)
+	assert.Len(t, fa.kills, 1)
+	assert.Len(t, fa.isolates, 1)
+
+	// the failures are reported by the action runner
+	err := e.runActions(RuleMatch{Rule: e.GetRuleSet().GetRules()[0], Events: []*event.Event{evt}})
+	require.Error(t, err)
+	for _, s := range []string{"no senders", "access denied", "wfp"} {
+		assert.Contains(t, err.Error(), s)
+	}
+	// the event is still marked
+	assert.Equal(t, "r", evt.GetMetaAsString(event.RuleNameKey))
 }
 
-func TestRunSequenceRule(t *testing.T) {
-	log.SetLevel(log.DebugLevel)
+func TestEngineWithoutActionImplementations(t *testing.T) {
+	r := def("r", "evt.name = 'CreateFile'")
+	r.Action = []policy.ActionDefinition{{Kill: &policy.KillAction{}}, {Isolate: &policy.IsolateAction{}}}
+	p := &fakeProvider{policies: []*policy.Policy{behaviour("p", r)}}
+	e := newTestEngine(t, true, p, Actions{})
+	startEngine(t, e)
 
-	e := NewEngine(new(ps.SnapshotterMock), newConfig("_fixtures/sequence_rule_complex.yml"))
-	compileRules(t, e)
-
-	e1 := &event.Event{
-		Seq:       1,
-		Type:      event.CreateProcess,
-		Timestamp: time.Now(),
-		Tid:       2484,
-		PID:       2243,
-		PS: &types.PS{
-			Name: "firefox.exe",
-			Exe:  "C:\\Program Files\\Firefox\\firefox.exe",
-		},
-		Params: event.Params{
-			params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: uint32(2243)},
-			params.ProcessName: {Name: params.ProcessName, Type: params.UnicodeString, Value: "firefox.exe"},
-		},
-		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
-	}
-
-	e2 := &event.Event{
-		Seq:       2,
-		Type:      event.CreateFile,
-		Timestamp: time.Now().Add(time.Millisecond * 250),
-		Tid:       2484,
-		PID:       2243,
-		PS: &types.PS{
-			Name:    "firefox.exe",
-			Exe:     "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
-			Cmdline: "C:\\Program Files\\Mozilla Firefox\\firefox.exe\" -contentproc --channel=\"10464.7.539748228\\1366525930\" -childID 6 -isF",
-		},
-		Params: event.Params{
-			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
-			params.FileOperation: {Name: params.FileOperation, Type: params.Enum, Value: uint32(2), Enum: fs.FileCreateDispositions},
-		},
-		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
-	}
-
-	e3 := &event.Event{
-		Seq:       4,
-		Type:      event.Connect,
-		Timestamp: time.Now().Add(time.Second),
-		Tid:       244,
-		PID:       2243,
-		PS: &types.PS{
-			Name:    "firefox.exe",
-			Exe:     "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
-			Cmdline: "C:\\Program Files\\Mozilla Firefox\\firefox.exe\" -contentproc --channel=\"10464.7.539748228\\1366525930\" -childID 6 -isF",
-		},
-		Params: event.Params{
-			params.NetDIP: {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("10.0.2.3")},
-		},
-		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
-	}
-
-	// register alert sender
-	require.NoError(t, alertsender.LoadAll([]alertsender.Config{{Type: alertsender.None}}))
-
-	require.False(t, wrapProcessEvent(e1, e.ProcessEvent))
-	require.False(t, wrapProcessEvent(e2, e.ProcessEvent))
-
-	time.Sleep(time.Millisecond * 30)
-	require.True(t, wrapProcessEvent(e3, e.ProcessEvent))
-
-	time.Sleep(time.Millisecond * 50)
-
-	// check the format of the generated alert
-	require.NotNil(t, seqAlert)
-	assert.Equal(t, "572902be-76e9-4ee7-a48a-6275fa571cf4", seqAlert.ID)
-	assert.Len(t, seqAlert.Events, 3)
-	assert.Equal(t, "Phishing dropper outbound communication", seqAlert.Title)
-	assert.Equal(t, "firefox.exe process initiated outbound communication to 10.0.2.3", seqAlert.Text)
-	seqAlert = nil
-
-	// FSM should transition from terminal to initial state
-	require.False(t, wrapProcessEvent(e1, e.ProcessEvent))
-	require.False(t, wrapProcessEvent(e2, e.ProcessEvent))
-	time.Sleep(time.Millisecond * 15)
-	require.True(t, wrapProcessEvent(e3, e.ProcessEvent))
+	evt := testutil.MakeEvent(event.CreateFile)
+	assert.NotPanics(t, func() { _ = e.HandleEvent(evt) })
+	assert.Equal(t, "r", evt.GetMetaAsString(event.RuleNameKey))
 }
 
-func TestRunSequenceRuleWithPsUUIDLink(t *testing.T) {
-	log.SetLevel(log.DebugLevel)
-
-	e := NewEngine(new(ps.SnapshotterMock), newConfig("_fixtures/sequence_rule_ps_uuid.yml"))
-	compileRules(t, e)
-
-	e1 := &event.Event{
-		Seq:       1,
-		Type:      event.CreateProcess,
-		Timestamp: time.Now(),
-		Tid:       2243,
-		PID:       uint32(os.Getpid()),
-		PS: &types.PS{
-			PID:  uint32(os.Getpid()),
-			Name: "firefox.exe",
-			Exe:  "C:\\Program Files\\Firefox\\firefox.exe",
-		},
-		Params: event.Params{
-			params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: uint32(os.Getpid())},
-			params.ProcessName: {Name: params.ProcessName, Type: params.UnicodeString, Value: "firefox.exe"},
-		},
-		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
-	}
-
-	e2 := &event.Event{
-		Seq:       2,
-		Type:      event.CreateFile,
-		Timestamp: time.Now().Add(time.Second),
-		Tid:       2484,
-		PID:       uint32(os.Getpid()),
-		PS: &types.PS{
-			PID:     uint32(os.Getpid()),
-			Name:    "firefox.exe",
-			Exe:     "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
-			Cmdline: "C:\\Program Files\\Mozilla Firefox\\firefox.exe\" -contentproc --channel=\"10464.7.539748228\\1366525930\" -childID 6 -isF",
-		},
-		Params: event.Params{
-			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
-			params.FileOperation: {Name: params.FileOperation, Type: params.Enum, Value: uint32(2), Enum: fs.FileCreateDispositions},
-		},
-		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
-	}
-
-	require.False(t, wrapProcessEvent(e1, e.ProcessEvent))
-	require.True(t, wrapProcessEvent(e2, e.ProcessEvent))
+func TestEngineNotStarted(t *testing.T) {
+	e := NewEngine(config.RulesConfig{}, WithProviders(&fakeProvider{}))
+	// the engine that wasn't started is a no-op
+	assert.NoError(t, e.HandleEvent(testutil.MakeEvent(event.CreateFile)))
+	assert.Equal(t, 0, e.Len())
+	assert.Equal(t, 0, e.Report().NumberRules)
+	assert.True(t, e.Approvers().Approve(event.RegOpenKey, nil))
+	// stopping the engine that wasn't started is safe
+	assert.NotPanics(t, e.Stop)
 }
 
-func TestRunSimpleAndSequenceRules(t *testing.T) {
-	log.SetLevel(log.DebugLevel)
+func TestEngineStartErrors(t *testing.T) {
+	// provider failure
+	p := &fakeProvider{err: errors.New("boom")}
+	e := newTestEngine(t, true, p, Actions{})
+	require.Error(t, e.Start(context.Background(), nil))
+	assert.Equal(t, 0, e.Len())
+	assert.False(t, p.started, "the providers aren't started when the load fails")
 
-	expectedMatches := make(map[string][]uint64)
-	c := newConfig("_fixtures/simple_and_sequence_rules/*.yml")
-	c.Filters.MatchAll = true
-	e := NewEngine(new(ps.SnapshotterMock), c)
-	e.RegisterMatchFunc(func(f *config.FilterConfig, evts ...*event.Event) {
-		ids := make([]uint64, 0)
-		for _, evt := range evts {
-			ids = append(ids, evt.Seq)
+	// the rule that doesn't compile
+	p = &fakeProvider{policies: []*policy.Policy{behaviour("p", def("bad", "evt.name = 'Nope'"))}}
+	e = newTestEngine(t, true, p, Actions{})
+	err := e.Start(context.Background(), nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "Nope")
+	assert.Equal(t, 0, e.Len())
+
+	// the provider that can't start
+	p = &fakeProvider{startErr: errors.New("watch failed")}
+	e = newTestEngine(t, true, p, Actions{})
+	require.Error(t, e.Start(context.Background(), nil))
+}
+
+func TestEngineReloadsWhenProviderReportsChanges(t *testing.T) {
+	p := &fakeProvider{policies: []*policy.Policy{behaviour("p",
+		def("reg", "evt.name = 'RegOpenKey' and registry.path imatches ('a*')"))}}
+	fa := &fakeActions{}
+	e := newTestEngine(t, true, p, fa.actions())
+
+	var (
+		mu      sync.Mutex
+		reports []*RuleSetReport
+	)
+	e.OnReload(func(r *RuleSetReport) { mu.Lock(); reports = append(reports, r); mu.Unlock() })
+	startEngine(t, e)
+
+	// the approvers consumers obtain from the engine follow the rule set
+	b := values(map[Key]string{keyPath: "bcd"})
+	assert.False(t, e.Approvers().Approve(event.RegOpenKey, b))
+
+	p.update(nil, behaviour("p",
+		def("reg", "evt.name = 'RegOpenKey' and registry.path imatches ('a*')"),
+		def("reg2", "evt.name = 'RegOpenKey' and registry.path imatches ('b*')"),
+		def("file", "evt.name = 'CreateFile'"),
+	))
+
+	waitFor(t, func() bool { return e.Len() == 3 })
+	assert.True(t, e.Approvers().Approve(event.RegOpenKey, b))
+	mu.Lock()
+	require.Len(t, reports, 2) // the initial load and the reload
+	assert.Equal(t, 3, reports[1].NumberRules)
+	assert.True(t, reports[1].HasFileEvents)
+	mu.Unlock()
+
+	require.NoError(t, e.HandleEvent(testutil.MakeEvent(event.CreateFile)))
+	assert.Len(t, fa.alerts, 1)
+}
+
+func TestEngineReloadsOnSignal(t *testing.T) {
+	p := &fakeProvider{policies: []*policy.Policy{behaviour("p", def("a", "evt.name = 'CreateFile'"))}}
+	e := newTestEngine(t, true, p, Actions{})
+	reload := startEngine(t, e)
+
+	// the provider changed the policies without notifying the loader
+	p.mu.Lock()
+	p.policies = []*policy.Policy{behaviour("p", def("a", "evt.name = 'CreateFile'"), def("b", "evt.name = 'WriteFile'"))}
+	p.mu.Unlock()
+	assert.Equal(t, 1, e.Len())
+
+	reload <- struct{}{}
+	waitFor(t, func() bool { return e.Len() == 2 })
+}
+
+func TestEngineKeepsRuleSetWhenReloadFails(t *testing.T) {
+	p := &fakeProvider{policies: []*policy.Policy{behaviour("p", def("a", "evt.name = 'CreateFile'"))}}
+	fa := &fakeActions{}
+	e := newTestEngine(t, true, p, fa.actions())
+
+	var (
+		mu     sync.Mutex
+		errs   []error
+		loaded int
+	)
+	e.SetRulesetLoadedCallback(func(rs *RuleSet, err error) {
+		mu.Lock()
+		defer mu.Unlock()
+		if err != nil {
+			errs = append(errs, err)
+			return
 		}
-		expectedMatches[f.Name] = ids
+		loaded++
 	})
+	startEngine(t, e)
+	before := e.GetRuleSet()
+	failures := func() int { mu.Lock(); defer mu.Unlock(); return len(errs) }
 
-	compileRules(t, e)
+	// the invalid rule
+	p.update(nil, behaviour("p", def("a", "evt.name = 'CreateFile'"), def("bad", "evt.nnname = 'x'")))
+	waitFor(t, func() bool { return failures() == 1 })
+	assert.Same(t, before, e.GetRuleSet())
 
-	evts := []*event.Event{
-		{
-			Seq:       1,
-			Type:      event.CreateProcess,
-			Timestamp: time.Now(),
-			Tid:       2484,
-			PID:       2243,
-			PS: &types.PS{
-				Name: "powershell.exe",
-				Exe:  "C:\\Windows\\system32\\powershell.exe",
-			},
-			Params: event.Params{
-				params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: uint32(2243)},
-				params.ProcessName: {Name: params.ProcessName, Type: params.UnicodeString, Value: "powershell.exe"},
-			},
-			Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
-		},
-		{
-			Seq:       2,
-			Type:      event.CreateFile,
-			Timestamp: time.Now().Add(time.Millisecond * 544),
-			Tid:       2484,
-			PID:       2243,
-			PS: &types.PS{
-				Name: "cmd.exe",
-				Exe:  "C:\\Windows\\system32\\cmd.exe",
-			},
-			Params: event.Params{
-				params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
-				params.FileOperation: {Name: params.FileOperation, Type: params.Enum, Value: uint32(2)},
-			},
-			Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
-		},
-		{
-			Seq:       10,
-			Type:      event.CreateProcess,
-			Timestamp: time.Now().Add(time.Second * 2),
-			Tid:       2484,
-			PID:       2243,
-			PS: &types.PS{
-				Name: "chrome.exe",
-				Exe:  "C:\\Program Files\\Chrome\\chrome.exe",
-				Parent: &types.PS{
-					Name: "cmd.exe",
-					Exe:  "C:\\Windows\\system32\\cmd.exe",
-				},
-			},
-			Params: event.Params{
-				params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: uint32(2243)},
-				params.ProcessName: {Name: params.ProcessName, Type: params.UnicodeString, Value: "chrome.exe"},
-			},
-			Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
-		},
-	}
+	// the provider failure
+	p.update(errors.New("unreachable"), behaviour("p"))
+	waitFor(t, func() bool { return failures() == 2 })
+	assert.Same(t, before, e.GetRuleSet())
 
-	for _, evt := range evts {
-		require.True(t, wrapProcessEvent(evt, e.ProcessEvent))
-	}
+	// duplicate rule identifiers across policies
+	p.update(nil, behaviour("p1", def("a", "evt.name = 'CreateFile'")), behaviour("p2", def("a", "evt.name = 'WriteFile'")))
+	waitFor(t, func() bool { return failures() == 3 })
+	assert.Same(t, before, e.GetRuleSet())
 
-	assert.Len(t, expectedMatches, 4)
+	// the previous rules keep working
+	require.NoError(t, e.HandleEvent(testutil.MakeEvent(event.CreateFile)))
+	assert.Len(t, fa.alerts, 1)
 
-	var tests = []struct {
-		rule     string
-		eventIDs []uint64
-	}{
-		{"Powershell process spawned", []uint64{1}},
-		{"Powershell created a temp file", []uint64{1, 2}},
-		{"Spawn Chrome browser", []uint64{10}},
-		{"Command shell spawned Chrome browser", []uint64{1, 10}},
-	}
+	// and the engine recovers when the policies are fixed
+	p.update(nil, behaviour("p", def("a", "evt.name = 'WriteFile'")))
+	waitFor(t, func() bool { return e.GetRuleSet() != before })
+	require.NoError(t, e.HandleEvent(testutil.MakeEvent(event.WriteFile)))
+	assert.Len(t, fa.alerts, 2)
 
-	for _, tt := range tests {
-		t.Run(tt.rule, func(t *testing.T) {
-			assert.Equal(t, expectedMatches[tt.rule], tt.eventIDs)
-		})
-	}
+	mu.Lock()
+	defer mu.Unlock()
+	assert.Equal(t, 2, loaded) // the initial load and the recovery
 }
 
-func TestAlertAction(t *testing.T) {
-	require.NoError(t, alertsender.LoadAll([]alertsender.Config{{Type: alertsender.Noop}}))
-	e := NewEngine(new(ps.SnapshotterMock), newConfig("_fixtures/simple_emit_alert.yml"))
-	compileRules(t, e)
+func TestEngineReloadLoopSurvivesPanics(t *testing.T) {
+	p := &fakeProvider{policies: []*policy.Policy{behaviour("p", def("a", "evt.name = 'CreateFile'"))}}
+	e := newTestEngine(t, true, p, Actions{})
 
-	evt := &event.Event{
-		Type: event.Recv,
-		Tid:  2484,
-		PID:  859,
-		PS: &types.PS{
-			Name: "cmd.exe",
-		},
-		Params: event.Params{
-			params.NetDport: {Name: params.NetDport, Type: params.Uint16, Value: uint16(443)},
-			params.NetSport: {Name: params.NetSport, Type: params.Uint16, Value: uint16(43123)},
-			params.NetSIP:   {Name: params.NetSIP, Type: params.IPv4, Value: net.ParseIP("127.0.0.1")},
-			params.NetDIP:   {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("216.58.201.174")},
-		},
-		Metadata: make(map[event.MetadataKey]any),
-	}
-
-	require.True(t, wrapProcessEvent(evt, e.ProcessEvent))
-	time.Sleep(time.Millisecond * 25)
-	require.NotNil(t, emitAlert)
-	assert.Equal(t, "match https connections", emitAlert.Title)
-	assert.Equal(t, "cmd.exe process received data on port 443", emitAlert.Text)
-	assert.Equal(t, alertsender.Critical, emitAlert.Severity)
-	assert.Equal(t, []string{"tag1", "tag2"}, emitAlert.Tags)
-	emitAlert = nil
-}
-
-func TestKillAction(t *testing.T) {
-	log.SetLevel(log.DebugLevel)
-
-	e := NewEngine(new(ps.SnapshotterMock), newConfig("_fixtures/kill_action.yml"))
-	compileRules(t, e)
-
-	// register alert sender
-	require.NoError(t, alertsender.LoadAll([]alertsender.Config{{Type: alertsender.None}}))
-
-	var si windows.StartupInfo
-	var pi windows.ProcessInformation
-	argv, err := windows.UTF16PtrFromString("calc.exe")
-	require.NoError(t, err)
-	err = windows.CreateProcess(
-		nil,
-		argv,
-		nil,
-		nil,
-		true,
-		0,
-		nil,
-		nil,
-		&si,
-		&pi)
-	require.NoError(t, err)
-
-	i := 0
-	for !sys.IsProcessRunning(pi.Process) && i < 10 {
-		i++
-		time.Sleep(time.Millisecond * 100 * time.Duration(i))
-	}
-
-	evt := &event.Event{
-		Type:      event.CreateProcess,
-		Timestamp: time.Now(),
-		Tid:       2484,
-		PID:       pi.ProcessId,
-		PS: &types.PS{
-			Name: "calc.exe",
-			Exe:  "C:\\Windows\\system32\\calc.exe",
-		},
-		Params: event.Params{
-			params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: pi.ProcessId},
-			params.ProcessName: {Name: params.ProcessName, Type: params.UnicodeString, Value: "calc.exe"},
-		},
-		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
-	}
-
-	require.True(t, sys.IsProcessRunning(pi.Process))
-	require.True(t, wrapProcessEvent(evt, e.ProcessEvent))
-	require.False(t, sys.IsProcessRunning(pi.Process))
-}
-
-func BenchmarkRunRules(b *testing.B) {
-	b.ReportAllocs()
-	e := NewEngine(new(ps.SnapshotterMock), newConfig("_fixtures/default/*.yml"))
-	rs, err := e.Compile()
-	require.NoError(b, err)
-	require.NotNil(b, rs)
-
-	b.ResetTimer()
-
-	evts := []*event.Event{
-		{
-			Type: event.Connect,
-			Tid:  2484,
-			PID:  859,
-			PS: &types.PS{
-				Name: "cmd.exe",
-			},
-			Params: event.Params{
-				params.NetDport: {Name: params.NetDport, Type: params.Uint16, Value: uint16(443)},
-				params.NetSport: {Name: params.NetSport, Type: params.Uint16, Value: uint16(43123)},
-				params.NetSIP:   {Name: params.NetSIP, Type: params.IPv4, Value: net.ParseIP("127.0.0.1")},
-				params.NetDIP:   {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("216.58.201.174")},
-			},
-			Metadata: make(map[event.MetadataKey]any),
-		},
-		{
-			Type: event.CreateProcess,
-			Tid:  2484,
-			PID:  859,
-			PS: &types.PS{
-				Name: "powershell.exe",
-			},
-			Params: event.Params{
-				params.ProcessID:       {Name: params.ProcessID, Type: params.PID, Value: 2323},
-				params.ProcessParentID: {Name: params.ProcessParentID, Type: params.PID, Value: uint32(8390)},
-				params.ProcessName:     {Name: params.ProcessName, Type: params.UnicodeString, Value: "spotify.exe"},
-				params.Cmdline:         {Name: params.Cmdline, Type: params.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`},
-				params.Exe:             {Name: params.Exe, Type: params.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe`},
-				params.UserSID:         {Name: params.UserSID, Type: params.UnicodeString, Value: `admin\SYSTEM`},
-			},
-			Metadata: make(map[event.MetadataKey]any),
-		},
-		{
-			Type: event.CreateFile,
-			Tid:  2484,
-			PID:  859,
-			PS: &types.PS{
-				Name: "powershell.exe",
-			},
-			Params: event.Params{
-				params.ProcessID: {Name: params.ProcessID, Type: params.PID, Value: 2323},
-			},
-			Metadata: make(map[event.MetadataKey]any),
-		},
-	}
-
-	for i := 0; i < b.N; i++ {
-		for _, evt := range evts {
-			_, _ = e.ProcessEvent(evt)
+	var calls atomic.Int32
+	e.OnReload(func(*RuleSetReport) {
+		if calls.Add(1) == 2 {
+			panic("boom")
 		}
+	})
+	startEngine(t, e)
+
+	p.update(nil, behaviour("p", def("a", "evt.name = 'CreateFile'"), def("b", "evt.name = 'WriteFile'")))
+	waitFor(t, func() bool { return calls.Load() == 2 })
+
+	// the loop is still alive after the panic, and the lock is released
+	p.update(nil, behaviour("p", def("a", "evt.name = 'CreateFile'"), def("b", "evt.name = 'WriteFile'"), def("c", "evt.name = 'CreateProcess'")))
+	waitFor(t, func() bool { return e.Len() == 3 })
+}
+
+func TestEngineReloadDiscardsSequenceState(t *testing.T) {
+	seq := `
+		sequence
+		  maxspan 1m
+		  |evt.name = 'CreateProcess'| by ps.pid
+		  |evt.name = 'CreateFile'| by ps.pid
+	`
+	p := &fakeProvider{policies: []*policy.Policy{behaviour("p", def("seq", seq))}}
+	fa := &fakeActions{}
+	e := newTestEngine(t, true, p, fa.actions())
+	startEngine(t, e)
+
+	require.NoError(t, e.HandleEvent(makeEvent(event.CreateProcess, 1)))
+	// the rule set built after the reload starts from the clean sequence state
+	before := e.GetRuleSet()
+	p.update(nil, behaviour("p", def("seq", seq)))
+	waitFor(t, func() bool { return e.GetRuleSet() != before })
+	require.NoError(t, e.HandleEvent(makeEvent(event.CreateFile, 1)))
+	assert.Empty(t, fa.alerts)
+
+	require.NoError(t, e.HandleEvent(makeEvent(event.CreateProcess, 2)))
+	require.NoError(t, e.HandleEvent(makeEvent(event.CreateFile, 2)))
+	require.Len(t, fa.alerts, 1)
+
+	// all events that participated in the sequence match are marked
+	for _, evt := range fa.alerts[0].Events {
+		assert.Equal(t, "seq", evt.GetMetaAsString(event.RuleNameKey))
 	}
+}
+
+func TestEngineHeartbeats(t *testing.T) {
+	p := &fakeProvider{policies: []*policy.Policy{
+		behaviour("a.yml", def("a", "evt.name = 'CreateFile'"), def("b", "evt.name = 'WriteFile'")),
+		behaviour("b.yml", def("c", "evt.name = 'CreateProcess'")),
+	}}
+	hb := &fakeHeartbeats{}
+	e := newTestEngine(t, true, p, Actions{},
+		WithHeartbeatSender(hb), WithHeartbeatIntervals(10*time.Millisecond, 20*time.Millisecond))
+	startEngine(t, e)
+
+	// the heartbeat is sent when the rules are loaded, and then periodically
+	waitFor(t, func() bool { return hb.count() >= 4 })
+
+	last := hb.last()
+	assert.Equal(t, 3, last.NumberRules)
+	require.Len(t, last.Policies, 2)
+	assert.Equal(t, HeartbeatPolicy{Name: "a.yml", Source: "a.yml", Rules: 2}, last.Policies[0])
+	assert.Equal(t, 1, last.Policies[1].Rules)
+	assert.False(t, last.Time.IsZero())
+}
+
+func TestEngineReloadSendsHeartbeatImmediately(t *testing.T) {
+	p := &fakeProvider{policies: []*policy.Policy{behaviour("p", def("a", "evt.name = 'CreateFile'"))}}
+	hb := &fakeHeartbeats{}
+	// the period is long, so only the load triggered heartbeats are observed
+	e := newTestEngine(t, true, p, Actions{},
+		WithHeartbeatSender(hb), WithHeartbeatIntervals(time.Hour, time.Hour))
+	startEngine(t, e)
+
+	waitFor(t, func() bool { return hb.count() == 1 })
+	assert.Equal(t, 1, hb.last().NumberRules)
+
+	p.update(nil, behaviour("p", def("a", "evt.name = 'CreateFile'"), def("b", "evt.name = 'WriteFile'")))
+	waitFor(t, func() bool { return hb.count() == 2 })
+	assert.Equal(t, 2, hb.last().NumberRules)
+}
+
+func TestEngineStop(t *testing.T) {
+	p := &fakeProvider{}
+	hb := &fakeHeartbeats{}
+	e := newTestEngine(t, true, p, Actions{}, WithHeartbeatSender(hb), WithHeartbeatIntervals(5*time.Millisecond, 5*time.Millisecond))
+	startEngine(t, e)
+
+	e.Stop()
+	assert.True(t, p.closed)
+
+	// no heartbeats after the engine has stopped
+	n := hb.count()
+	time.Sleep(30 * time.Millisecond)
+	assert.Equal(t, n, hb.count())
+
+	// stopping twice is safe
+	assert.NotPanics(t, e.Stop)
+}
+
+func TestEngineStopsWhenContextIsCancelled(t *testing.T) {
+	p := &fakeProvider{policies: []*policy.Policy{behaviour("p", def("a", "evt.name = 'CreateFile'"))}}
+	e := newTestEngine(t, true, p, Actions{})
+	ctx, cancel := context.WithCancel(context.Background())
+	require.NoError(t, e.Start(ctx, nil))
+	cancel()
+
+	done := make(chan struct{})
+	go func() { e.wg.Wait(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("the engine goroutines should stop when the context is cancelled")
+	}
+}
+
+func TestEngineConcurrentHandleEventAndReload(t *testing.T) {
+	p := &fakeProvider{policies: []*policy.Policy{behaviour("p", def("a", "evt.name = 'CreateFile'"))}}
+	fa := &fakeActions{}
+	e := newTestEngine(t, true, p, fa.actions())
+	startEngine(t, e)
+
+	var wg sync.WaitGroup
+	stop := make(chan struct{})
+	for i := 0; i < 4; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-stop:
+					return
+				default:
+					_ = e.HandleEvent(testutil.MakeEvent(event.CreateFile))
+				}
+			}
+		}()
+	}
+	for i := 0; i < 20; i++ {
+		p.update(nil, behaviour("p", def("a", "evt.name = 'CreateFile'"), def("b", "evt.name = 'WriteFile'")))
+		time.Sleep(time.Millisecond)
+	}
+	close(stop)
+	wg.Wait()
+	waitFor(t, func() bool { return e.Len() == 2 })
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-present by Nedim Sabic Sabic
+ * Copyright 2026 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -19,608 +19,424 @@
 package rules
 
 import (
-	"context"
-	"expvar"
-	"sort"
+	"fmt"
+	"slices"
+	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
-	fsm "github.com/qmuntal/stateless"
-	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/compiler/ast"
+	"github.com/rabbitstack/fibratus/pkg/eval"
 	"github.com/rabbitstack/fibratus/pkg/event"
-	"github.com/rabbitstack/fibratus/pkg/event/params"
-	"github.com/rabbitstack/fibratus/pkg/filter"
-	"github.com/rabbitstack/fibratus/pkg/filter/ql"
-	"github.com/rabbitstack/fibratus/pkg/ps"
 	log "github.com/sirupsen/logrus"
 )
 
-const (
-	// maxOutstandingPartials determines the maximum number of partials per sequence index
-	maxOutstandingPartials = 1000
-)
+// SequenceStepFunc is a pre-compiled sequence per-step callback. It
+// receives an event and advances the lookup ladder if the event
+// matches. It returns true if the event advanced the ladder.
+type SequenceStepFunc func(*event.Event, *eval.ValuerCache) bool
 
-var (
-	partialsPerSequence   = expvar.NewMap("sequence.partials.count")
-	partialExpirations    = expvar.NewMap("sequence.partial.expirations")
-	partialBreaches       = expvar.NewMap("sequence.partial.breaches")
-	matchTransitionErrors = expvar.NewInt("sequence.match.transition.errors")
+// SequenceStep is the compiled sequence step. Besides the callback, it
+// keeps the expression and the join/bound information of the step.
+type SequenceStep struct {
+	fn    SequenceStepFunc
+	expr  ast.Expr
+	by    *ast.SequenceLink
+	bound []boundRef
+}
 
-	// maxSequencePartialLifetime indicates the maximum time for the
-	// partial to exist in the sequence state. If the partial has been
-	// placed in the sequence state more than allowed, it is removed
-	maxSequencePartialLifetime = time.Hour * 4
-)
+// SequenceChain carries the accumulated events for one in-progress
+// sequence match keyed by a link. It moves through the lookups
+// ladder stage by stage until all steps are satisfied.
+type SequenceChain struct {
+	events []*event.Event
 
-var (
-	// sequenceTerminalState represents the final state in the FSM.
-	// This state is transitioned when the last rule in the sequence
-	// produces a match
-	sequenceTerminalState = fsm.State("terminal")
-	// sequenceDeadlineState represents the state to which other
-	// states transition if the rule's max span is reached
-	sequenceDeadlineState = fsm.State("deadline")
-	// sequenceExpiredState designates the state to which other
-	// states transition when the sequence is expired
-	sequenceExpiredState = fsm.State("expired")
-	// sequenceInitialState represents the initial sequence state
-	sequenceInitialState = fsm.State(0)
+	// id uniquely identifies the chain. It is preserved when
+	// the chain advances, so the deadline timer can find it
+	id uint64
 
-	// transitions for match, cancel, reset, and expire triggers
-	matchTransition  = fsm.Trigger("match")
-	cancelTransition = fsm.Trigger("cancel")
-	resetTransition  = fsm.Trigger("reset")
-	expireTransition = fsm.Trigger("expire")
-)
+	// link is the join value the chain is stored under in the ladder
+	link any
 
-// sequenceState represents the state of the
-// ordered sequence of multiple events that
-// may have time-frame constraints. A deterministic
-// finite state machine tracks the matching status of
-// each expression (state) in the machine.
-type sequenceState struct {
-	filter  filter.Filter
-	seq     *ql.Sequence
-	name    string
+	// stage is the index of the step that consumes the chain next
+	stage int
+
+	// timer fires when the maxspan deadline elapses
+	timer *time.Timer
+}
+
+// Advance returns a new chain with event appended at the next stage slot.
+// The new chain inherits the identity, the join key and the deadline of the
+// original chain.
+func (c *SequenceChain) Advance(e *event.Event) *SequenceChain {
+	next := make([]*event.Event, len(c.events)+1)
+	copy(next, c.events)
+	next[len(c.events)] = e
+	return &SequenceChain{events: next, id: c.id, link: c.link, stage: c.stage, timer: c.timer}
+}
+
+// boundRef is the reference to the field of the event that was matched
+// by a previous sequence step, e.g. $e1.ps.sid.
+type boundRef struct {
+	// value is the key the bound literal is looked up with in the valuer
+	value string
+	field eval.Field
+	// stage is the index of the step that declares the alias
+	stage int
+}
+
+// SequenceEvaluator evaluates the sequence rules. It is produced at compile
+// time from the sequence expression, and holds one compiled SequenceStep for
+// every step of the sequence. The ladder keeps a map for each stage, i.e.
+// lookups[i] maps the join key to the chain waiting for the step i to match.
+// A chain seeded by the first step is stored in lookups[1], and moves one
+// stage up each time the step of the stage matches, until the last step
+// completes the match. All mutable state is owned here.
+//
+// Steps that reference the events of the previous steps through bound fields
+// (e.g. $e1.ps.sid) can't be joined by a single key. They scan the chains
+// that wait in the stage, oldest first, and pick the first chain for which
+// the bound condition holds.
+//
+// If the sequence has the maxspan, the chain is dropped when the deadline
+// elapses, counted from the first event of the chain.
+type SequenceEvaluator struct {
+	mu sync.Mutex
+
+	evaluator *eval.Evaluator
+
+	// steps holds one compiled step per sequence step. They are stored
+	// in the reverse order and called in that order, so a single event
+	// cannot advance a chain through multiple stages in one call.
+	steps   []SequenceStep
 	maxSpan time.Duration
+	lookups []map[any]*SequenceChain
 
-	// partials keeps the state of all matched events per expression
-	partials map[int][]*event.Event
-	// mu guards the partials map
-	mu sync.RWMutex
+	// live indexes the chains that wait in the ladder by their identifier
+	live   map[uint64]*SequenceChain
+	nextID uint64
+	// unique indicates that chains can't be joined by a key, so
+	// each chain is stored under its own identifier
+	unique bool
 
-	// matches stores only the event that matched
-	// the upstream partials. These events will
-	// be propagated in the rule action context
-	matches map[int]*event.Event
-	// mmu guards the matches map
-	mmu sync.RWMutex
-
-	fsm *fsm.StateMachine
-
-	// exprs stores the expression index to
-	// its respective string representation
-	exprs              map[int]string
-	spanDeadlines      map[fsm.State]*time.Timer
-	inDeadline         atomic.Bool
-	inExpired          atomic.Bool
-	initialState       fsm.State
-	isPartialsBreached atomic.Bool
-
-	// states keeps the mapping between expression
-	// index and its matching state. Whenever the expression
-	// evaluates to true the state is updated for the index
-	// pertaining to the expression sequence slot
-	states map[fsm.State]bool
-	// smu guards the states map
-	smu sync.RWMutex
-
-	// lastMatch is the timestamp of the last matched event.
-	// The purpose is to enforce temporal monotonicity
-	lastMatch time.Time
-
-	psnap ps.Snapshotter
+	// events are the events of the match completed by the last step
+	events []*event.Event
 }
 
-func newSequenceState(f filter.Filter, c *config.FilterConfig, psnap ps.Snapshotter) *sequenceState {
-	ss := &sequenceState{
-		filter:        f,
-		seq:           f.GetSequence(),
-		name:          c.Name,
-		maxSpan:       f.GetSequence().MaxSpan,
-		partials:      make(map[int][]*event.Event),
-		states:        make(map[fsm.State]bool),
-		matches:       make(map[int]*event.Event),
-		exprs:         make(map[int]string),
-		spanDeadlines: make(map[fsm.State]*time.Timer),
-		initialState:  sequenceInitialState,
-		psnap:         psnap,
+// MakeSequenceEvaluator creates the evaluator for the sequence rule.
+func MakeSequenceEvaluator(evaluator *eval.Evaluator) (RuleEvaluator, error) {
+	expr := evaluator.GetExpr().(*ast.SequenceExpr)
+	depth := expr.Depth()
+
+	seq := &SequenceEvaluator{
+		evaluator: evaluator,
+		steps:     make([]SequenceStep, depth),
+		maxSpan:   expr.MaxSpan,
+		lookups:   make([]map[any]*SequenceChain, depth),
+		live:      make(map[uint64]*SequenceChain),
+	}
+	for i := range seq.lookups {
+		seq.lookups[i] = make(map[any]*SequenceChain)
 	}
 
-	ss.initFSM()
-
-	ss.configureFSM()
-
-	return ss
-}
-
-func (s *sequenceState) events() []*event.Event {
-	s.mmu.RLock()
-	defer s.mmu.RUnlock()
-	events := make([]*event.Event, 0, len(s.matches))
-	for _, e := range s.matches {
-		events = append(events, e)
-	}
-	sort.Slice(events, func(i, j int) bool { return events[i].Timestamp.Before(events[j].Timestamp) })
-	return events
-}
-
-func (s *sequenceState) isStateSchedulable(state fsm.State) bool {
-	return state != s.initialState && state != sequenceTerminalState && state != sequenceExpiredState && state != sequenceDeadlineState
-}
-
-// initFSM initializes the state machine and installs transition callbacks
-// that are triggered when the expression in the sequence matches, it expires
-// or the deadline occurs.
-func (s *sequenceState) initFSM() {
-	s.fsm = fsm.NewStateMachine(s.initialState)
-	s.fsm.OnTransitioned(func(ctx context.Context, transition fsm.Transition) {
-		// schedule span deadline for the current state unless initial/meta states
-		if s.maxSpan != 0 && s.isStateSchedulable(s.currentState()) {
-			log.Debugf("scheduling max span deadline of %v for expression [%s] of sequence [%s]", s.maxSpan, s.expr(s.currentState()), s.name)
-			s.scheduleMaxSpanDeadline(s.currentState(), s.maxSpan)
+	aliases := make(map[string]int)
+	compiled := make([]SequenceStep, depth)
+	for pos := range expr.Steps {
+		step := &expr.Steps[pos]
+		by := expr.By
+		if by == nil {
+			by = step.By
 		}
-		// if the sequence was deadlined/expired, we can disable the deadline
-		// status when the first expression in the sequence is reevaluated
-		if transition.Source == s.initialState && s.inDeadline.Load() {
-			s.inDeadline.Store(false)
+		bound, err := boundRefs(step.Expr, aliases)
+		if err != nil {
+			return nil, fmt.Errorf("step %d: %w", pos+1, err)
 		}
-		if transition.Source == s.initialState && s.inExpired.Load() {
-			s.inExpired.Store(false)
+		compiled[pos] = SequenceStep{expr: step.Expr, by: by, bound: bound}
+		if pos > 0 && by == nil && len(bound) > 0 {
+			seq.unique = true
 		}
-		// clear state in case of expire/deadline transitions
-		if transition.Trigger == expireTransition || transition.Trigger == cancelTransition {
-			s.clear()
-		}
-		if transition.Trigger == matchTransition {
-			log.Debugf("state trigger from expression [%s] of sequence [%s]", s.expr(transition.Source), s.name)
-			// a match occurred from current to next state.
-			// Stop deadline execution for the old current state
-			if span, ok := s.spanDeadlines[transition.Source]; ok {
-				log.Debugf("stopped max span deadline for expression [%s] of sequence [%s]", s.expr(transition.Source), s.name)
-				span.Stop()
-				delete(s.spanDeadlines, transition.Source)
+
+		if step.BareVariable != "" {
+			alias := normalizeAlias(step.BareVariable)
+			if _, ok := aliases[alias]; ok {
+				return nil, fmt.Errorf("step %d: duplicate alias $%s", pos+1, alias)
 			}
-			// save expression match
-			s.states[transition.Source] = true
-		}
-	})
-}
-
-// configureFSM sets up the states and transitions of the state automata.
-// A simplified representation of the constructed automata is better
-// visualized in the diagram above
-//
-//	       +-----+        +-----+        +-----+
-//	---->  |  0  | -----> |  1  | -----> |  2  | -----> terminal
-//	+      +-----+        +-----+        +-----+
-//	+        |               |               |
-//	+   +----+----+     +----+----+     +----+----+
-//	+   |         |     |         |     |         |
-//	+   v         v     v         v     v         v
-//	+---------+ +---------+ +---------+ +---------+ +---------+ +---------+
-//
-// | deadline| | expired | | deadline| | expired | | deadline| | expired |
-// +---------+ +---------+ +---------+ +---------+ +---------+ +---------+
-//
-// The diagram is based on the assumption that there are three expressions
-// inside the sequence. In the course of normal circumstances, the initial
-// state transitions to the state 1 and the state 1 to the state 2 whenever
-// the expression associated to the state is evaluated to true.
-// Once the final state is reached, it transitions to the terminal state and
-// the sequence is considered to yield a match.
-//
-// However, it can happen that the maximum time span defined in the sequence
-// elapses. In this situation, the sequence is promoted to the deadline state
-// and the state machine is reset to the initial state. The similar behaviour
-// occurs when the process attributed to any of the pending partials in the
-// sequence terminates. In this case, the state machine transitions to the
-// expired state.
-func (s *sequenceState) configureFSM() {
-	for seqID, expr := range s.seq.Expressions {
-		// sequence expression index is the state name
-		s.exprs[seqID] = expr.Expr.String()
-		// is this the last state?
-		if seqID >= len(s.seq.Expressions)-1 {
-			s.fsm.
-				Configure(seqID).
-				Permit(matchTransition, sequenceTerminalState).
-				Permit(cancelTransition, sequenceDeadlineState).
-				Permit(expireTransition, sequenceExpiredState)
-		} else {
-			// the previous state can transition to the next one
-			// via the match transition, or can either go to the
-			// deadline or expired states via cancel and expire
-			// transitions respectively
-			s.fsm.
-				Configure(seqID).
-				Permit(matchTransition, seqID+1).
-				Permit(cancelTransition, sequenceDeadlineState).
-				Permit(expireTransition, sequenceExpiredState)
+			aliases[alias] = pos
 		}
 	}
-	// configure reset transitions that are triggered
-	// when the final state is reached of when a deadline
-	// or sequence expiration happens
-	s.fsm.
-		Configure(sequenceTerminalState).
-		Permit(resetTransition, sequenceInitialState)
-	s.fsm.
-		Configure(sequenceDeadlineState).
-		Permit(resetTransition, sequenceInitialState)
-	s.fsm.
-		Configure(sequenceExpiredState).
-		Permit(resetTransition, sequenceInitialState)
+
+	// compile in reverse so one event can't advance multiple stages in one pass
+	for pos := depth - 1; pos >= 0; pos-- {
+		pos := pos // capture
+		step := compiled[pos]
+		step.fn = func(e *event.Event, valuer *eval.ValuerCache) bool {
+			evts := seq.advance(pos, e, valuer)
+			if evts == nil {
+				return false
+			}
+			seq.events = evts
+			return true
+		}
+		seq.steps[depth-1-pos] = step
+	}
+
+	return seq, nil
 }
 
-func (s *sequenceState) matchTransition(seqID int, e *event.Event) error {
-	s.smu.Lock()
-	defer s.smu.Unlock()
-	shouldFire := !s.states[seqID]
-	if shouldFire {
-		return s.fsm.Fire(matchTransition, e)
+// normalizeAlias strips the leading $ from the bound variable.
+func normalizeAlias(alias string) string { return strings.TrimPrefix(alias, "$") }
+
+// boundRefs collects the bound fields the step expression references. The
+// aliases are the ones declared by the preceding steps.
+func boundRefs(expr ast.Expr, aliases map[string]int) ([]boundRef, error) {
+	var (
+		refs []boundRef
+		seen = make(map[string]struct{})
+		err  error
+	)
+	ast.WalkFunc(expr, func(n ast.Node) {
+		f, ok := n.(*ast.BoundFieldLiteral)
+		if !ok || err != nil {
+			return
+		}
+		if _, ok := seen[f.Value]; ok {
+			return
+		}
+		seen[f.Value] = struct{}{}
+		alias := normalizeAlias(f.BoundVar.Value)
+		stage, ok := aliases[alias]
+		if !ok {
+			err = fmt.Errorf("bound field %s references an unknown or a later sequence alias $%s", f.Value, alias)
+			return
+		}
+		refs = append(refs, boundRef{
+			value: f.Value,
+			field: eval.Field{Name: f.Field.Field, Value: f.Field.Value, Arg: f.Field.Arg},
+			stage: stage,
+		})
+	})
+	return refs, err
+}
+
+// Evaluate feeds the event to the sequence. It returns the events of all
+// steps if the event completes the sequence.
+func (s *SequenceEvaluator) Evaluate(e *event.Event, valuer *eval.ValuerCache) ([]*event.Event, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.expire(e)
+
+	s.evaluator.Extract(e, valuer)
+
+	// the steps are stored from the last to the first one
+	for _, step := range s.steps {
+		step.fn(e, valuer)
+	}
+
+	if s.events != nil {
+		evts := s.events
+		s.events = nil // reset for next match
+		return evts, true
+	}
+
+	return nil, false
+}
+
+// advance tries to advance the ladder with the event on the given step.
+// It returns the events of the matched sequence if the last step completes it.
+func (s *SequenceEvaluator) advance(pos int, e *event.Event, valuer *eval.ValuerCache) []*event.Event {
+	step := &s.steps[len(s.steps)-1-pos]
+
+	if pos == 0 {
+		if !s.evaluator.EvalExpr(step.expr, e, valuer) {
+			return nil
+		}
+		c := &SequenceChain{id: s.newID(), stage: 1, events: []*event.Event{e}}
+		switch {
+		case step.by != nil:
+			c.link = eval.MakeSequenceLinkID(valuer, step.by)
+		case s.unique:
+			c.link = c.id
+		default:
+			// all events share one chain
+			c.link = struct{}{}
+		}
+		if s.maxSpan > 0 {
+			id := c.id
+			c.timer = time.AfterFunc(s.maxSpan, func() { s.expireChain(id) })
+		}
+		s.live[c.id] = c
+		s.put(1, c)
+		return nil
+	}
+
+	stage := s.lookups[pos]
+	if len(stage) == 0 {
+		return nil
+	}
+
+	c := s.match(step, stage, e, valuer)
+	if c == nil {
+		return nil
+	}
+
+	delete(stage, c.link)
+	next := c.Advance(e)
+	if pos == len(s.steps)-1 {
+		// the chain is completed here, so all events that
+		// participated in the match are returned
+		s.retire(next)
+		return next.events
+	}
+	next.stage = pos + 1
+	s.live[next.id] = next
+	s.put(next.stage, next)
+
+	return nil
+}
+
+// match finds the chain waiting in the stage that the event advances.
+func (s *SequenceEvaluator) match(step *SequenceStep, stage map[any]*SequenceChain, e *event.Event, valuer *eval.ValuerCache) *SequenceChain {
+	// a step without bound fields only needs to be evaluated once
+	if len(step.bound) == 0 && !s.evaluator.EvalExpr(step.expr, e, valuer) {
+		return nil
+	}
+
+	var candidates []*SequenceChain
+	if step.by != nil {
+		if c, ok := stage[eval.MakeSequenceLinkID(valuer, step.by)]; ok {
+			candidates = append(candidates, c)
+		}
+	} else {
+		for _, c := range stage {
+			candidates = append(candidates, c)
+		}
+		slices.SortFunc(candidates, func(a, b *SequenceChain) int {
+			switch {
+			case a.id < b.id:
+				return -1
+			case a.id > b.id:
+				return 1
+			}
+			return 0
+		})
+	}
+
+	for _, c := range candidates {
+		// the event arrived after the deadline, but the timer didn't fire yet
+		if s.maxSpan > 0 && e.Timestamp.Sub(c.events[0].Timestamp) > s.maxSpan {
+			s.drop(c)
+			continue
+		}
+		if len(step.bound) == 0 || s.evalBound(step, c, e, valuer) {
+			return c
+		}
 	}
 	return nil
 }
 
-func (s *sequenceState) cancelTransition(seqID fsm.State) error {
-	return s.fsm.Fire(cancelTransition, seqID)
-}
-
-func (s *sequenceState) expireTransition() error {
-	return s.fsm.Fire(expireTransition)
-}
-
-func (s *sequenceState) isTerminalState() bool {
-	isFinal := s.currentState() == sequenceTerminalState
-	if isFinal {
-		err := s.fsm.Fire(resetTransition)
-		if err != nil {
-			log.Warnf("unable to transition to initial state: %v", err)
+// evalBound evaluates the step expression with the bound fields
+// resolved from the events the chain has accumulated.
+func (s *SequenceEvaluator) evalBound(step *SequenceStep, c *SequenceChain, e *event.Event, valuer *eval.ValuerCache) bool {
+	for _, ref := range step.bound {
+		if ref.stage >= len(c.events) {
+			continue
 		}
+		valuer.Valuer[ref.value] = ref.field.Extract(c.events[ref.stage])
 	}
-	return isFinal
-}
-
-func (s *sequenceState) isInitialState() bool {
-	return s.currentState() == s.initialState
-}
-
-func (s *sequenceState) currentState() fsm.State {
-	return s.fsm.MustState()
-}
-
-func (s *sequenceState) expr(state fsm.State) string {
-	seqID, ok := state.(int)
-	if !ok {
-		return ""
-	}
-	return s.exprs[seqID]
-}
-
-// addPartial appends the event that matched the expression at the
-// sequence index. If the event arrived out of order, then the isOOO
-// parameter is equal to false.
-func (s *sequenceState) addPartial(seqID int, e *event.Event, isOOO bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if len(s.partials[seqID]) > maxOutstandingPartials {
-		partialBreaches.Add(s.name, 1)
-		if !s.isPartialsBreached.Load() {
-			log.Warnf("max partials encountered in sequence %s slot [%d]. "+
-				"Dropping incoming partial: %s", s.name, seqID, e)
+	defer func() {
+		for _, ref := range step.bound {
+			delete(valuer.Valuer, ref.value)
 		}
-		s.isPartialsBreached.Store(true)
+	}()
+	return s.evaluator.EvalExpr(step.expr, e, valuer)
+}
+
+func (s *SequenceEvaluator) newID() uint64 {
+	s.nextID++
+	return s.nextID
+}
+
+// put stores the chain in the stage. A more recent chain
+// supersedes the stale chain with the same join key.
+func (s *SequenceEvaluator) put(stage int, c *SequenceChain) {
+	if prev, ok := s.lookups[stage][c.link]; ok && prev != c {
+		s.drop(prev)
+	}
+	s.lookups[stage][c.link] = c
+}
+
+// retire forgets about the chain and cancels its deadline.
+func (s *SequenceEvaluator) retire(c *SequenceChain) {
+	delete(s.live, c.id)
+	if c.timer != nil {
+		c.timer.Stop()
+	}
+}
+
+// drop removes the chain from whichever stage it currently occupies.
+func (s *SequenceEvaluator) drop(c *SequenceChain) {
+	if s.live[c.id] != c {
 		return
 	}
-	key := e.PartialKey()
-	if key != 0 {
-		for _, p := range s.partials[seqID] {
-			if key == p.PartialKey() {
-				log.Debugf("event %s for tuple %d already in sequence state", e, key)
-				return
-			}
-		}
+	s.retire(c)
+	if s.lookups[c.stage][c.link] == c {
+		delete(s.lookups[c.stage], c.link)
 	}
-	if isOOO {
-		e.AddMeta(event.RuleSequenceOOOKey, true)
-	}
-	log.Debugf("adding partial to sequence [%s] slot [%d] for expression %q, ooo: %t: %s", s.name, seqID, s.expr(seqID), isOOO, e)
-	partialsPerSequence.Add(s.name, 1)
-	s.partials[seqID] = append(s.partials[seqID], e)
-	sort.Slice(s.partials[seqID], func(n, m int) bool { return s.partials[seqID][n].Timestamp.Before(s.partials[seqID][m].Timestamp) })
 }
 
-// gc prunes the sequence partial if it remained
-// more time than specified by max span or if max
-// span is omitted, the partial is allowed to remain
-// in sequence state for four hours.
-func (s *sequenceState) gc() {
+// expireChain is called when the maxspan deadline of the chain elapses.
+func (s *SequenceEvaluator) expireChain(id uint64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	dur := s.maxSpan
-	if dur == 0 {
-		dur = maxSequencePartialLifetime
+	c, ok := s.live[id]
+	if !ok {
+		return
 	}
-	for idx := range s.exprs {
-		for i := len(s.partials[idx]) - 1; i >= 0; i-- {
-			if len(s.partials[idx]) > 0 && time.Since(s.partials[idx][i].Timestamp) > dur {
-				log.Debugf("garbage collecting partial: [%s] of sequence [%s]", s.partials[idx][i], s.name)
-				// remove partial event from the corresponding slot
-				s.partials[idx] = append(
-					s.partials[idx][:i],
-					s.partials[idx][i+1:]...)
-				partialsPerSequence.Add(s.name, -1)
+	log.Debugf("sequence maxspan [%s] elapsed, dropping the chain of %d event(s)", s.maxSpan, len(c.events))
+	s.drop(c)
+}
+
+// expire drops the chains that contain the events of the process terminated by the event.
+func (s *SequenceEvaluator) expire(evt *event.Event) {
+	if !evt.IsTerminateProcess() {
+		return
+	}
+	pid, err := evt.Params.GetPid()
+	if err != nil {
+		return
+	}
+
+	canExpire := func(e *event.Event, pid uint32) bool {
+		// the chain can be dropped only if the remote process terminates
+		if e.IsCreateRemoteThread() {
+			return e.Params.MustGetPid() == pid
+		}
+		// final stage holds a CreateProcess event. Only expire
+		// if the spawned pid matches the terminating pid
+		//TODO:
+
+		// Everything else
+		return e.PID == pid
+	}
+
+	for _, stage := range s.lookups {
+		for _, chain := range stage {
+			if slices.ContainsFunc(chain.events,
+				func(evt *event.Event) bool { return canExpire(evt, pid) }) {
+				s.drop(chain)
 			}
 		}
 	}
 }
 
-func (s *sequenceState) clear() {
-	s.partials = make(map[int][]*event.Event)
-	s.matches = make(map[int]*event.Event)
-	s.states = make(map[fsm.State]bool)
-	s.spanDeadlines = make(map[fsm.State]*time.Timer)
-	s.isPartialsBreached.Store(false)
-	partialsPerSequence.Delete(s.name)
-	s.lastMatch = time.Time{}
-}
-
-func (s *sequenceState) clearLocked() {
+// Len returns the number of in-progress chains.
+func (s *SequenceEvaluator) Len() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.smu.Lock()
-	defer s.smu.Unlock()
-	s.mmu.Lock()
-	defer s.mmu.Unlock()
-	s.clear()
-}
-
-// next determines whether the next expression in the
-// sequence should be evaluated. The expression is evaluated
-// if all its upstream sequence expression produced a match and
-// the sequence is not stuck in deadline or expired state.
-func (s *sequenceState) next(seqID int) bool {
-	// always evaluate the first expression in the sequence
-	if seqID == 0 {
-		return true
+	n := 0
+	for _, stage := range s.lookups {
+		n += len(stage)
 	}
-
-	var next bool
-	s.smu.RLock()
-	defer s.smu.RUnlock()
-	for n := range seqID {
-		next = s.states[n]
-		if !next {
-			break
-		}
-	}
-
-	return next && !s.inDeadline.Load() && !s.inExpired.Load()
-}
-
-func (s *sequenceState) scheduleMaxSpanDeadline(seqID fsm.State, maxSpan time.Duration) {
-	t := time.AfterFunc(maxSpan, func() {
-		inState, _ := s.fsm.IsInState(seqID)
-		if inState {
-			log.Debugf("max span of %v exceded for expression [%s] of sequence [%s]", maxSpan, s.expr(seqID), s.name)
-			s.inDeadline.Store(true)
-			s.mu.Lock()
-			defer s.mu.Unlock()
-			s.smu.Lock()
-			defer s.smu.Unlock()
-			// transitions to deadline state
-			err := s.cancelTransition(seqID)
-			if err != nil {
-				s.inDeadline.Store(false)
-				log.Warnf("deadline transition failed: %v", err)
-			}
-			// transitions from deadline state to initial state
-			err = s.fsm.Fire(resetTransition)
-			if err != nil {
-				log.Warnf("unable to transition to initial state: %v", err)
-			}
-		}
-	})
-	s.spanDeadlines[seqID] = t
-}
-
-func (s *sequenceState) evalSequence(e *event.Event, v *filter.ValuerCache) bool {
-	for i, expr := range s.seq.Expressions {
-		// only try to evaluate the expression
-		// if upstream expressions have matched
-		if !s.next(i) {
-			if !s.seq.IsUnordered {
-				continue
-			}
-			// it could be the event arrived out
-			// of order because certain provider
-			// flushed its buffers first. When this
-			// happens the event timestamp serves as
-			// a temporal reference.
-			// If this sequence expression can evaluate
-			// against the current event, mark it as
-			// out-of-order and store in partials list
-			s.mu.RLock()
-			ok := expr.IsEvaluable(e) && s.filter.EvalSequence(e, v, i, s.partials, true)
-			s.mu.RUnlock()
-			if ok {
-				s.addPartial(i, e, true)
-			}
-			continue
-		}
-
-		s.mu.RLock()
-		matches := expr.IsEvaluable(e) && s.filter.EvalSequence(e, v, i, s.partials, false)
-		s.mu.RUnlock()
-		if !matches {
-			continue
-		}
-
-		// enforce temporal monotonicity check for ordered sequences
-		if !s.seq.IsUnordered && !s.lastMatch.IsZero() && !e.Timestamp.After(s.lastMatch) {
-			// this event is older than or equal to the previous matched slot
-			continue
-		}
-
-		// append the partial and transition state machine
-		s.addPartial(i, e, false)
-		err := s.matchTransition(i, e)
-		if err != nil {
-			matchTransitionErrors.Add(1)
-			log.Warnf("match transition failure: %v", err)
-		}
-		if !s.seq.IsUnordered {
-			s.lastMatch = e.Timestamp
-		}
-		// now try to match all pending out-of-order
-		// events from downstream sequence slots if
-		// the previous match hasn't reached terminal
-		// state
-		if s.seq.IsUnordered && s.currentState() != sequenceTerminalState {
-			s.mu.RLock()
-			for seqID := range s.partials {
-				for _, evt := range s.partials[seqID] {
-					if !evt.ContainsMeta(event.RuleSequenceOOOKey) {
-						continue
-					}
-					// try to initialize process state before evaluating the event
-					if evt.PS == nil {
-						_, evt.PS = s.psnap.Find(evt.PID)
-					}
-
-					v := filter.AcquireValuerCache()
-					defer v.Release()
-					matches = s.filter.EvalSequence(evt, v, seqID, s.partials, false)
-					if !matches {
-						continue
-					}
-
-					// transition the state machine
-					err := s.matchTransition(seqID, evt)
-					if err != nil {
-						matchTransitionErrors.Add(1)
-						log.Warnf("out of order match transition failure: %v", err)
-					}
-					evt.RemoveMeta(event.RuleSequenceOOOKey)
-				}
-			}
-			s.mu.RUnlock()
-		}
-
-		// if both the terminal state is reached and the partials
-		// in the sequence state could be joined by the specified
-		// field(s) or the sequence is unconstrained, the rule has
-		// matched successfully, and we can collect all events involved
-		// in the rule match
-		isTerminal := s.isTerminalState()
-		if isTerminal {
-			setMatch := func(seqID int, e *event.Event) {
-				s.mmu.Lock()
-				defer s.mmu.Unlock()
-				if s.matches[seqID] == nil {
-					s.matches[seqID] = e
-				}
-			}
-
-			s.mu.RLock()
-			for seqID := 0; seqID < len(s.partials); seqID++ {
-				for _, outer := range s.partials[seqID] {
-					for _, inner := range s.partials[seqID+1] {
-						switch {
-						case filter.CompareSeqLinks(outer.SequenceLinks(), inner.SequenceLinks()):
-							setMatch(seqID, outer)
-							setMatch(seqID+1, inner)
-						case !s.seq.IsConstrained() && !outer.ContainsMeta(event.RuleSequenceLinks) && !inner.ContainsMeta(event.RuleSequenceLinks):
-							setMatch(seqID, outer)
-							setMatch(seqID+1, inner)
-						}
-					}
-				}
-			}
-			s.mu.RUnlock()
-
-			return true
-		}
-	}
-	return false
-}
-
-func (s *sequenceState) expire(e *event.Event) bool {
-	if !e.IsTerminateProcess() {
-		return false
-	}
-	canExpire := func(lhs, rhs *event.Event, isFinalSlot bool) bool {
-		// if the TerminateProcess event arrives for the
-		// process spawned by CreateProcess, and it pertains
-		// to the final sequence slot, it is safe to expire
-		// the whole sequence
-		pid := rhs.Params.MustGetPid()
-		if lhs.IsCreateProcess() && isFinalSlot {
-			return lhs.Params.MustGetPid() == pid
-		}
-		if lhs.IsCreateThread() {
-			// if the pids differ, the thread
-			// is created in a remote process.
-			// Sequence can be expired only if
-			// the remote process terminates
-			if lhs.PID != lhs.Params.MustGetPid() {
-				return lhs.Params.MustGetPid() == pid
-			}
-		}
-		return lhs.PID == pid
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.smu.RLock()
-	defer s.smu.RUnlock()
-
-	for idx := range s.exprs {
-		for i := len(s.partials[idx]) - 1; i >= 0; i-- {
-			if len(s.partials[idx]) > 0 && !canExpire(s.partials[idx][i], e, idx == len(s.exprs)-1) {
-				continue
-			}
-			log.Debugf("removing event originated from %s (%d) "+
-				"in partials pertaining to sequence [%s] and slot [%d]",
-				e.Params.MustGetString(params.ProcessName),
-				e.Params.MustGetPid(),
-				s.name,
-				idx)
-			// remove partial event from the corresponding slot
-			s.partials[idx] = append(
-				s.partials[idx][:i],
-				s.partials[idx][i+1:]...)
-			partialsPerSequence.Add(s.name, -1)
-
-			if len(s.partials[idx]) == 0 {
-				partialExpirations.Add(s.name, 1)
-				log.Debugf("%q sequence expired. All partials retracted", s.name)
-				s.inExpired.Store(true)
-				err := s.expireTransition()
-				if err != nil {
-					s.inExpired.Store(false)
-					log.Warnf("expire transition failed: %v", err)
-				}
-				// transitions from expired state to initial state
-				err = s.fsm.Fire(resetTransition)
-				if err != nil {
-					log.Warnf("unable to transition to initial state: %v", err)
-				}
-				return true
-			}
-		}
-	}
-
-	return false
+	return n
 }

@@ -1,0 +1,120 @@
+/*
+ * Copyright 2019-2020 by Nedim Sabic Sabic
+ * https://www.fibratus.io
+ * All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package ast
+
+import (
+	"strings"
+	"time"
+
+	"github.com/rabbitstack/fibratus/pkg/compiler/lexer"
+)
+
+// Node represents a node in the abstract syntax tree.
+type Node interface {
+	String() string
+}
+
+// Expr represents an expression that can be evaluated to a value.
+type Expr interface {
+	Node
+}
+
+// ParenExpr represents a parenthesized expression.
+type ParenExpr struct {
+	Expr Expr
+}
+
+// String returns a string representation of the parenthesized expression.
+func (e *ParenExpr) String() string {
+	var b strings.Builder
+	b.Grow(len(e.Expr.String()) + 2)
+	b.WriteRune('(')
+	b.WriteString(e.Expr.String())
+	b.WriteRune(')')
+	return b.String()
+}
+
+// BinaryExpr represents an operation between two expressions.
+type BinaryExpr struct {
+	Op  lexer.Token
+	LHS Expr
+	RHS Expr
+}
+
+// String returns a string representation of the binary expression.
+func (e *BinaryExpr) String() string {
+	var b strings.Builder
+
+	lhs := e.LHS.String()
+	op := e.Op.String()
+	rhs := e.RHS.String()
+
+	b.Grow(len(lhs) + len(op) + len(rhs) + 2)
+
+	b.WriteString(lhs)
+	b.WriteString(" ")
+	b.WriteString(op)
+	b.WriteString(" ")
+	b.WriteString(rhs)
+
+	return b.String()
+}
+
+// NotExpr represents an unary not expression.
+type NotExpr struct {
+	Expr Expr
+}
+
+// String returns a string representation of the not expression.
+func (e *NotExpr) String() string {
+	var b strings.Builder
+	b.Grow(len(e.Expr.String()) + 4)
+	b.WriteString("NOT ")
+	b.WriteString(e.Expr.String())
+	return b.String()
+}
+
+// MacroRef is a reference to a macro in the expression. The parser emits
+// the reference for identifiers that resolve to macros, and the macro
+// expansion pass rewrites it to the macro body. Evaluating an expression
+// that still contains macro references is a programming error.
+type MacroRef struct {
+	// Name is the macro name.
+	Name string
+	// Pos is the position of the reference in the parsed expression.
+	Pos int
+}
+
+// String returns the macro name.
+func (m *MacroRef) String() string { return m.Name }
+
+// SequenceExpr is a collection of two or more sequence steps.
+type SequenceExpr struct {
+	By      *SequenceLink
+	MaxSpan time.Duration
+	Steps   []SequenceStep
+}
+
+func (e *SequenceExpr) String() string {
+	return "SEQUENCE"
+}
+
+func (e *SequenceExpr) Depth() int {
+	return len(e.Steps)
+}

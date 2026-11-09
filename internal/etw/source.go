@@ -25,6 +25,8 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/rabbitstack/fibratus/pkg/rules"
+
 	"github.com/rabbitstack/fibratus/internal/etw/processors"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	errs "github.com/rabbitstack/fibratus/pkg/errors"
@@ -70,8 +72,8 @@ var (
 // starting ETW tracing sessions and setting up event
 // consumers.
 type EventSource struct {
-	r          *config.RulesCompileResult
 	traces     []Trace
+	r          RuleSource
 	consumers  []*Consumer
 	processors *processors.Chain
 
@@ -90,16 +92,27 @@ type EventSource struct {
 	isClosed bool
 }
 
+// RuleSource supplies the information the event source needs from the
+// rule engine to decide which events to enable, drop or approve. The
+// report and approvers are fetched on demand, so they always reflect the
+// most recently loaded rule set. A nil rule source means no rules are loaded,
+// and thus no events are narrowed down.
+type RuleSource interface {
+	rules.ApproversProvider
+	// Report returns the report of the current rule set.
+	Report() *rules.RuleSetReport
+}
+
 // NewEventSource creates the new ETW event source.
 func NewEventSource(
 	psnap ps.Snapshotter,
 	hsnap handle.Snapshotter,
 	config *config.Config,
-	compiler *config.RulesCompileResult,
+	rules RuleSource,
 ) source.EventSource {
 	evs := &EventSource{
-		r:          compiler,
 		traces:     make([]Trace, 0),
+		r:          rules,
 		consumers:  make([]*Consumer, 0),
 		processors: processors.NewChain(psnap, hsnap, config),
 		errs:       make(chan error, 1000),
@@ -127,20 +140,17 @@ func (e *EventSource) Open(config *config.Config) error {
 	// disabled in the config, then thread events
 	// are not captured
 	if e.r != nil {
-		config.EventSource.EnableThreadEvents = config.EventSource.EnableThreadEvents && e.r.HasThreadEvents
-		config.EventSource.EnableModuleEvents = config.EventSource.EnableModuleEvents && e.r.HasModuleEvents
-		config.EventSource.EnableNetEvents = config.EventSource.EnableNetEvents && e.r.HasNetworkEvents
-		config.EventSource.EnableRegistryEvents = config.EventSource.EnableRegistryEvents && (e.r.HasRegistryEvents || (config.Yara.Enabled && !config.Yara.SkipRegistry))
-		config.EventSource.EnableFileIOEvents = config.EventSource.EnableFileIOEvents && (e.r.HasFileEvents || (config.Yara.Enabled && !config.Yara.SkipFiles))
-		config.EventSource.EnableVAMapEvents = config.EventSource.EnableVAMapEvents && (e.r.HasVAMapEvents || (config.Yara.Enabled && !config.Yara.SkipMmaps))
-		config.EventSource.EnableMemEvents = config.EventSource.EnableMemEvents && (e.r.HasMemEvents || (config.Yara.Enabled && !config.Yara.SkipAllocs))
-		config.EventSource.EnableDNSEvents = config.EventSource.EnableDNSEvents && e.r.HasDNSEvents
-		config.EventSource.EnableAuditAPIEvents = config.EventSource.EnableAuditAPIEvents && e.r.HasAuditAPIEvents
-
+		report := e.r.Report()
+		config.EventSource.EnableThreadEvents = config.EventSource.EnableThreadEvents && report.HasThreadEvents
+		config.EventSource.EnableModuleEvents = config.EventSource.EnableModuleEvents && report.HasModuleEvents
+		config.EventSource.EnableNetEvents = config.EventSource.EnableNetEvents && report.HasNetworkEvents
+		config.EventSource.EnableRegistryEvents = config.EventSource.EnableRegistryEvents && (report.HasRegistryEvents || (config.Yara.Enabled && !config.Yara.SkipRegistry))
+		config.EventSource.EnableFileIOEvents = config.EventSource.EnableFileIOEvents && (report.HasFileEvents || (config.Yara.Enabled && !config.Yara.SkipFiles))
+		config.EventSource.EnableVAMapEvents = config.EventSource.EnableVAMapEvents && (report.HasVAMapEvents || (config.Yara.Enabled && !config.Yara.SkipMmaps))
+		config.EventSource.EnableMemEvents = config.EventSource.EnableMemEvents && (report.HasMemEvents || (config.Yara.Enabled && !config.Yara.SkipAllocs))
+		config.EventSource.EnableDNSEvents = config.EventSource.EnableDNSEvents && report.HasDNSEvents
+		config.EventSource.EnableAuditAPIEvents = config.EventSource.EnableAuditAPIEvents && report.HasAuditAPIEvents
 		for _, typ := range event.AllTypes() {
-			if typ.OnlyState() || typ.StateSnapshot() {
-				continue
-			}
 			if typ == event.CreateProcess || typ == event.TerminateProcess ||
 				typ == event.TerminateThread || typ == event.LoadModule || typ == event.UnloadModule {
 				// always allow fundamental events
@@ -161,7 +171,7 @@ func (e *EventSource) Open(config *config.Config) error {
 				continue
 			}
 
-			if !e.r.ContainsEvent(typ) {
+			if !report.ContainsEvent(typ) {
 				config.EventSource.SetDropMask(typ)
 			}
 		}

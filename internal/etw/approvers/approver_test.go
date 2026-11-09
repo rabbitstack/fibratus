@@ -22,7 +22,6 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
@@ -57,15 +56,9 @@ func TestApproversNoApprovers(t *testing.T) {
 
 func TestApproversChainPassesEnrichedRecord(t *testing.T) {
 	psnap := &ps.SnapshotterMock{}
-	rules := &config.RulesCompileResult{
-		Approvers: config.Approvers{
-			Paths: map[string][]string{
-				"IMATCHES": {`C:\Windows\*`},
-			},
-		},
-	}
+	provider := newProvider(t, fileRule("file.path imatches "+list(`C:\Windows\*`)))
 
-	p := New(psnap, rules)
+	p := New(psnap, provider)
 
 	r := &etw.EventRecord{}
 	r.Header.ProviderID = etw.WindowsKernelProcessGUID
@@ -128,16 +121,10 @@ func TestApproversFileEventFullFlow(t *testing.T) {
 }
 
 func TestApproversFileEventWithRulesApproved(t *testing.T) {
-	rules := &config.RulesCompileResult{
-		Approvers: config.Approvers{
-			Paths: map[string][]string{
-				"ICONTAINS": {`windows\appcompat`},
-			},
-		},
-	}
+	provider := newProvider(t, fileRule("file.path icontains "+list(`windows\appcompat`)))
 
 	psnap := &ps.SnapshotterMock{}
-	p := New(psnap, rules)
+	p := New(psnap, provider)
 
 	cr := createFileRecord(t, createBuf)
 	p.Approve(cr)
@@ -158,16 +145,10 @@ func TestApproversFileEventWithRulesApproved(t *testing.T) {
 }
 
 func TestApproversFileEventWithRulesRejected(t *testing.T) {
-	rules := &config.RulesCompileResult{
-		Approvers: config.Approvers{
-			Extensions: map[string][]string{
-				"IN": {".exe", ".cpl"},
-			},
-		},
-	}
+	provider := newProvider(t, fileRule("file.extension in "+list(".exe", ".cpl")))
 
 	psnap := &ps.SnapshotterMock{}
-	p := New(psnap, rules)
+	p := New(psnap, provider)
 
 	cr := createFileRecord(t, createBuf)
 	p.Approve(cr)
@@ -190,15 +171,9 @@ func TestApproversRegistryEventNoRulesApprovesAll(t *testing.T) {
 
 func TestApproversRegistryEventWithRulesApproved(t *testing.T) {
 	psnap := &ps.SnapshotterMock{}
-	rules := &config.RulesCompileResult{
-		Approvers: config.Approvers{
-			Keys: map[string][]string{
-				"IMATCHES": {`hkey_local_machine\software\microsoft\windows\*`},
-			},
-		},
-	}
+	provider := newProvider(t, regRule("registry.path imatches "+list(`hkey_local_machine\software\microsoft\windows\*`)))
 
-	p := New(psnap, rules)
+	p := New(psnap, provider)
 
 	k := makeRecord(event.RegistryEventGUID, event.RegCreateKCBID, 0, regCreateKCBBuf)
 	r := makeRecord(event.RegistryEventGUID, event.RegOpenKeyID, 0, regOpenKeyBuf)
@@ -213,15 +188,9 @@ func TestApproversRegistryEventWithRulesApproved(t *testing.T) {
 
 func TestApproversRegistryEventWithRulesRejected(t *testing.T) {
 	psnap := &ps.SnapshotterMock{}
-	rules := &config.RulesCompileResult{
-		Approvers: config.Approvers{
-			Keys: map[string][]string{
-				"IMATCHES": {`HKEY_LOCAL_MACHINE\SYSTEM\*`},
-			},
-		},
-	}
+	provider := newProvider(t, regRule("registry.path imatches "+list(`HKEY_LOCAL_MACHINE\SYSTEM\*`)))
 
-	p := New(psnap, rules)
+	p := New(psnap, provider)
 
 	k := makeRecord(event.RegistryEventGUID, event.RegCreateKCBID, 0, regCreateKCBBuf)
 	r := makeRecord(event.RegistryEventGUID, event.RegOpenKeyID, 0, regOpenKeyBuf)
@@ -248,15 +217,9 @@ func TestApproversProcEventNoRulesApprovesAll(t *testing.T) {
 
 func TestApproversProcEventWithRulesApproved(t *testing.T) {
 	psnap := &ps.SnapshotterMock{}
-	rules := &config.RulesCompileResult{
-		Approvers: config.Approvers{
-			Executables: map[string][]string{
-				"IMATCHES": {`?:\windows\system32\*`},
-			},
-		},
-	}
+	provider := newProvider(t, procRule("evt.arg[exe] imatches "+list(`?:\windows\system32\*`)))
 
-	p := New(psnap, rules)
+	p := New(psnap, provider)
 
 	const pid = uint32(1234)
 	psnap.On("Find", pid).Return(true, &pstypes.PS{
@@ -274,14 +237,8 @@ func TestApproversProcEventWithRulesApproved(t *testing.T) {
 
 func TestApproversProcEventWithRulesRejected(t *testing.T) {
 	psnap := &ps.SnapshotterMock{}
-	rules := &config.RulesCompileResult{
-		Approvers: config.Approvers{
-			Executables: map[string][]string{
-				"IMATCHES": {`C:\Windows\System32\*`},
-			},
-		},
-	}
-	p := New(psnap, rules)
+	provider := newProvider(t, procRule("evt.arg[exe] imatches "+list(`C:\Windows\System32\*`)))
+	p := New(psnap, provider)
 
 	const pid = uint32(5678)
 	psnap.On("Find", pid).Return(true, &pstypes.PS{
@@ -295,88 +252,6 @@ func TestApproversProcEventWithRulesRejected(t *testing.T) {
 
 	_, approved := p.Approve(r)
 	assert.False(t, approved)
-}
-
-func TestApproversMatchPredicate(t *testing.T) {
-	a := &approver{}
-	tests := []struct {
-		name string
-		m    map[string][]string
-		val  string
-		want bool
-	}{
-		{
-			name: "imatches wildcard hit",
-			m:    map[string][]string{"IMATCHES": {`c:\windows\*`}},
-			val:  `C:\Windows\System32\ntdll.dll`,
-			want: true,
-		},
-		{
-			name: "imatches wildcard miss",
-			m:    map[string][]string{"IMATCHES": {`c:\windows\*`}},
-			val:  `C:\Users\Administrator\cmd.exe`,
-			want: false,
-		},
-		{
-			name: "imatches case insensitive",
-			m:    map[string][]string{"IMATCHES": {`c:\windows\*`}},
-			val:  `C:\WINDOWS\System32\ntdll.dll`,
-			want: true,
-		},
-		{
-			name: "icontains hit",
-			m:    map[string][]string{"ICONTAINS": {"svchost"}},
-			val:  `C:\Windows\System32\svchost.exe`,
-			want: true,
-		},
-		{
-			name: "icontains miss",
-			m:    map[string][]string{"ICONTAINS": {"evil"}},
-			val:  `C:\Windows\System32\svchost.exe`,
-			want: false,
-		},
-		{
-			name: "eq hit",
-			m:    map[string][]string{"=": {`C:\Windows\System32\svchost.exe`}},
-			val:  `C:\Windows\System32\svchost.exe`,
-			want: true,
-		},
-		{
-			name: "eq miss",
-			m:    map[string][]string{"=": {`C:\Windows\System32\svchost.exe`}},
-			val:  `C:\Windows\System32\lsass.exe`,
-			want: false,
-		},
-		{
-			name: "ieq hit",
-			m:    map[string][]string{"~=": {`c:\windows\system32\svchost.exe`}},
-			val:  `c:\windows\system32\svchost.exe`,
-			want: true,
-		},
-		{
-			name: "multiple patterns first hits",
-			m: map[string][]string{
-				"IMATCHES": {`c:\windows\*`, `C:\System32\*`},
-			},
-			val:  `C:\Windows\notepad.exe`,
-			want: true,
-		},
-		{
-			name: "multiple operators one hits",
-			m: map[string][]string{
-				"IMATCHES":  {`C:\System32\*`},
-				"ICONTAINS": {"notepad"},
-			},
-			val:  `C:\Windows\notepad.exe`,
-			want: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := a.matchPredicate(tt.m, tt.val)
-			assert.Equal(t, tt.want, got)
-		})
-	}
 }
 
 // mockApprover is a simple test double for the Approver interface

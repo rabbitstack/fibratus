@@ -19,14 +19,10 @@
 package approvers
 
 import (
-	"path/filepath"
-	"strings"
-
-	"github.com/rabbitstack/fibratus/pkg/config"
-	"github.com/rabbitstack/fibratus/pkg/filter/ql"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/ps"
+	"github.com/rabbitstack/fibratus/pkg/rules"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
-	"github.com/rabbitstack/fibratus/pkg/util/wildcard"
 )
 
 // Approver represents the contract that every approver must satisfy.
@@ -44,20 +40,19 @@ type Approvers struct {
 	fs *fs
 }
 
-// New creates a new approvers set.
-func New(psnap ps.Snapshotter, r *config.RulesCompileResult) Approvers {
+// New creates a new approvers set. The provider supplies the approvers
+// derived from the rules. If it is nil, no event is rejected by the rules.
+func New(psnap ps.Snapshotter, provider rules.ApproversProvider) Approvers {
 	p := Approvers{
 		approvers: make([]Approver, 0),
 	}
 
-	p.fs = newFSApprover(r).(*fs)
+	p.fs = newFSApprover(provider).(*fs)
 
 	p.approvers = append(p.approvers, p.fs)
-	if r != nil {
-		p.approvers = append(p.approvers, newRegistryApprover(r))
-	}
-	if r != nil {
-		p.approvers = append(p.approvers, newProcApprover(psnap, r))
+	if provider != nil {
+		p.approvers = append(p.approvers, newRegistryApprover(provider))
+		p.approvers = append(p.approvers, newProcApprover(psnap, provider))
 	}
 
 	return p
@@ -91,53 +86,20 @@ func (p *Approvers) Cleanup(r *etw.EventRecord) {
 	p.fs.cleanup(r)
 }
 
-// approver contains the base logic any approver can consume.
+// approver contains the base logic any approver can consume. It reads
+// the approvers from the provider each time the event is approved, so the
+// approvers derived from the rules reloaded by the engine are used right away.
 type approver struct {
-	r *config.RulesCompileResult
+	provider rules.ApproversProvider
 }
 
-func (p *approver) approvePath(path string) bool {
-	return p.matchPredicate(p.r.Approvers.Paths, path)
-}
+// active determines if the rules provide approvers.
+func (a *approver) active() bool { return a.provider != nil }
 
-func (p *approver) approveBasename(path string) bool {
-	return p.matchPredicate(p.r.Approvers.Bases, filepath.Base(path))
-}
-
-func (p *approver) approveExtension(path string) bool {
-	return p.matchPredicate(p.r.Approvers.Extensions, filepath.Ext(path))
-}
-
-func (p *approver) approveKey(key string) bool {
-	return p.matchPredicate(p.r.Approvers.Keys, key)
-}
-
-func (p *approver) approveExecutable(exe string) bool {
-	return p.matchPredicate(p.r.Approvers.Executables, exe)
-}
-
-func (*approver) matchPredicate(m map[string][]string, v string) bool {
-	for op, patterns := range m {
-		for _, pattern := range patterns {
-			switch op {
-			case ql.IMatches.String():
-				if wildcard.Match(pattern, v, false) {
-					return true
-				}
-			case ql.IContains.String():
-				if strings.Contains(strings.ToLower(v), pattern) {
-					return true
-				}
-			case ql.Eq.String(), ql.In.String():
-				return v == pattern
-			case ql.IEq.String(), ql.IIn.String():
-				return strings.EqualFold(v, pattern)
-			case ql.IStartswith.String():
-				return strings.HasPrefix(strings.ToLower(v), pattern)
-			case ql.IEndswith.String():
-				return strings.HasSuffix(strings.ToLower(v), pattern)
-			}
-		}
+// approve asks the rule approvers if the event of the type is approved.
+func (a *approver) approve(typ event.Type, value rules.ValueFunc) bool {
+	if a.provider == nil {
+		return true
 	}
-	return false
+	return a.provider.Approvers().Approve(typ, value)
 }

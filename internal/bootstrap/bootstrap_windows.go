@@ -25,6 +25,7 @@ import (
 	"errors"
 	"os"
 
+	"github.com/rabbitstack/fibratus/internal/etw"
 	"github.com/rabbitstack/fibratus/internal/evasion"
 	"github.com/rabbitstack/fibratus/pkg/aggregator"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
@@ -148,26 +149,31 @@ func NewApp(cfg *config.Config, options ...Option) (*App, error) {
 	psnap := ps.NewSnapshotter(hsnap, cfg)
 
 	var engine *rules.Engine
-	var rs *config.RulesCompileResult
+	// the rule source stays a nil interface if the rule engine is
+	// disabled, so the event source doesn't narrow down the events
+	var ruleSource etw.RuleSource
 
 	signature.InitStore()
 	fs.InitMetadataStore()
 
-	if cfg.Filters.Rules.Enabled && !cfg.ForwardMode && !cfg.IsCaptureSet() && !cfg.IsFilamentSet() {
-		engine = rules.NewEngine(psnap, cfg)
-		var err error
-		rs, err = engine.Compile()
-		if err != nil {
+	if cfg.Rules.Enabled && !cfg.ForwardMode && !cfg.IsCaptureSet() && !cfg.IsFilamentSet() {
+		engine = rules.NewEngine(cfg.Rules, rules.WithActions(rules.Actions{
+			Alerter:       etw.NewRuleAlerter(),
+			ProcessKiller: etw.NewProcessKiller(),
+			Isolator:      etw.NewIsolator(),
+		}))
+		// the engine loads the policies, so the event source can
+		// find out which events the rules are interested in
+		if err := engine.Start(context.Background(), nil); err != nil {
 			return nil, err
 		}
-		if rs != nil {
-			log.Infof("rules compile summary: %s", rs)
-		}
+		log.Infof("rules loaded: %s", engine.Report())
+		ruleSource = engine
 	} else {
 		log.Info("rule engine is disabled")
 	}
 
-	evs := NewEventSourceControl(psnap, hsnap, cfg, rs)
+	evs := NewEventSourceControl(psnap, hsnap, cfg, ruleSource)
 
 	server, err := api.NewServer(cfg)
 	if err != nil {
@@ -207,7 +213,7 @@ func (f *App) Run(args []string) error {
 	// build the filter from the CLI argument. If we got
 	// a valid expression the filter is attached to the
 	// event consumer
-	fltr, err := filter.NewFromCLI(args, cfg)
+	fltr, err := filter.NewFromCLI(args)
 	if err != nil {
 		return err
 	}
@@ -260,7 +266,7 @@ func (f *App) Run(args []string) error {
 		}
 		// register rule engine
 		if f.engine != nil {
-			f.evs.RegisterEventListener(f.engine)
+			f.evs.RegisterEventListener(newEngineListener(f.engine))
 		}
 		// register YARA scanner
 		if cfg.Yara.Enabled {
@@ -301,7 +307,7 @@ func (f *App) WriteCapture(args []string) error {
 		return ErrAlreadyRunning
 	}
 
-	fltr, err := filter.NewFromCLI(args, f.config)
+	fltr, err := filter.NewFromCLI(args)
 	if err != nil {
 		return err
 	}
@@ -333,7 +339,7 @@ func (f *App) ReadCapture(ctx context.Context, args []string) error {
 	if f.reader == nil {
 		panic("reader is nil")
 	}
-	fltr, err := filter.NewFromCLIWithAllAccessors(args)
+	fltr, err := filter.NewFromCLI(args)
 	if err != nil {
 		return err
 	}
@@ -396,6 +402,9 @@ func (f *App) Wait() {
 // Shutdown is responsible for tearing down everything gracefully.
 func (f *App) Shutdown() error {
 	errs := make([]error, 0)
+	if f.engine != nil {
+		f.engine.Stop()
+	}
 	if f.symbolizer != nil {
 		f.symbolizer.Close()
 	}

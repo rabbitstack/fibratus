@@ -20,13 +20,14 @@ package rules
 
 import (
 	"fmt"
-	"github.com/enescakir/emoji"
-	"github.com/google/uuid"
-	"github.com/rabbitstack/fibratus/pkg/config"
-	"github.com/rabbitstack/fibratus/pkg/util/version"
 	"os"
 	"strings"
 	"text/template"
+
+	"github.com/enescakir/emoji"
+	"github.com/google/uuid"
+	"github.com/rabbitstack/fibratus/pkg/policy"
+	"github.com/rabbitstack/fibratus/pkg/util/version"
 )
 
 var ruleTemplate = `name: {{ .Name }}
@@ -64,12 +65,12 @@ var tactics = map[string]string{
 
 func createRule(name string) error {
 	data := struct {
-		*config.FilterConfig
+		*policy.RuleDef
 		MinEngineVersion string
 	}{
-		&config.FilterConfig{
+		&policy.RuleDef{
 			Name:    name,
-			ID:      uuid.New().String(),
+			ID:      policy.RuleID(uuid.New().String()),
 			Version: "1.0.0",
 		},
 		version.Get(),

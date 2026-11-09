@@ -22,8 +22,8 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/rules"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 )
 
@@ -128,8 +128,8 @@ func utf16Encode(s string) []byte {
 	return buf
 }
 
-func newTestRegistryApprover(r *config.RulesCompileResult) *registry {
-	return newRegistryApprover(r).(*registry)
+func newTestRegistryApprover(p rules.ApproversProvider) *registry {
+	return newRegistryApprover(p).(*registry)
 }
 
 func TestRegistryApproverNonRegistryEvent(t *testing.T) {
@@ -205,15 +205,9 @@ func TestRegistryApproverNonOpenKeyOpcodeApproved(t *testing.T) {
 }
 
 func TestRegistryApproverRegOpenKeyApproved(t *testing.T) {
-	rules := &config.RulesCompileResult{
-		Approvers: config.Approvers{
-			Keys: map[string][]string{
-				"IMATCHES": {`hkey_local_machine\software\microsoft\windows\currentversion\capabilityaccessmanager\*`},
-			},
-		},
-	}
+	provider := newProvider(t, regRule("registry.path imatches "+list(`hkey_local_machine\software\microsoft\windows\currentversion\capabilityaccessmanager\*`)))
 
-	a := newTestRegistryApprover(rules)
+	a := newTestRegistryApprover(provider)
 	r := registryRecord(t, event.RegOpenKeyID, regOpenKeyBuf)
 
 	const kcb = uint64(18446662209287223696)
@@ -226,15 +220,9 @@ func TestRegistryApproverRegOpenKeyApproved(t *testing.T) {
 }
 
 func TestRegistryApproverRegOpenKeyRejected(t *testing.T) {
-	rules := &config.RulesCompileResult{
-		Approvers: config.Approvers{
-			Keys: map[string][]string{
-				"IMATCHES": {`HKEY_LOCAL_MACHINE\SYSTEM\*`},
-			},
-		},
-	}
+	provider := newProvider(t, regRule("registry.path imatches "+list(`HKEY_LOCAL_MACHINE\SYSTEM\*`)))
 
-	a := newTestRegistryApprover(rules)
+	a := newTestRegistryApprover(provider)
 	r := registryRecord(t, event.RegOpenKeyID, regOpenKeyBuf)
 
 	const kcb = uint64(18446662209287223696)
@@ -247,15 +235,9 @@ func TestRegistryApproverRegOpenKeyRejected(t *testing.T) {
 }
 
 func TestRegistryApproverRegOpenKeyKCBPathPrepended(t *testing.T) {
-	rules := &config.RulesCompileResult{
-		Approvers: config.Approvers{
-			Keys: map[string][]string{
-				"IMATCHES": {`hkey_local_machine\system\*`},
-			},
-		},
-	}
+	provider := newProvider(t, regRule("registry.path imatches "+list(`hkey_local_machine\system\*`)))
 
-	a := newTestRegistryApprover(rules)
+	a := newTestRegistryApprover(provider)
 	const kcb = uint64(0xffb58174f990)
 	// store KCB with a root path
 	a.kcbs[kcb] = `\REGISTRY\MACHINE`
@@ -270,15 +252,9 @@ func TestRegistryApproverRegOpenKeyKCBPathPrepended(t *testing.T) {
 }
 
 func TestRegistryApproverRegOpenKeyZeroKCBUsesPathDirectly(t *testing.T) {
-	rules := &config.RulesCompileResult{
-		Approvers: config.Approvers{
-			Keys: map[string][]string{
-				"IMATCHES": {`hkey_local_machine\software\*`},
-			},
-		},
-	}
+	provider := newProvider(t, regRule("registry.path imatches "+list(`hkey_local_machine\software\*`)))
 
-	a := newTestRegistryApprover(rules)
+	a := newTestRegistryApprover(provider)
 	r := buildRegOpenKeyRecord(t, 0, `HKEY_LOCAL_MACHINE\SOFTWARE\Classes\.AAC`)
 
 	_, approved := a.Approve(r)

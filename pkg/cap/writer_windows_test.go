@@ -171,7 +171,6 @@ func TestLiveCapture(t *testing.T) {
 			EnableThreadEvents:   true,
 		},
 		CapFile:            "../../test.cap",
-		Filters:            &config.Filters{},
 		InitHandleSnapshot: true,
 	}
 	wait := make(chan struct{}, 1)

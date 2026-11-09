@@ -19,6 +19,7 @@
 package processors
 
 import (
+	"errors"
 	"expvar"
 	"fmt"
 	"os"
@@ -192,6 +193,9 @@ func (r *registryProcessor) processEvent(e *event.Event) (*event.Event, error) {
 		if err != nil {
 			errno, ok := err.(windows.Errno)
 			if ok && (errno.Is(os.ErrNotExist) || err == windows.ERROR_ACCESS_DENIED) {
+				return e, nil
+			}
+			if errors.Is(err, key.ErrInvalidRoot) {
 				return e, nil
 			}
 			return e, ErrReadValue(path, err)

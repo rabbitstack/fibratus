@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 by Nedim Sabic Sabic
+ * Copyright 2021-present by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -19,157 +19,52 @@
 package filter
 
 import (
+	"errors"
 	"fmt"
-	"reflect"
 	"strings"
 
-	"github.com/rabbitstack/fibratus/pkg/config"
-	"github.com/rabbitstack/fibratus/pkg/filter/fields"
-	"github.com/rabbitstack/fibratus/pkg/filter/ql"
-	"github.com/rabbitstack/fibratus/pkg/ps"
+	"github.com/rabbitstack/fibratus/pkg/eval"
+	"github.com/rabbitstack/fibratus/pkg/event"
 )
 
-type opts struct {
-	psnap ps.Snapshotter
+// ErrSequence signals that the filter expression is a sequence.
+var ErrSequence = errors.New("sequences are not allowed in filter expressions")
+
+type filter struct {
+	evaluator *eval.Evaluator
 }
 
-// Option defines the option supplied to the filter
-type Option func(o *opts)
-
-// WithPSnapshotter passes a process snapshotter reference to the filter.
-func WithPSnapshotter(psnap ps.Snapshotter) Option {
-	return func(o *opts) {
-		o.psnap = psnap
+// New parses the filter expression and returns the filter ready for evaluation.
+func New(expr string) (Filter, error) {
+	evaluator, err := eval.NewEvaluator("filter", expr)
+	if err != nil {
+		return nil, err
 	}
+	if evaluator.IsSequenceExpr() {
+		return nil, ErrSequence
+	}
+	if len(evaluator.GetFields()) == 0 {
+		return nil, errors.New("expected at least one field or operator but zero found")
+	}
+	return &filter{evaluator: evaluator}, nil
 }
 
-// New creates a new filter with the specified filter expression. The consumers must ensure
-// the expression is correctly parsed before executing the filter. This is achieved by calling the
-// `Compile` method after constructing the filter.
-func New(expr string, config *config.Config, options ...Option) Filter {
-	var opts opts
-	for _, opt := range options {
-		opt(&opts)
-	}
-	accessors := []Accessor{
-		// general event parameters
-		newEventAccessor(),
-		// process state and parameters
-		newPSAccessor(opts.psnap),
-		// PE metadata
-		newPEAccessor(),
-	}
-
-	fconfig := config.Filters
-
-	if config.EventSource.EnableThreadEvents {
-		accessors = append(accessors, newThreadAccessor())
-	}
-	if config.EventSource.EnableModuleEvents {
-		accessors = append(accessors, newModuleAccessor())
-	}
-	if config.EventSource.EnableFileIOEvents {
-		accessors = append(accessors, newFileAccessor())
-	}
-	if config.EventSource.EnableRegistryEvents {
-		accessors = append(accessors, newRegistryAccessor())
-	}
-	if config.EventSource.EnableNetEvents {
-		accessors = append(accessors, newNetworkAccessor())
-	}
-	if config.EventSource.EnableMemEvents {
-		accessors = append(accessors, newMemAccessor())
-	}
-	if config.EventSource.EnableDNSEvents {
-		accessors = append(accessors, newDNSAccessor())
-	}
-
-	var parser *ql.Parser
-	if fconfig.HasMacros() {
-		parser = ql.NewParserWithConfig(expr, fconfig)
-	} else {
-		parser = ql.NewParser(expr)
-	}
-
-	return &filter{
-		parser:         parser,
-		accessors:      accessors,
-		fields:         make([]Field, 0),
-		segments:       make([]fields.Segment, 0),
-		stringFields:   make(map[fields.Field][]string),
-		boundFields:    make([]*ql.BoundFieldLiteral, 0),
-		seqBoundFields: make(map[int][]BoundField),
-	}
-}
-
-// NewFromCLI builds and compiles a filter by joining all the command line arguments into the filter expression.
-func NewFromCLI(args []string, config *config.Config) (Filter, error) {
+// NewFromCLI builds the filter by joining all the command line arguments
+// into the filter expression. It returns a nil filter if there are no arguments.
+func NewFromCLI(args []string) (Filter, error) {
 	expr := strings.Join(args, " ")
 	if expr == "" {
 		return nil, nil
 	}
-	filter := New(expr, config)
-	if err := filter.Compile(); err != nil {
+	f, err := New(expr)
+	if err != nil {
 		return nil, fmt.Errorf("bad filter:\n%v", err)
 	}
-	return filter, nil
+	return f, nil
 }
 
-// NewFromCLIWithAllAccessors builds and compiles a filter with all field accessors enabled.
-func NewFromCLIWithAllAccessors(args []string) (Filter, error) {
-	expr := strings.Join(args, " ")
-	if expr == "" {
-		return nil, nil
-	}
-	filter := &filter{
-		parser:         ql.NewParser(expr),
-		accessors:      GetAccessors(),
-		fields:         make([]Field, 0),
-		segments:       make([]fields.Segment, 0),
-		stringFields:   make(map[fields.Field][]string),
-		boundFields:    make([]*ql.BoundFieldLiteral, 0),
-		seqBoundFields: make(map[int][]BoundField),
-	}
-	if err := filter.Compile(); err != nil {
-		return nil, fmt.Errorf("bad filter:\n %v", err)
-	}
-	return filter, nil
-}
-
-// Accessor finds exactly one accessor that can serve the bound field.
-func (b *BoundField) Accessor(f *filter) Accessor {
-	if b.accessor != nil {
-		return b.accessor
-	}
-	switch {
-	case b.Field.Name.IsKevtField(), b.Field.Name.IsEvtField():
-		b.accessor = newEventAccessor()
-	case b.Field.Name.IsPsField():
-		for _, accessor := range f.accessors {
-			if reflect.TypeOf(accessor) == reflect.TypeOf(&psAccessor{}) {
-				b.accessor = accessor
-				break
-			}
-		}
-		if b.accessor == nil {
-			b.accessor = newPSAccessor(nil)
-		}
-	case b.Field.Name.IsThreadField():
-		b.accessor = newThreadAccessor()
-	case b.Field.Name.IsImageField():
-		b.accessor = newModuleAccessor()
-	case b.Field.Name.IsFileField():
-		b.accessor = newFileAccessor()
-	case b.Field.Name.IsRegistryField():
-		b.accessor = newRegistryAccessor()
-	case b.Field.Name.IsNetworkField():
-		b.accessor = newNetworkAccessor()
-	case b.Field.Name.IsPeField():
-		b.accessor = newPEAccessor()
-	case b.Field.Name.IsMemField():
-		b.accessor = newMemAccessor()
-	case b.Field.Name.IsDNSField():
-		b.accessor = newDNSAccessor()
-	}
-	return b.accessor
+func (f *filter) Eval(evt *event.Event) bool {
+	valuer := eval.AcquireValuerCache()
+	defer valuer.Release()
+	return f.evaluator.Eval(evt, valuer)
 }

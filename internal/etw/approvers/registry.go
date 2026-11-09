@@ -28,8 +28,9 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/utf16"
 
 	"github.com/hashicorp/golang-lru/v2/expirable"
-	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/compiler/fields"
 	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/rules"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
 )
@@ -48,10 +49,10 @@ type registry struct {
 	pathLRUCache *expirable.LRU[uint64, string] // interned KCB paths
 }
 
-func newRegistryApprover(r *config.RulesCompileResult) Approver {
+func newRegistryApprover(p rules.ApproversProvider) Approver {
 	return &registry{
 		approver: approver{
-			r: r,
+			provider: p,
 		},
 		kcbs:         make(map[uint64]string, 5000),
 		pathLRUCache: expirable.NewLRU[uint64, string](1000, nil, time.Minute*5),
@@ -124,4 +125,14 @@ func (r *registry) Approve(rec *etw.EventRecord) (*etw.EventRecord, bool) {
 	registryApproverRejections.Add(1)
 
 	return rec, false
+}
+
+// approveKey asks the rule approvers if the registry key open is approved.
+func (r *registry) approveKey(path string) bool {
+	return r.approve(event.RegOpenKey, func(k rules.Key) (string, bool) {
+		if k.Field == fields.RegistryPath {
+			return path, true
+		}
+		return "", false
+	})
 }

@@ -24,6 +24,7 @@ import (
 	"github.com/rabbitstack/fibratus/internal/evasion"
 	"golang.org/x/sys/windows"
 
+	"github.com/rabbitstack/fibratus/pkg/aggregator"
 	"github.com/rabbitstack/fibratus/pkg/event"
 
 	"os"
@@ -92,6 +93,8 @@ type Config struct {
 
 	// Yara contains configuration that influences the behaviour of the Yara engine
 	Yara yara.Config `json:"yara" yaml:"yara"`
+	// Aggregator stores event aggregator configuration
+	Aggregator aggregator.Config `json:"aggregator" yaml:"aggregator"`
 
 	// Evasion controls the detection of evasion behaviours.
 	Evasion evasion.Config `json:"evasion" yaml:"evasion"`

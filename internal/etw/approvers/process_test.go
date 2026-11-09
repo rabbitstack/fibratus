@@ -22,10 +22,10 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
+	"github.com/rabbitstack/fibratus/pkg/rules"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/stretchr/testify/mock"
 	"golang.org/x/sys/windows"
@@ -61,8 +61,8 @@ func openThreadRecord(callerPID, targetPID uint32) *etw.EventRecord {
 	return r
 }
 
-func newTestProcApprover(psnap *ps.SnapshotterMock, r *config.RulesCompileResult) *proc {
-	return newProcApprover(psnap, r).(*proc)
+func newTestProcApprover(psnap *ps.SnapshotterMock, p rules.ApproversProvider) *proc {
+	return newProcApprover(psnap, p).(*proc)
 }
 
 func TestProcApproverNonAuditAPIEvent(t *testing.T) {
@@ -142,14 +142,8 @@ func TestProcApproverOpenProcessNilPS(t *testing.T) {
 
 func TestProcApproverOpenProcessExeApproved(t *testing.T) {
 	psnap := &ps.SnapshotterMock{}
-	rules := &config.RulesCompileResult{
-		Approvers: config.Approvers{
-			Executables: map[string][]string{
-				"IMATCHES": {`c:\windows\system32\*`},
-			},
-		},
-	}
-	a := newTestProcApprover(psnap, rules)
+	provider := newProvider(t, procRule("evt.arg[exe] imatches "+list(`c:\windows\system32\*`)))
+	a := newTestProcApprover(psnap, provider)
 
 	const pid = uint32(1234)
 	psnap.On("Find", pid).Return(true, &pstypes.PS{Exe: `C:\Windows\System32\svchost.exe`})
@@ -163,14 +157,8 @@ func TestProcApproverOpenProcessExeApproved(t *testing.T) {
 
 func TestProcApproverOpenProcessExeRejected(t *testing.T) {
 	psnap := &ps.SnapshotterMock{}
-	rules := &config.RulesCompileResult{
-		Approvers: config.Approvers{
-			Executables: map[string][]string{
-				"IMATCHES": {`C:\Windows\System32\*`},
-			},
-		},
-	}
-	a := newTestProcApprover(psnap, rules)
+	provider := newProvider(t, procRule("evt.arg[exe] imatches "+list(`C:\Windows\System32\*`)))
+	a := newTestProcApprover(psnap, provider)
 
 	const pid = uint32(5678)
 	psnap.On("Find", pid).Return(true, &pstypes.PS{Exe: `C:\Users\Administrator\cmd.exe`})
@@ -184,14 +172,8 @@ func TestProcApproverOpenProcessExeRejected(t *testing.T) {
 
 func TestProcApproverOpenProcessEmptyExeApproved(t *testing.T) {
 	psnap := &ps.SnapshotterMock{}
-	rules := &config.RulesCompileResult{
-		Approvers: config.Approvers{
-			Executables: map[string][]string{
-				"IMATCHES": {`C:\Windows\*`},
-			},
-		},
-	}
-	a := newTestProcApprover(psnap, rules)
+	provider := newProvider(t, procRule("evt.arg[exe] imatches "+list(`C:\Windows\*`)))
+	a := newTestProcApprover(psnap, provider)
 
 	const pid = uint32(9999)
 	psnap.On("Find", pid).Return(true, &pstypes.PS{Exe: ""})
@@ -205,16 +187,10 @@ func TestProcApproverOpenProcessEmptyExeApproved(t *testing.T) {
 
 func TestProcApproverOpenThreadSameProcessExeApproved(t *testing.T) {
 	psnap := &ps.SnapshotterMock{}
-	rules := &config.RulesCompileResult{
-		Approvers: config.Approvers{
-			Executables: map[string][]string{
-				"IMATCHES": {`c:\windows\*`},
-			},
-		},
-	}
+	provider := newProvider(t, procRule("evt.arg[exe] imatches "+list(`c:\windows\*`)))
 
 	const pid = uint32(888)
-	a := newTestProcApprover(psnap, rules)
+	a := newTestProcApprover(psnap, provider)
 	r := openThreadRecord(pid, pid)
 
 	psnap.On("Find", pid).Return(true, &pstypes.PS{Exe: `C:\Windows\System32\lsass.exe`})
@@ -227,16 +203,10 @@ func TestProcApproverOpenThreadSameProcessExeApproved(t *testing.T) {
 
 func TestProcApproverOpenThreadSameProcessExeRejected(t *testing.T) {
 	psnap := &ps.SnapshotterMock{}
-	rules := &config.RulesCompileResult{
-		Approvers: config.Approvers{
-			Executables: map[string][]string{
-				"IMATCHES": {`C:\Windows\*`},
-			},
-		},
-	}
+	provider := newProvider(t, procRule("evt.arg[exe] imatches "+list(`C:\Windows\*`)))
 	const pid = uint32(777)
 
-	a := newTestProcApprover(psnap, rules)
+	a := newTestProcApprover(psnap, provider)
 	r := openThreadRecord(pid, pid)
 
 	psnap.On("Find", pid).Return(true, &pstypes.PS{Exe: `C:\suspicious\inject.exe`})

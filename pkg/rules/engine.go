@@ -19,337 +19,492 @@
 package rules
 
 import (
+	"context"
 	"expvar"
 	"fmt"
+	"os"
+	"runtime/debug"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
-	"github.com/rabbitstack/fibratus/pkg/filter"
-	"github.com/rabbitstack/fibratus/pkg/filter/fields"
-	"github.com/rabbitstack/fibratus/pkg/ps"
-	"github.com/rabbitstack/fibratus/pkg/rules/action"
+	"github.com/rabbitstack/fibratus/pkg/policy"
+	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	log "github.com/sirupsen/logrus"
 )
 
-// RuleMatchFunc is rule match function definition. It accepts
-// the filter (rule) config and the group of events that fired
-// the rule
-type RuleMatchFunc func(f *config.FilterConfig, evts ...*event.Event)
+const (
+	// heartbeatFastInterval is the heartbeat period after the engine
+	// starts or the rules are reloaded
+	heartbeatFastInterval = time.Minute
+	// heartbeatSlowInterval is the heartbeat period once the fast beats are sent
+	heartbeatSlowInterval = 10 * time.Minute
+	// heartbeatFastBeats is the number of heartbeats sent at the fast period
+	heartbeatFastBeats = 5
+)
 
 var (
-	// sequenceGcInterval determines how often sequence GC kicks in
-	sequenceGcInterval = time.Minute
+	ruleMatches   = expvar.NewMap("filter.matches")
+	noMatches     = expvar.NewMap("rules.events.nomatch")
+	reloads       = expvar.NewInt("rules.reloads")
+	reloadFails   = expvar.NewInt("rules.reload.errors")
+	heartbeatsOut = expvar.NewInt("rules.heartbeats")
 
-	filterMatches = expvar.NewMap("filter.matches")
-
-	ErrRuleAction = func(rule string, err error) error {
-		return fmt.Errorf("fail to execute action for %q rule: %v", rule, err)
+	// ErrRuleAction signals the rule action failed.
+	ErrRuleAction = func(rule, action string, err error) error {
+		return fmt.Errorf("fail to execute %s action for %q rule: %v", action, rule, err)
 	}
 )
 
-// Engine asserts the full-fledged system event against
-// the collection of compiled filters that are derived
-// from the loaded ruleset.
+// Heartbeat describes the state of the rule engine. It is sent periodically
+// to tell that the engine is alive and which rules it is running.
+type Heartbeat struct {
+	// Time is the heartbeat time.
+	Time time.Time
+	// Hostname is the name of the host the engine runs on.
+	Hostname string
+	// NumberRules is the number of the rules in the current rule set.
+	NumberRules int
+	// Policies describes the policies of the current rule set.
+	Policies []HeartbeatPolicy
+}
+
+// HeartbeatPolicy summarizes the policy in the heartbeat.
+type HeartbeatPolicy struct {
+	Name    string
+	Source  string
+	Version string
+	// Rules is the number of the active rules coming from the policy.
+	Rules int
+}
+
+// HeartbeatSender delivers the engine heartbeats.
+type HeartbeatSender interface {
+	SendHeartbeat(h *Heartbeat) error
+}
+
+// logHeartbeatSender is the default heartbeat sender, which only logs the heartbeat.
+type logHeartbeatSender struct{}
+
+func (logHeartbeatSender) SendHeartbeat(h *Heartbeat) error {
+	log.Debugf("rule engine heartbeat: rules=%d policies=%d", h.NumberRules, len(h.Policies))
+	return nil
+}
+
+// RulesetLoadedFunc is invoked each time the engine tries to load the rule set. If
+// loading failed, the rule set is nil and the error describes why the engine keeps
+// running with the previous rule set.
+type RulesetLoadedFunc func(rs *RuleSet, err error)
+
+// ReloadFunc is invoked after the engine has replaced the rule set.
+type ReloadFunc func(report *RuleSetReport)
+
+// EngineOption customizes the engine.
+type EngineOption func(*Engine)
+
+// WithProviders sets the providers that supply the policies. By default,
+// the policies are loaded from the rule and macro paths from the configuration.
+func WithProviders(providers ...policy.Provider) EngineOption {
+	return func(e *Engine) { e.providers = providers }
+}
+
+// WithActions sets the implementations of the rule actions.
+func WithActions(actions Actions) EngineOption {
+	return func(e *Engine) { e.actions = actions }
+}
+
+// WithRuleSetOptions sets the options for the rule sets the engine builds.
+func WithRuleSetOptions(opts ...Option) EngineOption {
+	return func(e *Engine) { e.rsOpts = opts }
+}
+
+// WithHeartbeatSender sets the heartbeat sender.
+func WithHeartbeatSender(sender HeartbeatSender) EngineOption {
+	return func(e *Engine) { e.heartbeat = sender }
+}
+
+// WithHeartbeatIntervals sets the heartbeat periods. The fast period is used
+// for the first beats after the engine starts or the rules are reloaded.
+func WithHeartbeatIntervals(fast, slow time.Duration) EngineOption {
+	return func(e *Engine) { e.heartbeatFast, e.heartbeatSlow = fast, slow }
+}
+
+// Engine is the rule engine. It owns the lifecycle of the rule set, which is
+// built from the policies the providers supply, and replaces it as a whole each
+// time the policies change. A rule set that fails to build never replaces the
+// working one, so the engine keeps evaluating the events with the rules it has.
+//
+// The engine listens to the matches of the rule sets it builds. On a match, it
+// tags the events of the match, sends the alert via the alert senders and runs
+// the actions that the rule declares. While it runs, the engine reloads the
+// policies in a goroutine when the providers report the changes, or when it is
+// asked to, and periodically sends the heartbeats.
 type Engine struct {
-	filters *filterset
-	config  *config.Config
-	psnap   ps.Snapshotter
+	// RWMutex guards the callbacks
+	sync.RWMutex
+	// reloadMu serializes the rule set replacements
+	reloadMu sync.Mutex
 
-	matches   []*ruleMatch
-	mmu       sync.Mutex // guards the rule matches slice
-	sequences []*sequenceState
+	cfg          config.RulesConfig
+	providers    []policy.Provider
+	policyLoader *policy.Loader
+	rsOpts       []Option
+	actions      Actions
 
-	scavenger *time.Ticker
+	ruleSet atomic.Pointer[RuleSet]
 
-	compiler *compiler
+	rulesLoaded RulesetLoadedFunc
+	reloadFns   []ReloadFunc
+	matchFns    []func(rule *Rule, events []*event.Event)
 
-	matchFunc RuleMatchFunc
+	heartbeat      HeartbeatSender
+	heartbeatFast  time.Duration
+	heartbeatSlow  time.Duration
+	heartbeatReset chan struct{}
+	hostname       string
+
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
 }
 
-type ruleMatch struct {
-	ctx *config.ActionContext
-}
-
-type compiledFilter struct {
-	filter filter.Filter
-	config *config.FilterConfig
-	ss     *sequenceState
-}
-
-// filterset contains compiled filters indexed by event type and category.
-type filterset struct {
-	types      map[event.Type][]*compiledFilter
-	categories map[event.Category][]*compiledFilter
-}
-
-func newFilterset() *filterset {
-	fs := &filterset{
-		types:      make(map[event.Type][]*compiledFilter),
-		categories: make(map[event.Category][]*compiledFilter),
-	}
-	return fs
-}
-
-func (f *filterset) empty() bool {
-	return len(f.types) == 0 && len(f.categories) == 0
-}
-
-func (f *filterset) collect(e *event.Event) []*compiledFilter {
-	if len(f.categories) == 0 {
-		return f.types[e.Type]
-	}
-	return append(f.types[e.Type], f.categories[e.Category()]...)
-}
-
-func newCompiledFilter(f filter.Filter, c *config.FilterConfig, ss *sequenceState) *compiledFilter {
-	return &compiledFilter{filter: f, config: c, ss: ss}
-}
-
-// isScoped determines if this filter is scoped, i.e. it has the event name or category
-// conditions.
-func (f *compiledFilter) isScoped() bool {
-	for name := range f.filter.GetStringFields() {
-		if name == fields.EvtName || name == fields.EvtCategory {
-			return true
-		}
-	}
-	return false
-}
-
-func (f *compiledFilter) isSequence() bool {
-	return f.ss != nil
-}
-
-func (f *compiledFilter) eval(e *event.Event, valuer *filter.ValuerCache) bool {
-	if f.ss != nil {
-		return f.ss.evalSequence(e, valuer)
-	}
-	return f.filter.EvalWithValuer(e, valuer)
-}
-
-// NewEngine builds a fresh rules engine instance.
-func NewEngine(psnap ps.Snapshotter, config *config.Config) *Engine {
+// NewEngine creates the rule engine. Call Start to load the rules and begin
+// watching the policy providers.
+func NewEngine(cfg config.RulesConfig, opts ...EngineOption) *Engine {
 	e := &Engine{
-		filters:   newFilterset(),
-		matches:   make([]*ruleMatch, 0),
-		sequences: make([]*sequenceState, 0),
-		psnap:     psnap,
-		config:    config,
-		scavenger: time.NewTicker(sequenceGcInterval),
-		compiler:  newCompiler(psnap, config),
+		cfg:            cfg,
+		heartbeat:      logHeartbeatSender{},
+		heartbeatFast:  heartbeatFastInterval,
+		heartbeatSlow:  heartbeatSlowInterval,
+		heartbeatReset: make(chan struct{}, 1),
 	}
-
-	go e.gcSequences()
-
+	e.hostname, _ = os.Hostname()
+	for _, opt := range opts {
+		opt(e)
+	}
+	if len(e.providers) == 0 {
+		e.providers = []policy.Provider{policy.NewDirProvider(cfg.RulePaths, cfg.MacroPaths)}
+	}
+	e.policyLoader = policy.NewLoader(policy.DefaultLoadOptions(), e.providers...)
+	e.ruleSet.Store(NewEmptyRuleSet())
 	return e
 }
 
-// ApproverPlan returns the conservative in-kernel prefilter derived from the
-// compiled ruleset. RulesCompileResult stays a usage summary and is not used
-// as predicate data.
-func (e *Engine) ApproverPlan() *filter.ApproverPlan {
-	if e == nil || e.compiler == nil {
-		return filter.AllowAllPlan()
+// Start loads the rules, starts the policy providers, and spins up the goroutines
+// that reload the policies and send the heartbeats. The policies are reloaded when
+// a provider reports a change, or when a signal arrives on the reload channel, which
+// may be nil. The engine stops when the context is cancelled or Stop is called.
+// If the initial load fails, the engine doesn't start.
+func (e *Engine) Start(ctx context.Context, reloadChan <-chan struct{}) error {
+	if err := e.LoadPolicies(true); err != nil {
+		return err
 	}
-	return e.compiler.ApproverPlan()
+	if err := e.policyLoader.Watch(); err != nil {
+		return err
+	}
+
+	ctx, e.cancel = context.WithCancel(ctx)
+
+	e.wg.Add(2)
+	go func() {
+		defer e.wg.Done()
+		e.reloadLoop(ctx, reloadChan)
+	}()
+	go func() {
+		defer e.wg.Done()
+		e.heartbeatLoop(ctx)
+	}()
+
+	return nil
 }
 
-func (e *Engine) gcSequences() {
+// Stop stops the goroutines and closes the policy providers.
+func (e *Engine) Stop() {
+	if e.cancel != nil {
+		e.cancel()
+	}
+	if err := e.policyLoader.Close(); err != nil {
+		log.Errorf("unable to close policy providers: %v", err)
+	}
+	e.wg.Wait()
+}
+
+// reloadLoop reloads the policies when the providers report new policies
+// or when the reload signal arrives. A panic while reloading is logged,
+// and doesn't stop the loop.
+func (e *Engine) reloadLoop(ctx context.Context, reloadChan <-chan struct{}) {
 	for {
-		<-e.scavenger.C
-		for _, seq := range e.sequences {
-			seq.gc()
+		select {
+		case <-ctx.Done():
+			return
+		case <-reloadChan:
+			log.Info("reload signal received, reloading policies")
+			e.safely("reload policies", func() { _ = e.ReloadPolicies() })
+		case <-e.policyLoader.NewPolicyReady():
+			log.Info("new policies are ready, reloading")
+			e.safely("reload policies", func() { _ = e.ReloadPolicies() })
 		}
 	}
 }
 
-// Compile loads macros/rules and builds an indexable filter set.
-// For every rule in the ruleset the condition is compiled and
-// converted into a filter. The filter is indexed by either the
-// event name or event category.
-func (e *Engine) Compile() (*config.RulesCompileResult, error) {
-	filters, rs, err := e.compiler.compile()
+func (e *Engine) safely(what string, fn func()) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("panic while trying to %s: %v\n%s", what, r, debug.Stack())
+		}
+	}()
+	fn()
+}
+
+// ReloadPolicies reloads the policies from the providers and replaces the
+// rule set. The engine keeps the current rule set if reloading fails.
+func (e *Engine) ReloadPolicies() error {
+	log.Info("reloading policies")
+	return e.LoadPolicies(true)
+}
+
+// LoadPolicies loads the policies from all providers, builds the rule set and
+// replaces the current one. The current rule set stays in place if the policies
+// can't be loaded or any rule fails to compile. If sendLoadedReport is set, the
+// heartbeat is sent right away, and the heartbeat period restarts.
+func (e *Engine) LoadPolicies(sendLoadedReport bool) error {
+	e.reloadMu.Lock()
+	defer e.reloadMu.Unlock()
+
+	policies, err := e.policyLoader.LoadPolicies()
 	if err != nil {
-		return nil, err
+		return e.loadFailed(err)
 	}
 
-	for c, f := range filters {
-		var ss *sequenceState
-		if f.IsSequence() {
-			ss = newSequenceState(f, c, e.psnap)
-		}
-		fltr := newCompiledFilter(f, c, ss)
-		if ss != nil {
-			// store the sequences in engine
-			// for more convenient tracking
-			e.sequences = append(e.sequences, ss)
-		}
+	opts := append([]Option{WithMatchAll(e.cfg.MatchAll)}, e.rsOpts...)
+	rs, err := NewRuleSet(policies, opts...)
+	if err != nil {
+		return e.loadFailed(err)
+	}
 
-		if !fltr.isScoped() {
-			log.Warnf("%q rule doesn't have "+
-				"event type or event category condition! "+
-				"This rule is being discarded by "+
-				"the engine. Please consider narrowing the "+
-				"scope of the rule by including the `evt.name` "+
-				"or `evt.category` condition",
-				c.Name)
-			continue
-		}
+	// the engine is notified about every rule that matches
+	rs.AddListener(e)
 
-		// traverse all event name or category fields and determine
-		// the event type from the filter field name expression.
-		// We end up with a map of rules indexed by event type
-		// or event category
-		for name, values := range f.GetStringFields() {
-			for _, v := range values {
-				switch name {
-				case fields.EvtName:
-					typ, ok := event.ParseType(v)
-					if !ok {
-						continue
-					}
-					e.filters.types[typ] = append(e.filters.types[typ], fltr)
-				case fields.EvtCategory:
-					category, ok := event.ParseCategory(v)
-					if !ok {
-						continue
-					}
-					e.filters.categories[category] = append(e.filters.categories[category], fltr)
-				}
-			}
+	prev := e.ruleSet.Swap(rs)
+	reloads.Add(1)
+
+	report := rs.Report()
+	log.Infof("rule set loaded: %s", report)
+
+	// the event source enables the providers and event types at startup,
+	// so the rules that need events it didn't enable can't match them
+	if prev != nil && prev.Len() > 0 {
+		if missing := prev.Report().Missing(report); len(missing) > 0 {
+			log.Warnf("the reloaded rules use the event types the event "+
+				"source wasn't started with: %v. Restart Fibratus to capture them", missing)
 		}
 	}
 
-	return rs, nil
-}
-
-func (e *Engine) RegisterMatchFunc(fn RuleMatchFunc) {
-	e.matchFunc = fn
-}
-
-func (*Engine) CanEnqueue() bool { return true }
-
-// ProcessEvent processes the system event against compiled filters.
-// Filter is the internal lingo that designates a rule condition.
-// Filters can be simple direct-event matchers or sequence states that
-// track an ordered series of events over a short period of time.
-func (e *Engine) ProcessEvent(evt *event.Event) (bool, error) {
-	if e.filters.empty() {
-		return true, nil
+	e.RLock()
+	loaded, fns := e.rulesLoaded, append([]ReloadFunc(nil), e.reloadFns...)
+	e.RUnlock()
+	if loaded != nil {
+		loaded(rs, nil)
+	}
+	for _, fn := range fns {
+		fn(report)
 	}
 
-	if evt.IsTerminateProcess() {
-		// expire all sequences if the
-		// process referenced in any
-		// partials has terminated
-		for _, seq := range e.sequences {
-			seq.expire(evt)
-		}
-	}
-
-	filters := e.filters.collect(evt)
-
-	// acquire valuer cache
-	valuer := filter.AcquireValuerCache()
-	defer valuer.Release()
-
-	// assert event against compiled ruleset
-	var matches bool
-	for _, f := range filters {
-		match := f.eval(evt, valuer)
-		if !match {
-			continue
-		}
-		if f.isSequence() {
-			e.appendMatch(f.config, f.ss.events()...)
-			f.ss.clearLocked()
-		} else {
-			e.appendMatch(f.config, evt)
-		}
-		err := e.processActions()
-		if err != nil {
-			log.Errorf("unable to execute rule action: %v", err)
-		}
-		switch {
-		case e.config.Filters.MatchAll:
-			matches = true
+	if sendLoadedReport {
+		select {
+		case e.heartbeatReset <- struct{}{}:
 		default:
-			return true, nil
-		}
-	}
-
-	return matches, nil
-}
-
-// processActions executes rule actions
-// on behalf of rule matches. Actions are
-// categorized into implicit and explicit
-// actions.
-// Sending an alert is an implicit action
-// carried out each time there is a rule
-// match. Other actions are executed if
-// declared in the rule definition.
-func (e *Engine) processActions() error {
-	defer e.clearMatches()
-	e.mmu.Lock()
-	defer e.mmu.Unlock()
-
-	for _, m := range e.matches {
-		f, evts := m.ctx.Filter, m.ctx.Events
-		filterMatches.Add(f.Name, 1)
-		log.Debugf("[%s] rule matched", f.Name)
-		err := action.Alert(m.ctx, f.Name, filter.InterpolateFields(f.Output, evts), f.Severity, f.Tags)
-		if err != nil {
-			return ErrRuleAction(f.Name, err)
-		}
-
-		actions, err := f.DecodeActions()
-		if err != nil {
-			return err
-		}
-
-		for _, act := range actions {
-			switch t := act.(type) {
-			case config.KillAction:
-				log.Infof("executing kill action: rule=%s", f.Name)
-				if err := action.Kill(m.ctx); err != nil {
-					return ErrRuleAction(f.Name, err)
-				}
-			case config.IsolateAction:
-				log.Infof("executing isolate action: rule=%s", f.Name)
-				if err := action.Isolate(t.Whitelist); err != nil {
-					return ErrRuleAction(f.Name, err)
-				}
-			}
 		}
 	}
 
 	return nil
 }
 
-func (e *Engine) appendMatch(f *config.FilterConfig, evts ...*event.Event) {
-	for _, evt := range evts {
-		evt.AddMeta(event.RuleNameKey, f.Name)
-		for k, v := range f.Labels {
-			evt.AddMeta(event.MetadataKey(k), v)
+func (e *Engine) loadFailed(err error) error {
+	reloadFails.Add(1)
+	log.Errorf("unable to load policies. The rule set remains unchanged: %v", err)
+	e.RLock()
+	loaded := e.rulesLoaded
+	e.RUnlock()
+	if loaded != nil {
+		loaded(nil, err)
+	}
+	return err
+}
+
+// heartbeatLoop sends the heartbeats. The first beats are sent at the fast
+// period, and the following at the slow one. The reload of the rule set sends the
+// heartbeat immediately, and restarts the fast period.
+func (e *Engine) heartbeatLoop(ctx context.Context) {
+	beats := heartbeatFastBeats
+	ticker := time.NewTicker(e.heartbeatFast)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-e.heartbeatReset:
+			beats = heartbeatFastBeats
+			ticker.Reset(e.heartbeatFast)
+			e.safely("send heartbeat", e.sendHeartbeat)
+		case <-ticker.C:
+			e.safely("send heartbeat", e.sendHeartbeat)
+			if beats > 0 {
+				beats--
+				if beats == 0 {
+					ticker.Reset(e.heartbeatSlow)
+				}
+			}
 		}
-	}
-	ctx := &config.ActionContext{
-		Events: evts,
-		Filter: f,
-	}
-	e.mmu.Lock()
-	defer e.mmu.Unlock()
-	e.matches = append(e.matches, &ruleMatch{ctx: ctx})
-	if e.matchFunc != nil {
-		e.matchFunc(f, evts...)
 	}
 }
 
-func (e *Engine) clearMatches() {
-	e.mmu.Lock()
-	defer e.mmu.Unlock()
-	e.matches = make([]*ruleMatch, 0)
+// sendHeartbeat sends the heartbeat about the current rule set.
+func (e *Engine) sendHeartbeat() {
+	rs := e.ruleSet.Load()
+
+	hb := &Heartbeat{Time: time.Now(), Hostname: e.hostname, NumberRules: rs.Len()}
+	for _, p := range rs.GetPolicies() {
+		hp := HeartbeatPolicy{Name: p.Name, Source: p.Source, Version: p.Version}
+		for _, r := range rs.GetRules() {
+			if r.Source == p.Source {
+				hp.Rules++
+			}
+		}
+		hb.Policies = append(hb.Policies, hp)
+	}
+
+	if err := e.heartbeat.SendHeartbeat(hb); err != nil {
+		log.Errorf("unable to send heartbeat: %v", err)
+		return
+	}
+	heartbeatsOut.Add(1)
 }
+
+// SetRulesetLoadedCallback sets the function called each time the engine
+// tries to load the rule set.
+func (e *Engine) SetRulesetLoadedCallback(cb RulesetLoadedFunc) {
+	e.Lock()
+	defer e.Unlock()
+	e.rulesLoaded = cb
+}
+
+// OnReload registers the function called after the rule set is replaced.
+func (e *Engine) OnReload(fn ReloadFunc) {
+	e.Lock()
+	defer e.Unlock()
+	e.reloadFns = append(e.reloadFns, fn)
+}
+
+// RegisterMatchFunc registers the function called for every rule match.
+func (e *Engine) RegisterMatchFunc(fn func(rule *Rule, events []*event.Event)) {
+	e.Lock()
+	defer e.Unlock()
+	e.matchFns = append(e.matchFns, fn)
+}
+
+// GetRuleSet returns the current rule set.
+func (e *Engine) GetRuleSet() *RuleSet { return e.ruleSet.Load() }
+
+// Report returns the report of the current rule set.
+func (e *Engine) Report() *RuleSetReport { return e.ruleSet.Load().Report() }
+
+// Approvers returns the approvers of the current rule set. Since the rule
+// set is replaced when the rules change, consumers should call this method
+// every time they need the approvers, and never hold on to the result.
+func (e *Engine) Approvers() *Approvers { return e.ruleSet.Load().Approvers() }
+
+// Len returns the number of rules in the current rule set.
+func (e *Engine) Len() int { return e.ruleSet.Load().Len() }
+
+// HandleEvent evaluates the event against the current rule set. The events
+// that trigger the rules are tagged with the rule name and the rule labels in the
+// event metadata, so the downstream consumers can tell which events matched.
+// The failures of rule actions are logged, and don't prevent the remaining
+// actions from running, nor do they stop the event from being processed.
+func (e *Engine) HandleEvent(evt *event.Event) error {
+	rs := e.ruleSet.Load()
+	if rs.Len() == 0 {
+		return nil
+	}
+
+	if !rs.Evaluate(evt) && rs.HasRulesForEventType(evt.Type) {
+		noMatches.Add(evt.Type.String(), 1)
+	}
+
+	return nil
+}
+
+// RuleMatch implements the RuleSetListener interface. It tags the events of
+// the match, sends the alert through the alert senders, and runs the actions
+// that the rule declares. It always returns true, so the other listeners are
+// notified as well.
+func (e *Engine) RuleMatch(rule *Rule, events []*event.Event) bool {
+	m := RuleMatch{Rule: rule, Events: events}
+	name := rule.Name
+	ruleMatches.Add(name, 1)
+	log.Debugf("[%s] rule matched", name)
+
+	for _, evt := range events {
+		evt.AddMeta(event.RuleNameKey, name)
+		for k, v := range rule.Labels {
+			evt.AddMeta(event.MetadataKey(k), v)
+		}
+	}
+
+	e.RLock()
+	fns := e.matchFns
+	e.RUnlock()
+	for _, fn := range fns {
+		fn(rule, events)
+	}
+
+	if err := e.runActions(m); err != nil {
+		log.Errorf("unable to execute rule actions: %v", err)
+	}
+
+	return true
+}
+
+// runActions executes the rule actions. Sending the alert is the implicit
+// action carried out each time there is a match. The other actions run only
+// if they are declared in the rule definition.
+func (e *Engine) runActions(m RuleMatch) error {
+	var errs []error
+	name := m.Rule.Name
+
+	if e.actions.Alerter != nil {
+		if err := e.actions.Alerter.Alert(m); err != nil {
+			errs = append(errs, ErrRuleAction(name, "alert", err))
+		}
+	}
+
+	for _, act := range m.Rule.Action {
+		switch {
+		case act.Kill != nil:
+			if e.actions.ProcessKiller == nil {
+				log.Warnf("[%s] the kill action is not available", name)
+				continue
+			}
+			log.Infof("executing kill action: rule=%s", name)
+			if err := e.actions.ProcessKiller.Kill(m); err != nil {
+				errs = append(errs, ErrRuleAction(name, "kill", err))
+			}
+		case act.Isolate != nil:
+			if e.actions.Isolator == nil {
+				log.Warnf("[%s] the isolate action is not available", name)
+				continue
+			}
+			log.Infof("executing isolate action: rule=%s", name)
+			if err := e.actions.Isolator.Isolate(act.Isolate.Whitelist); err != nil {
+				errs = append(errs, ErrRuleAction(name, "isolate", err))
+			}
+		}
+	}
+
+	return multierror.Wrap(errs...)
+}
+
+var _ RuleSetListener = (*Engine)(nil)

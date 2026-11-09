@@ -20,6 +20,7 @@ package etw
 import (
 	"context"
 	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/rules"
 	"net"
 	"net/http"
 	"os"
@@ -100,7 +101,6 @@ func TestEventSourceStartTraces(t *testing.T) {
 					BufferSize:         1024,
 					FlushTimer:         time.Millisecond * 2300,
 				},
-				Filters: &config.Filters{},
 			},
 			2,
 			[]etw.EventTraceFlags{0x6018203, 0},
@@ -117,7 +117,6 @@ func TestEventSourceStartTraces(t *testing.T) {
 					FlushTimer:           time.Millisecond * 2300,
 					EnableAuditAPIEvents: true,
 				},
-				Filters: &config.Filters{},
 			},
 			2,
 			[]etw.EventTraceFlags{0x6038203, 0x80000040},
@@ -164,7 +163,7 @@ func TestEventSourceEnableFlagsDynamically(t *testing.T) {
 	hsnap.On("FindByObject", mock.Anything).Return(htypes.Handle{}, false)
 	hsnap.On("FindHandles", mock.Anything).Return([]htypes.Handle{}, nil)
 
-	r := &config.RulesCompileResult{
+	r := staticRules{report: &rules.RuleSetReport{
 		HasProcEvents:     true,
 		HasModuleEvents:   true,
 		HasRegistryEvents: true,
@@ -184,7 +183,7 @@ func TestEventSourceEnableFlagsDynamically(t *testing.T) {
 			event.OpenProcess,
 			event.Connect,
 		},
-	}
+	}}
 	cfg := &config.Config{
 		EventSource: config.EventSourceConfig{
 			EnableThreadEvents:   true,
@@ -193,7 +192,6 @@ func TestEventSourceEnableFlagsDynamically(t *testing.T) {
 			EnableFileIOEvents:   true,
 			EnableAuditAPIEvents: true,
 		},
-		Filters: &config.Filters{},
 	}
 
 	cfg.EventSource.Init()
@@ -244,7 +242,7 @@ func TestEventSourceEnableFlagsDynamicallyWithYaraEnabled(t *testing.T) {
 	hsnap.On("FindByObject", mock.Anything).Return(htypes.Handle{}, false)
 	hsnap.On("FindHandles", mock.Anything).Return([]htypes.Handle{}, nil)
 
-	r := &config.RulesCompileResult{
+	r := staticRules{report: &rules.RuleSetReport{
 		HasProcEvents:     true,
 		HasModuleEvents:   true,
 		HasRegistryEvents: true,
@@ -261,7 +259,7 @@ func TestEventSourceEnableFlagsDynamicallyWithYaraEnabled(t *testing.T) {
 			event.OpenProcess,
 			event.Connect,
 		},
-	}
+	}}
 	cfg := &config.Config{
 		EventSource: config.EventSourceConfig{
 			EnableThreadEvents:   true,
@@ -272,13 +270,18 @@ func TestEventSourceEnableFlagsDynamicallyWithYaraEnabled(t *testing.T) {
 			EnableVAMapEvents:    false,
 			EnableMemEvents:      true,
 		},
-		Filters: &config.Filters{},
 	}
 	cfg.Yara = yara.Config{
 		Enabled:    true,
 		SkipFiles:  false,
 		SkipMmaps:  true,
 		SkipAllocs: false,
+		Yara: yara.Config{
+			Enabled:    true,
+			SkipFiles:  false,
+			SkipMmaps:  true,
+			SkipAllocs: false,
+		},
 	}
 
 	cfg.EventSource.Init()
@@ -332,7 +335,6 @@ func TestEventSourceRundownEvents(t *testing.T) {
 	cfg := &config.Config{
 		EventSource: evsConfig,
 		CapFile:     "fake.cap", // simulate capture to receive state/rundown events
-		Filters:     &config.Filters{},
 	}
 
 	cfg.EventSource.Init()
@@ -683,7 +685,7 @@ func TestEventSourceAllEvents(t *testing.T) {
 	}
 
 	evsConfig.Init()
-	cfg := &config.Config{EventSource: evsConfig, Filters: &config.Filters{}}
+	cfg := &config.Config{EventSource: evsConfig}
 	psnap := ps.NewSnapshotter(hsnap, cfg)
 	evs := NewEventSource(psnap, hsnap, cfg, nil)
 
@@ -1138,8 +1140,8 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 	evsConfig.Init()
 
 	cfg := &config.Config{
-		EventSource: evsConfig,
-		Filters:     &config.Filters{},
+		EventSource:              evsConfig,
+		SymbolizeKernelAddresses: true,
 	}
 	cfg.SymbolizeKernelAddresses = true
 
@@ -1264,7 +1266,7 @@ func TestEvasionScanner(t *testing.T) {
 	hsnap.On("Write", mock.Anything).Return(nil)
 	hsnap.On("Remove", mock.Anything).Return(nil)
 
-	cfg := &config.Config{EventSource: evsConfig, Filters: &config.Filters{}}
+	cfg := &config.Config{EventSource: evsConfig}
 
 	psnap := ps.NewSnapshotter(hsnap, cfg)
 
@@ -1375,3 +1377,13 @@ func createTransaction() (handle windows.Handle, err error) {
 	}
 	return
 }
+
+// staticRules is the rule source that serves the fixed report, and
+// approves all events.
+type staticRules struct {
+	report *rules.RuleSetReport
+}
+
+func (s staticRules) Report() *rules.RuleSetReport { return s.report }
+
+func (s staticRules) Approvers() *rules.Approvers { return nil }
