@@ -20,13 +20,15 @@ package approvers
 
 import (
 	"expvar"
+	"path/filepath"
 	"time"
 	"unsafe"
 
 	"github.com/hashicorp/golang-lru/v2/expirable"
-	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/compiler/fields"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	devmapper "github.com/rabbitstack/fibratus/pkg/fs"
+	"github.com/rabbitstack/fibratus/pkg/rules"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/rabbitstack/fibratus/pkg/util/utf16"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
@@ -79,8 +81,6 @@ type fs struct {
 
 	irps map[uint64]irp
 
-	approvers []func(string) bool
-
 	pathLRUCache *expirable.LRU[uint64, string] // interned file paths
 }
 
@@ -89,27 +89,31 @@ func hashFilePath(u []uint16) uint64 {
 	return xxh3.Hash(b)
 }
 
-func newFSApprover(r *config.RulesCompileResult) Approver {
-	fs := &fs{
-		approver: approver{
-			r: r,
-		},
-		approvers:    make([]func(string) bool, 0),
+func newFSApprover(p rules.ApproversProvider) Approver {
+	return &fs{
+		approver:     approver{provider: p},
 		irps:         make(map[uint64]irp, 120),
 		pathLRUCache: expirable.NewLRU[uint64, string](2500, nil, time.Minute*5),
 	}
+}
 
-	if r != nil && len(r.Approvers.Paths) > 0 {
-		fs.approvers = append(fs.approvers, fs.approvePath)
-	}
-	if r != nil && len(r.Approvers.Extensions) > 0 {
-		fs.approvers = append(fs.approvers, fs.approveExtension)
-	}
-	if r != nil && len(r.Approvers.Bases) > 0 {
-		fs.approvers = append(fs.approvers, fs.approveBasename)
-	}
-
-	return fs
+// approveFile asks the rule approvers if the file open is approved. The file
+// attributes are derived from the path lazily, only if the approvers need them.
+func (f *fs) approveFile(path string) bool {
+	return f.approve(event.CreateFile, func(k rules.Key) (string, bool) {
+		switch k.Field {
+		case fields.FilePath:
+			return path, true
+		case fields.FileName:
+			return filepath.Base(path), true
+		case fields.FileExtension:
+			return filepath.Ext(path), true
+		case fields.FileOperation:
+			// the approvers are consulted for the file opens only
+			return "OPEN", true
+		}
+		return "", false
+	})
 }
 
 func (f *fs) Approve(r *etw.EventRecord) (*etw.EventRecord, bool) {
@@ -168,7 +172,7 @@ func (f *fs) Approve(r *etw.EventRecord) (*etw.EventRecord, bool) {
 		// if the I/O status is different than file open
 		// or the rules compilation result is not present
 		// we'll allow events flow downstream processors
-		if f.r == nil || disposition != windows.FILE_OPEN {
+		if !f.active() || disposition != windows.FILE_OPEN {
 			irp.storeExtendedDataItems(disposition, status)
 			f.irps[i] = irp
 			return rec, true
@@ -184,13 +188,11 @@ func (f *fs) Approve(r *etw.EventRecord) (*etw.EventRecord, bool) {
 		}
 
 		// evaluate against available approvers
-		for _, approver := range f.approvers {
-			if approver(path) {
-				fsApproverApprovals.Add(1)
-				irp.storeExtendedDataItems(disposition, status)
-				f.irps[i] = irp
-				return rec, true
-			}
+		if f.approveFile(path) {
+			fsApproverApprovals.Add(1)
+			irp.storeExtendedDataItems(disposition, status)
+			f.irps[i] = irp
+			return rec, true
 		}
 		// the event is rejected by approvers
 		irp.releasePools()

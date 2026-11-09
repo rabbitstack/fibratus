@@ -202,6 +202,9 @@ func (r *registryProcessor) processEvent(e *event.Event) (*event.Event, error) {
 			if ok && (errno.Is(os.ErrNotExist) || err == windows.ERROR_ACCESS_DENIED) {
 				return e, nil
 			}
+			if errors.Is(err, key.ErrInvalidRoot) {
+				return e, nil
+			}
 			return e, ErrReadValue(path, err)
 		}
 		e.SetParam(params.RegValueType, params.U32(typ))

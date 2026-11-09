@@ -46,9 +46,9 @@ func NewEventSourceControl(
 	psnap ps.Snapshotter,
 	hsnap handle.Snapshotter,
 	config *config.Config,
-	compiler *config.RulesCompileResult,
+	rules etw.RuleSource,
 ) *EventSourceControl {
-	return &EventSourceControl{evs: etw.NewEventSource(psnap, hsnap, config, compiler)}
+	return &EventSourceControl{evs: etw.NewEventSource(psnap, hsnap, config, rules)}
 }
 
 func (s *EventSourceControl) Open(config *config.Config) error {

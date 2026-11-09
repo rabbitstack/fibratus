@@ -25,7 +25,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -71,44 +70,4 @@ func TestEventSummary(t *testing.T) {
 	require.Equal(t, "<code>firefox.exe</code> opened a file <code>C:\\Windows\\system32\\user32.dll</code>", evt.Summary())
 	evt.PS = nil
 	require.Equal(t, "process with <code>859</code> id opened a file <code>C:\\Windows\\system32\\user32.dll</code>", evt.Summary())
-}
-
-func TestPartialKey(t *testing.T) {
-	var tests = []struct {
-		evt *Event
-		key uint64
-	}{
-		{
-			&Event{Type: OpenProcess, PID: 1234, Params: ParamsOf(
-				NewParam(params.ProcessID, params.PID, params.U32(uint32(1221))),
-				NewParam(params.DesiredAccess, params.Uint32, params.U32(uint32(5))),
-			)},
-			0x99c,
-		},
-		{
-			&Event{Type: OpenThread, PID: 11234, Params: ParamsOf(
-				NewParam(params.ThreadID, params.TID, params.U32(uint32(8452))),
-				NewParam(params.DesiredAccess, params.Uint32, params.U32(uint32(15))),
-			)},
-			0x4cf5,
-		},
-		{
-			&Event{Type: CreateFile, PID: 4321, Params: ParamsOf(
-				NewParam(params.FilePath, params.DOSPath, params.Str("C:\\Windows\\System32\\kernelbase.dll")),
-			)},
-			0x7ec254f31df879ec,
-		},
-		{
-			&Event{Type: CreateFile, PID: 4321, Params: ParamsOf(
-				NewParam(params.FilePath, params.DOSPath, params.Str("C:\\Windows\\System32\\kernel32.dll")),
-			)},
-			0xb6380d9159ccd174,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.evt.Type.String(), func(t *testing.T) {
-			assert.Equal(t, tt.key, tt.evt.PartialKey())
-		})
-	}
 }

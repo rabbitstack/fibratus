@@ -82,8 +82,8 @@ type BaseConfig struct {
 	// Alertsenders stores alert sender configurations.
 	Alertsenders []alertsender.Config
 
-	// Filters contains filter and rule definitions.
-	Filters *Filters `json:"filters" yaml:"filters"`
+	// Rules contains the rule engine configuration
+	Rules RulesConfig `json:"rules" yaml:"rules"`
 
 	// ForwardMode designates whether event forwarding mode is engaged.
 	ForwardMode bool `json:"forward" yaml:"forward"`
@@ -144,7 +144,7 @@ func newWithOpts(options ...Option) BaseConfig {
 		API:         APIConfig{},
 		Aggregator:  aggregator.Config{},
 		Log:         log.Config{},
-		Filters:     &Filters{},
+		Rules:       RulesConfig{},
 		flags:       new(pflag.FlagSet),
 		viper:       v,
 		opts:        opts,
@@ -211,21 +211,13 @@ func (c *BaseConfig) initFromViper() {
 	c.API.initFromViper(c.viper)
 	c.Aggregator.InitFromViper(c.viper)
 	c.Log.InitFromViper(c.viper)
-	c.Filters.initFromViper(c.viper)
+	c.Rules.initFromViper(c.viper)
 	c.ForwardMode = c.viper.GetBool(forwardMode)
 	c.CapFile = c.viper.GetString(capFile)
 }
 
 // GetConfigFile gets the path of the configuration file from Viper value.
 func (c *BaseConfig) GetConfigFile() string { return c.viper.GetString(configFile) }
-
-// GetFilters returns all rule filters loaded into the engine.
-func (c *BaseConfig) GetFilters() []*FilterConfig {
-	if c.Filters == nil {
-		return nil
-	}
-	return c.Filters.filters
-}
 
 // TryLoadFile attempts to load the configuration file from specified path on the file system.
 func (c *BaseConfig) TryLoadFile(file string) error {
@@ -284,9 +276,8 @@ func (c *BaseConfig) addFlags() {
 	if c.opts.run || c.opts.replay || c.opts.validate {
 		c.flags.StringP(filamentName, "f", "", "Specifies the filament to execute")
 		c.flags.Bool(rulesEnabled, true, "Indicates if the rule engine is enabled and rules loaded")
-		c.flags.StringSlice(rulesFromPaths, rulesPaths, "Comma-separated list of rules files")
-		c.flags.StringSlice(macrosFromPaths, macrosPaths, "Comma-separated list of macro files")
-		c.flags.StringSlice(rulesFromURLs, nil, "Comma-separated list of rules URL resources")
+		c.flags.StringSlice(rulePaths, rulesPaths, "Comma-separated list of rules files")
+		c.flags.StringSlice(macroPaths, macrosPaths, "Comma-separated list of macro files")
 		c.flags.Bool(matchAll, true, "Indicates if the match all strategy is enabled for the rule engine")
 	}
 	if c.opts.capture {

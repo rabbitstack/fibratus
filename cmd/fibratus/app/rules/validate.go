@@ -22,11 +22,7 @@ import (
 	"fmt"
 	"github.com/enescakir/emoji"
 	"github.com/rabbitstack/fibratus/internal/bootstrap"
-	"github.com/rabbitstack/fibratus/pkg/filter"
-	"github.com/rabbitstack/fibratus/pkg/filter/fields"
-	"github.com/rabbitstack/fibratus/pkg/rules"
-	"path/filepath"
-	"strings"
+	"github.com/rabbitstack/fibratus/pkg/compiler/fields"
 )
 
 type warning struct {
@@ -46,57 +42,26 @@ func validateRules() error {
 		return err
 	}
 
-	isValidExt := func(path string) bool {
-		return filepath.Ext(path) == ".yml" || filepath.Ext(path) == ".yaml"
-	}
-	// load macros and rules
-	for _, m := range cfg.Filters.Macros.FromPaths {
-		paths, err := filepath.Glob(m)
-		if err != nil {
-			return err
-		}
-		for _, path := range paths {
-			if !isValidExt(path) {
-				continue
-			}
-			emo("%v Loading macros from %s\n", emoji.Hook, path)
-		}
-	}
-	if err := cfg.Filters.LoadMacros(); err != nil {
-		return fmt.Errorf("%v %v", emoji.DisappointedFace, err)
+	rs, err := loadRuleSet(true)
+	if err != nil {
+		return err
 	}
 
-	for _, r := range cfg.Filters.Rules.FromPaths {
-		paths, err := filepath.Glob(r)
-		if err != nil {
-			return err
-		}
-		for _, path := range paths {
-			if !isValidExt(path) {
-				continue
-			}
-			emo("%v Loading rule %s\n", emoji.Package, path)
-		}
-	}
-	if err := cfg.Filters.LoadFilters(); err != nil {
-		return fmt.Errorf("%v %v", emoji.DisappointedFace, err)
-	}
-	if len(cfg.GetFilters()) == 0 {
-		return fmt.Errorf("%v no rules found in %s", emoji.DisappointedFace, strings.Join(cfg.Filters.Rules.FromPaths, ","))
+	for _, p := range rs.GetPolicies() {
+		emo("%v Loaded policy %s (%d rules, %d macros)\n", emoji.Package, p.Source, len(p.Rules), len(p.Macros))
 	}
 
 	warnings := make([]warning, 0)
 
-	// validate rules
-	for _, rule := range cfg.GetFilters() {
-		f := filter.New(rule.Condition, cfg)
-		err := f.Compile()
-		if err != nil {
-			return fmt.Errorf("%v %v", emoji.DisappointedFace, rules.ErrInvalidFilter(rule.Name, err))
-		}
+	// the rule set compiles all rules, so every syntax error is already
+	// reported. The rules left out of the rule set are reported as errors
+	for _, d := range rs.Report().Discarded {
+		return fmt.Errorf("%v rule %s in %s: %s", emoji.DisappointedFace, d.Name, d.Source, d.Reason)
+	}
 
+	for _, rule := range rs.GetRules() {
 		w := warning{rule: rule.Name}
-		for _, fld := range f.GetFields() {
+		for _, fld := range rule.Evaluator().GetFields() {
 			if isDeprecated, dep := fields.IsDeprecated(fld.Name); isDeprecated {
 				w.addMessage(fmt.Sprintf("%s field deprecated in favor of %v", fld.Name.String(), dep.Fields))
 			}

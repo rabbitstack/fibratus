@@ -167,14 +167,6 @@
   description:
     Detects when untrusted DLL is loaded into process address space.
 
-- macro: load_unsigned_module
-  expr: >
-    load_module and module.signature.exists = false
-  description: |
-    Detects when unsigned executable or DLL is loaded into process address space.
-    The module is considered as unsigned if it lacks the cert in the PE security
-    directory or the Authenticode hash is not present in any of the catalogs.
-
 - macro: load_unsigned_dll
   expr: >
     load_dll and dll.signature.exists = false

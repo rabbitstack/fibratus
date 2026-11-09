@@ -236,62 +236,38 @@
       },
       "additionalProperties": false
     },
-    "filters": {
+    "rules": {
       "type": "object",
       "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
         "match-all": {
           "type": "boolean"
         },
-        "rules": {
-          "type": "object",
-          "properties": {
-            "enabled": {
-              "type": "boolean"
-            },
-            "from-paths": {
-              "type": [
-                "array",
-                "null"
-              ],
-              "items": [
-                {
-                  "type": "string",
-                  "minLength": 4
-                }
-              ]
-            },
-            "from-urls": {
-              "type": [
-                "array",
-                "null"
-              ],
-              "items": [
-                {
-                  "type": "string",
-                  "minLength": 8
-                }
-              ]
+        "rule-paths": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": [
+            {
+              "type": "string",
+              "minLength": 4
             }
-          },
-          "additionalProperties": false
+          ]
         },
-        "macros": {
-          "type": "object",
-          "properties": {
-            "from-paths": {
-              "type": [
-                "array",
-                "null"
-              ],
-              "items": [
-                {
-                  "type": "string",
-                  "minLength": 4
-                }
-              ]
+        "macro-paths": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": [
+            {
+              "type": "string",
+              "minLength": 4
             }
-          },
-          "additionalProperties": false
+          ]
         }
       },
       "additionalProperties": false

@@ -127,29 +127,26 @@ filament:
   # Determines how often event batches are propagated to the filament callback function
   #flush-period: 200ms
 
-# =============================== Filters ===============================================
+# =============================== Rules ===============================================
 
-# Contains the definition of detection rules. Rules are contained within rule YAML files.
-# Rule definitions can reside in the local file system or also can be served over HTTP/S.
-# For local file system rule paths, it is possible to use the glob expression to load the
-# rules from different directory locations.
-filters:
+# Configures the rule engine. Rules are contained within rule YAML files that reside in the local
+# file system. It is possible to use the glob expression to load the rules from different directory
+# locations.
+rules:
+  # Indicates if the rule engine is enabled and rules loaded.
+  enabled: true
+
   # Indicates if the rule engine match all strategy is enabled. When the match all strategy
   # is enabled, a single event can trigger multiple rules.
   match-all: true
 
-  rules:
-    # Indicates if the rule engine is enabled and rules loaded
-    enabled: true
+  # The list of file system paths where rule files are located. Supports glob expressions in path names.
+  rule-paths:
+    # - C:\Program Files\Fibratus\Rules\*.yml
 
-    # The list of file system paths were rule files are located. Supports glob expressions in path names.
-    from-paths:
-     # - C:\Program Files\Fibratus\Rules\*.yml
-    #from-urls:
-  macros:
-    # The list of file system paths were macro library files are located. Supports glob expressions in path names.
-    from-paths:
-      #- C:\Program Files\Fibratus\Rules\Macros\*.yml
+  # The list of file system paths where macro library files are located. Supports glob expressions in path names.
+  macro-paths:
+    #- C:\Program Files\Fibratus\Rules\Macros\*.yml
 
 # =============================== Handle ===============================================
 

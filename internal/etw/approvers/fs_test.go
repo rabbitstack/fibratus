@@ -22,8 +22,8 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/rules"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"golang.org/x/sys/windows"
 )
@@ -156,8 +156,8 @@ func buildMatchingFileOpEnd(t *testing.T, createBuf []byte, disposition uint64) 
 	return r
 }
 
-func newTestFSApprover(r *config.RulesCompileResult) *fs {
-	return newFSApprover(r).(*fs)
+func newTestFSApprover(p rules.ApproversProvider) *fs {
+	return newFSApprover(p).(*fs)
 }
 
 func TestFSApproverNonFileEvent(t *testing.T) {
@@ -234,14 +234,8 @@ func TestFSApproverFileOpEndNoRules(t *testing.T) {
 }
 
 func TestFSApproverFileOpEndNonOpenDispositionApprovesWithoutPathCheck(t *testing.T) {
-	rules := &config.RulesCompileResult{
-		Approvers: config.Approvers{
-			Paths: map[string][]string{
-				"IMATCHES": {`C:\Windows\*`},
-			},
-		},
-	}
-	f := newTestFSApprover(rules)
+	provider := newProvider(t, fileRule("file.path imatches "+list(`C:\Windows\*`)))
+	f := newTestFSApprover(provider)
 	f.Approve(createFileRecord(t, createBuf))
 
 	// FILE_CREATE disposition should bypass path approvers
@@ -256,14 +250,8 @@ func TestFSApproverFileOpEndNonOpenDispositionApprovesWithoutPathCheck(t *testin
 }
 
 func TestFSApproverFileOpEndPathApproverApproved(t *testing.T) {
-	rules := &config.RulesCompileResult{
-		Approvers: config.Approvers{
-			Paths: map[string][]string{
-				"ICONTAINS": {`windows\appcompat`},
-			},
-		},
-	}
-	f := newTestFSApprover(rules)
+	provider := newProvider(t, fileRule("file.path icontains "+list(`windows\appcompat`)))
+	f := newTestFSApprover(provider)
 	f.Approve(createFileRecord(t, createBuf))
 
 	r := buildMatchingFileOpEnd(t, createBuf, windows.FILE_OPEN)
@@ -280,14 +268,8 @@ func TestFSApproverFileOpEndPathApproverApproved(t *testing.T) {
 }
 
 func TestFSApproverFileOpEndPathApproverRejected(t *testing.T) {
-	rules := &config.RulesCompileResult{
-		Approvers: config.Approvers{
-			Paths: map[string][]string{
-				"ICONTAINS": {`Windows\System32`},
-			},
-		},
-	}
-	f := newTestFSApprover(rules)
+	provider := newProvider(t, fileRule("file.path icontains "+list(`Windows\System32`)))
+	f := newTestFSApprover(provider)
 
 	f.Approve(createFileRecord(t, createBuf))
 

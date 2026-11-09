@@ -27,9 +27,9 @@ import (
 
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/rabbitstack/fibratus/internal/bootstrap"
+	"github.com/rabbitstack/fibratus/pkg/compiler/fields"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
-	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/spf13/cobra"
 )
 

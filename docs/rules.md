@@ -25,15 +25,14 @@ A rule is defined in `YAML` format and consists of **metadata**, a detection **c
 
 The recommended rule naming nomenclature dictates that the rule file starts with the [MITRE](https://attack.mitre.org/tactics/enterprise/) tactic followed by the rule name. All lower case tokens separated by `_` delimiter. For example, `defense_evasion_dll_loaded_via_apc_queue.yml`
 
-By default, rules reside inside `%PROGRAM FILES%\Fibratus\Rules` directory. You can load any number of rule files from file system paths or URL locations. It is possible to utilize wildcard expressions in file paths to enumerate multiple rule files from a single path specifier.
+By default, rules reside inside `%PROGRAM FILES%\Fibratus\Rules` directory. You can load any number of rule files from file system paths. It is possible to utilize wildcard expressions in file paths to enumerate multiple rule files from a single path specifier.
 
-Edit the main [configuration](../setup/configuration?id=files) file. Go to the `filters` section where the `from-paths` fragment represents an array of file system paths pointing to the rule definition files:
+Edit the main [configuration](../setup/configuration?id=files) file. Go to the `rules` section where the `rule-paths` fragment represents an array of file system paths pointing to the rule definition files:
 
 ```yaml
-filters:
-  rules:
-    from-paths:
-      - C:\Program Files\Fibratus\Rules\*.yml
+rules:
+  rule-paths:
+    - C:\Program Files\Fibratus\Rules\*.yml
 ```
 
 Here is the full YAML illustrating the rule format:

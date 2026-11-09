@@ -19,25 +19,20 @@
 package rules
 
 import (
-	"fmt"
-	"github.com/enescakir/emoji"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/rabbitstack/fibratus/internal/bootstrap"
 	"os"
-	"strings"
 )
 
 func listRules() error {
 	if err := bootstrap.InitConfigAndLogger(cfg); err != nil {
 		return err
 	}
-	if err := cfg.Filters.LoadFilters(); err != nil {
-		return fmt.Errorf("%v %v", emoji.DisappointedFace, err)
+	rs, err := loadRuleSet(false)
+	if err != nil {
+		return err
 	}
-	filters := cfg.GetFilters()
-	if len(filters) == 0 {
-		return fmt.Errorf("%v no rules found in %s", emoji.DisappointedFace, strings.Join(cfg.Filters.Rules.FromPaths, ","))
-	}
+	filters := rs.GetRules()
 
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)

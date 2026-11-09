@@ -25,6 +25,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/filter"
 	"github.com/rabbitstack/fibratus/pkg/ps"
+	"github.com/rabbitstack/fibratus/pkg/rules"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 )
 
@@ -52,7 +53,7 @@ func NewConsumer(
 	sequencer *event.Sequencer,
 	evts chan *event.Event,
 	processors *processors.Chain,
-	r *config.RulesCompileResult,
+	r rules.ApproversProvider,
 ) *Consumer {
 	return &Consumer{
 		q:          event.NewQueueWithChannel(evts, config.EventSource.StackEnrichment, config.ForwardMode || config.IsCaptureSet()),

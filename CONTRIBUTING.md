@@ -128,18 +128,15 @@ $ .\cmd\fibratus\fibratus.exe run --forward
 
 If you want to run Fibratus in rule engine mode, follow the next steps:
 
-- modify the configuration file to set the location to the rule files. Go to the `filters` section, and specify the absolute path to the `Rules` and `Macros` directories of this repository.
+- modify the configuration file to set the location to the rule files. Go to the `rules` section, and specify the absolute path to the `Rules` and `Macros` directories of this repository.
   ```
-  filters:
-    rules:
-      # The list of file system paths were rule files are located. Supports glob expressions in path names.
-      from-paths:
-       - C:\Fibratus\Rules\*.yml
-      #from-urls:
-    macros:
-      # The list of file system paths were macro library files are located. Supports glob expressions in path names.
-      from-paths:
-       - C:\Fibratus\Rules\Macros\*.yml
+  rules:
+    # The list of file system paths where rule files are located. Supports glob expressions in path names.
+    rule-paths:
+     - C:\Fibratus\Rules\*.yml
+    # The list of file system paths where macro library files are located. Supports glob expressions in path names.
+    macro-paths:
+     - C:\Fibratus\Rules\Macros\*.yml
   ```
   Change the paths according to the location of your repository.
 
