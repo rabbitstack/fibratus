@@ -29,8 +29,9 @@ import (
 	"github.com/rabbitstack/fibratus/cmd/fibratus/app/rules"
 	"github.com/rabbitstack/fibratus/cmd/fibratus/app/service"
 	"github.com/rabbitstack/fibratus/cmd/fibratus/app/stats"
+	"github.com/rabbitstack/fibratus/cmd/fibratus/app/systray"
 )
 
 func registerCommands() {
-	RootCmd.AddCommand(capture.Command, replay.Command, service.Command, stats.Command, config.Command, list.Command, rules.Command, runCmd, docsCmd, versionCmd)
+	RootCmd.AddCommand(capture.Command, replay.Command, service.Command, stats.Command, config.Command, list.Command, rules.Command, systray.Command, runCmd, docsCmd, versionCmd)
 }
