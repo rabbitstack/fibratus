@@ -21,6 +21,10 @@ package params
 const (
 	// ProcessID represents the process identifier.
 	ProcessID = "pid"
+	// ProcessSequenceNumber represents the process sequence number.
+	ProcessSequenceNumber = "process_sequence_number"
+	// ParentProcessSequenceNumber represents the parent process sequence number.
+	ParentProcessSequenceNumber = "parent_process_sequence_number"
 	// TargetProcessID represents the target process identifier.
 	TargetProcessID = "target_pid"
 	// ThreadID field represents the thread identifier.
@@ -47,6 +51,8 @@ const (
 	FileObject = "file_object"
 	// FilePath represents the field that designates the absolute path of the file.
 	FilePath = "file_path"
+	// FileName represents the field that designates the file name.
+	FileName = "file_name"
 	// FileCreated represents the name for the file creation field.
 	FileCreated = "created"
 	// FileAccessed represents the name for the file access field.

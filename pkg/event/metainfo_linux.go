@@ -24,27 +24,32 @@ package event
 import (
 	"cmp"
 	"slices"
+
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 )
 
 var table = [MaxEvent]Info{
-	Execve:         {Name: "execve", Category: Process, Source: RawSyscallTracepoint, Description: "Executes a program"},
-	Exit:           {Name: "exit", Category: Process, Source: RawSyscallTracepoint, Description: "Exit all threads in a process"},
-	Openat:         {Name: "openat", Category: File, Source: RawSyscallTracepoint, Description: "Opens or creates a file"},
-	Unlink:         {Name: "unlink", Category: File, Source: RawSyscallTracepoint, Description: "Removes a directory entry"},
-	Rename:         {Name: "rename", Category: File, Source: RawSyscallTracepoint, Description: "Renames a file or directory"},
-	Connect:        {Name: "connect", Category: Network, Source: RawSyscallTracepoint, Description: "Initiates a socket connection"},
-	Accept:         {Name: "accept", Category: Network, Source: RawSyscallTracepoint, Description: "Accepts a socket connection"},
-	Mmap:           {Name: "mmap", Category: Memory, Source: RawSyscallTracepoint, Description: "Maps files or devices into memory"},
-	ProcessVMRead:  {Name: "process_vm_read", Category: Memory, Source: RawSyscallTracepoint, Description: "Reads memory from another process"},
-	ProcessVMWrite: {Name: "process_vm_write", Category: Memory, Source: RawSyscallTracepoint, Description: "Writes memory into another process"},
-	Kill:           {Name: "kill", Category: Process, Source: RawSyscallTracepoint, Description: "Sends a signal to a process"},
-	Ptrace:         {Name: "ptrace", Category: Process, Source: RawSyscallTracepoint, Description: "Traces or controls another process"},
-	Prctl:          {Name: "prctl", Category: Process, Source: RawSyscallTracepoint, Description: "Performs a process-control operation"},
+	Execve:         {Name: "execve", Category: Process, Source: RawSyscallTracepoint, Description: "Executes a program", Params: params.ExecveDescriptor},
+	Exit:           {Name: "exit", Category: Process, Source: RawSyscallTracepoint, Description: "Exit all threads in a process", Params: params.ExitDescriptor},
+	Clone:          {Name: "clone", Category: Process, Source: RawSyscallTracepoint, Description: "Creates a child process", Params: params.CloneDescriptor},
+	Openat:         {Name: "openat", Category: File, Source: RawSyscallTracepoint, Description: "Opens or creates a file", Params: params.OpenatDescriptor},
+	Unlink:         {Name: "unlink", Category: File, Source: RawSyscallTracepoint, Description: "Removes a directory entry", Params: params.UnlinkDescriptor},
+	Rename:         {Name: "rename", Category: File, Source: RawSyscallTracepoint, Description: "Renames a file or directory", Params: params.RenameDescriptor},
+	Connect:        {Name: "connect", Category: Network, Source: RawSyscallTracepoint, Description: "Initiates a socket connection", Params: params.SocketDescriptor},
+	Accept:         {Name: "accept", Category: Network, Source: RawSyscallTracepoint, Description: "Accepts a socket connection", Params: params.SocketDescriptor},
+	Mmap:           {Name: "mmap", Category: Memory, Source: RawSyscallTracepoint, Description: "Maps files or devices into memory", Params: params.MmapDescriptor},
+	ProcessVMRead:  {Name: "process_vm_read", Category: Memory, Source: RawSyscallTracepoint, Description: "Reads memory from another process", Params: params.ProcessVMReadDescriptor},
+	ProcessVMWrite: {Name: "process_vm_write", Category: Memory, Source: RawSyscallTracepoint, Description: "Writes memory into another process", Params: params.ProcessVMWriteDescriptor},
+	Kill:           {Name: "kill", Category: Process, Source: RawSyscallTracepoint, Description: "Sends a signal to a process", Params: params.KillDescriptor},
+	Ptrace:         {Name: "ptrace", Category: Process, Source: RawSyscallTracepoint, Description: "Traces or controls another process", Params: params.PtraceDescriptor},
+	Prctl:          {Name: "prctl", Category: Process, Source: RawSyscallTracepoint, Description: "Performs a process-control operation", Params: params.PrctlDescriptor},
 }
 
 // GetTypesInfo returns event types metadata.
 func GetTypesInfo() []Info {
-	t := table[:]
+	// work on a copy, otherwise the in-place deletion and sorting
+	// would corrupt the table which is indexed by the event type
+	t := slices.Clone(table[:])
 	t = slices.DeleteFunc(t, func(info Info) bool {
 		return info.Name == ""
 	})
