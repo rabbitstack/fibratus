@@ -20,11 +20,6 @@
 
 package params
 
-const (
-	// String is a UTF-8 encoded Linux string.
-	String Type = 1
-)
-
 // String returns the type name.
 func (t Type) String() string {
 	switch t {
