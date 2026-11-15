@@ -48,7 +48,8 @@ for /f %%p in ('go list .\...') do call set "PKGS=%%PKGS%% %%p"
 
 
 if "%~1"=="build" goto build
-if "%~1"=="test" goto test
+if "%~1"=="unit-test" goto unit-test
+if "%~1"=="integration-test" goto integration-test
 if "%~1"=="lint" goto lint
 if "%~1"=="fmt" goto fmt
 if "%~1"=="clean" goto clean
@@ -67,8 +68,15 @@ go build -ldflags %LDFLAGS% -o .\cmd\systray\fibratus-systray.exe .\cmd\systray
 if errorlevel 1 goto fail
 goto :EOF
 
-:test
+:unit-test
 %GOTEST% -tags %TAGS% %PKGS%
+if errorlevel 1 goto fail
+goto :EOF
+
+:integration-test
+set IPKGS=
+for /f "tokens=1" %%p in ('go list -tags integration -f "{{.ImportPath}} {{.TestGoFiles}}" .\... ^| findstr /c:"_integration_test.go"') do call set "IPKGS=%%IPKGS%% %%p"
+%GOTEST% -tags integration,%TAGS% %IPKGS%
 if errorlevel 1 goto fail
 goto :EOF
 

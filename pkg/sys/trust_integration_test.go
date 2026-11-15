@@ -1,4 +1,4 @@
-//go:build windows
+//go:build windows && integration
 
 /*
  * Copyright 2021-2022 by Nedim Sabic Sabic

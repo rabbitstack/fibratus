@@ -122,7 +122,62 @@ jobs:
           name: "fibratus-amd64-slim.exe"
           path: "./cmd/fibratus/fibratus.exe"
 
-  test:
+  unit-test:
+    runs-on: windows-latest
+    needs:
+      - build
+      - build-slim
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Adjust pkg-config prefix
+        shell: bash
+        run: |
+           sed -i 's/C:\/Python37/C:\/hostedtoolcache\/windows\/Python\/3.7.9\/x64/' pkg-config/python-37.pc
+      - name: Setup msys2
+        uses: msys2/setup-msys2@v2
+        with:
+         release: false
+         install: >-
+           base-devel
+           mingw-w64-x86_64-gcc
+           mingw-w64-x86_64-pkg-config
+           mingw-w64-x86_64-openssl
+           automake
+           libtool
+           autoconf
+      - name: Cache yara
+        uses: actions/cache@v4
+        id: cache
+        with:
+          path: |
+            **/yara
+          key: ${{ runner.os }}-yara-${{ hashFiles('**/pkg/yara') }}
+          restore-keys: |
+            ${{ runner.os }}-yara-${{ hashFiles('**/pkg/yara') }}
+      - name: Install yara
+        shell: msys2 {0}
+        run: |
+          cd yara
+          make install
+      - name: Test
+        shell: bash
+        run: |
+           export PATH="/c/msys64/mingw64/bin:$PATH"
+           export PKG_CONFIG_PATH=$(pwd)/pkg-config
+           ./make.bat unit-test
+        env:
+          TAGS: cap,yara,yara_static
+
+  integration-test:
     runs-on: windows-latest
     needs:
       - build
@@ -178,13 +233,13 @@ jobs:
         run: |
            export PATH="/c/msys64/mingw64/bin:$PATH"
            export PKG_CONFIG_PATH=$(pwd)/pkg-config
-           ./make.bat test
+           ./make.bat integration-test
         env:
           TAGS: cap,yara,yara_static
 
   lint:
     runs-on: windows-latest
-    needs: test
+    needs: unit-test
     continue-on-error: true
     steps:
       - name: Checkout
