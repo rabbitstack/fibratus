@@ -224,8 +224,7 @@ jobs:
 
   lint:
     runs-on: windows-latest
-    needs: unit-test
-    continue-on-error: true
+    needs: build
     steps:
       - name: Checkout
         uses: actions/checkout@v4
