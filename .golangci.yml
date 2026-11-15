@@ -1,4 +1,7 @@
 version: "2"
+run:
+  build-tags:
+    - integration
 # run:
 #   build-tags:
 #     - cap
