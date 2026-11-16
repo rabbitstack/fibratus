@@ -358,7 +358,7 @@ func TestParseSecurityDirectorySigned(t *testing.T) {
 				t.Fatalf("got (%t, _, %v), want (true, _, nil)", signed, err)
 			}
 			wantCert(t, cert, signer,
-				"US, WA, Redmond, Fibratus Test Signer",
+				"US, WA, Redmond, Fibratus Test Corp, Fibratus Test Signer",
 				"US, WA, Redmond, Fibratus Test Corp, Fibratus Test Signer")
 		})
 	}
@@ -376,7 +376,7 @@ func TestParseSecurityDirectoryPicksSignerNotFirstCertificate(t *testing.T) {
 		t.Fatalf("got (%t, _, %v), want (true, _, nil)", signed, err)
 	}
 	wantCert(t, cert, leaf,
-		"US, WA, Redmond, Fibratus Test CA",
+		"US, WA, Redmond, Fibratus Test CA Org, Fibratus Test CA",
 		"US, WA, Redmond, Fibratus Test Corp, Fibratus Test Leaf")
 }
 
@@ -394,7 +394,7 @@ func TestParseSecurityDirectorySameSerialDifferentIssuer(t *testing.T) {
 	if err != nil || !signed {
 		t.Fatalf("got (%t, _, %v), want (true, _, nil)", signed, err)
 	}
-	wantCert(t, cert, signer, "US, WA, Redmond, CA Two", "US, WA, Redmond, Real Corp, Real Signer")
+	wantCert(t, cert, signer, "US, WA, Redmond, CA Two Org, CA Two", "US, WA, Redmond, Real Corp, Real Signer")
 }
 
 // The strings are formatted as before the rewrite: a missing country leaves
@@ -406,7 +406,7 @@ func TestParseSecurityDirectoryCertFormatIsPreserved(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantCert(t, cert, signer, ", CN", ", Org, CN")
+	wantCert(t, cert, signer, ", Org, CN", ", Org, CN")
 }
 
 func TestParseSecurityDirectoryLargeImage(t *testing.T) {
@@ -420,7 +420,7 @@ func TestParseSecurityDirectoryLargeImage(t *testing.T) {
 			if err != nil || !signed {
 				t.Fatalf("got (%t, _, %v), want (true, _, nil)", signed, err)
 			}
-			wantCert(t, cert, signer, "US, WA, Redmond, Big Signer", "US, WA, Redmond, Big Corp, Big Signer")
+			wantCert(t, cert, signer, "US, WA, Redmond, Big Corp, Big Signer", "US, WA, Redmond, Big Corp, Big Signer")
 
 			if limit := int64(len(table)) + 1024; im.read.Load() > limit {
 				t.Errorf("read %d bytes from a %d byte image, want at most %d", im.read.Load(), im.size, limit)
@@ -444,7 +444,7 @@ func TestParseSecurityDirectoryFile(t *testing.T) {
 		if err != nil || !signed {
 			t.Fatalf("got (%t, _, %v), want (true, _, nil)", signed, err)
 		}
-		wantCert(t, cert, signer, "US, WA, Redmond, File Signer", "US, WA, Redmond, File Corp, File Signer")
+		wantCert(t, cert, signer, "US, WA, Redmond, File Corp, File Signer", "US, WA, Redmond, File Corp, File Signer")
 	})
 
 	t.Run("unsigned file", func(t *testing.T) {

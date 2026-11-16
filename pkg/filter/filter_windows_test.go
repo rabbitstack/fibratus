@@ -983,6 +983,8 @@ func TestModuleFilter(t *testing.T) {
 			event.NewParam(params.ModuleSignatureType, params.Enum, params.U32(uint32(1)), params.WithEnum(signature.Types)),
 			event.NewParam(params.ModuleSignatureLevel, params.Enum, params.U32(uint32(4)), params.WithEnum(signature.Levels)),
 			event.NewParam(params.FileIsDotnet, params.Bool, params.Boolean(false)),
+			event.NewParam(params.ModuleCertIssuer, params.String, params.Value{}),
+			event.NewParam(params.ModuleCertSubject, params.String, params.Value{}),
 		),
 	}
 
@@ -1051,6 +1053,8 @@ func TestModuleFilter(t *testing.T) {
 			event.NewParam(params.ModuleSignatureType, params.Enum, params.U32(uint32(0)), params.WithEnum(signature.Types)),
 			event.NewParam(params.ModuleSignatureLevel, params.Enum, params.U32(uint32(0)), params.WithEnum(signature.Levels)),
 			event.NewParam(params.FileIsDotnet, params.Bool, params.Boolean(false)),
+			event.NewParam(params.ModuleCertIssuer, params.String, params.Value{}),
+			event.NewParam(params.ModuleCertSubject, params.String, params.Value{}),
 		),
 	}
 
@@ -1104,6 +1108,8 @@ func TestModuleFilter(t *testing.T) {
 			event.NewParam(params.ModuleSignatureType, params.Enum, params.U32(uint32(0)), params.WithEnum(signature.Types)),
 			event.NewParam(params.ModuleSignatureLevel, params.Enum, params.U32(uint32(0)), params.WithEnum(signature.Levels)),
 			event.NewParam(params.FileIsDotnet, params.Bool, params.Boolean(true)),
+			event.NewParam(params.ModuleCertIssuer, params.String, params.Value{}),
+			event.NewParam(params.ModuleCertSubject, params.String, params.Value{}),
 		),
 	}
 
