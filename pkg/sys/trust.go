@@ -23,6 +23,7 @@ package sys
 import (
 	libytes "bytes"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -590,49 +591,39 @@ type Cert struct {
 	SerialNumber string `json:"serial_number"`
 }
 
+// formatPkixName renders a pkix.Name as "C, ST, L, O, CN".
+func formatPkixName(name pkix.Name) string {
+	var formattedName string
+	if len(name.Country) > 0 {
+		formattedName = name.Country[0]
+	}
+
+	if len(name.Province) > 0 {
+		formattedName += ", " + name.Province[0]
+	}
+
+	if len(name.Locality) > 0 {
+		formattedName += ", " + name.Locality[0]
+	}
+
+	if len(name.Organization) > 0 {
+		formattedName += ", " + name.Organization[0]
+	}
+
+	formattedName += ", " + name.CommonName
+
+	return formattedName
+}
+
 // NewCert builds the certificate info from the X.509 certificate.
 func NewCert(cert *x509.Certificate) *Cert {
-	certInfo := &Cert{
+	return &Cert{
 		SerialNumber: hex.EncodeToString(cert.SerialNumber.Bytes()),
 		NotAfter:     cert.NotAfter,
 		NotBefore:    cert.NotBefore,
+		Issuer:       formatPkixName(cert.Issuer),
+		Subject:      formatPkixName(cert.Subject),
 	}
-
-	// issuer information
-	if len(cert.Issuer.Country) > 0 {
-		certInfo.Issuer = cert.Issuer.Country[0]
-	}
-
-	if len(cert.Issuer.Province) > 0 {
-		certInfo.Issuer += ", " + cert.Issuer.Province[0]
-	}
-
-	if len(cert.Issuer.Locality) > 0 {
-		certInfo.Issuer += ", " + cert.Issuer.Locality[0]
-	}
-
-	certInfo.Issuer += ", " + cert.Issuer.CommonName
-
-	// subject information
-	if len(cert.Subject.Country) > 0 {
-		certInfo.Subject = cert.Subject.Country[0]
-	}
-
-	if len(cert.Subject.Province) > 0 {
-		certInfo.Subject += ", " + cert.Subject.Province[0]
-	}
-
-	if len(cert.Subject.Locality) > 0 {
-		certInfo.Subject += ", " + cert.Subject.Locality[0]
-	}
-
-	if len(cert.Subject.Organization) > 0 {
-		certInfo.Subject += ", " + cert.Subject.Organization[0]
-	}
-
-	certInfo.Subject += ", " + cert.Subject.CommonName
-
-	return certInfo
 }
 
 // Marshal writes certificate info into a raw buffer.

@@ -21,11 +21,12 @@
 package sys
 
 import (
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestIsCatalogSigned(t *testing.T) {
@@ -50,7 +51,7 @@ func TestIsCatalogSigned(t *testing.T) {
 			filepath.Join(os.Getenv("windir"), "notepad.exe"),
 			true,
 			true,
-			"US, Washington, Redmond, Microsoft Windows Production PCA 2011",
+			"US, Washington, Redmond, Microsoft Corporation, Microsoft Windows Production PCA 2011",
 			"US, Washington, Redmond, Microsoft Corporation, Microsoft Windows",
 		},
 	}
