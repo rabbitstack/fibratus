@@ -71,7 +71,7 @@ func newFsProcessor(
 }
 
 func (f *fsProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, error) {
-	if e.Category() == event.File {
+	if e.Category() == event.File || e.Category() == event.Memory {
 		evt, err := f.processEvent(e)
 		return evt, false, err
 	}
@@ -97,7 +97,7 @@ func (f *fsProcessor) processEvent(e *event.Event) (*event.Event, error) {
 			totalRundownFiles.Add(1)
 			f.files[fileObject] = &FileInfo{Name: filepath, Type: fs.GetFileType(filepath, 0)}
 		}
-	case event.MapViewOfSection:
+	case event.MapViewSectionRundown:
 		fileKey := e.Params.GetUint64ByName(params.FileKey)
 		fileinfo := f.files[fileKey]
 
