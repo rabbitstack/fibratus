@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project.scripts]
+test-runner = "run:main"
+
+[project]
+name = "test-runner"
+version = "0.1.0"
+
+[tool.setuptools]
+py-modules = ["run"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["systest*"]

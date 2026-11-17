@@ -23,3 +23,7 @@ filaments/__pycache__
 
 # Linux packages
 build/pkg/
+
+# System tests
+test/**/__pycache__/
+test/*egg-info
