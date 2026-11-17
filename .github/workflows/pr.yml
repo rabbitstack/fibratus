@@ -15,6 +15,7 @@ env:
   GO_VERSION: 1.27.x
   WIX_VERSION: 5.0.0
   PYTHON_VERSION: 3.7.9
+  SYSTEM_TEST_PYTHON_VERSION: 3.12
 
 jobs:
   build:
@@ -167,6 +168,7 @@ jobs:
     runs-on: windows-latest
     needs:
       - build
+    timeout-minutes: 20
     continue-on-error: true
     steps:
       - name: Checkout
@@ -221,6 +223,56 @@ jobs:
            ./make.bat integration-test
         env:
           TAGS: cap,yara,yara_static
+
+  system-test:
+    runs-on: windows-latest
+    needs:
+      - build
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.SYSTEM_TEST_PYTHON_VERSION }}
+      - name: Download MSI
+        uses: actions/download-artifact@v4
+        with:
+          name: "fibratus-amd64.msi"
+          path: .
+      - name: Run helper unit tests
+        shell: bash
+        run: |
+          python -m unittest discover -s test/tests -t test
+      - name: Install test-runner package
+        shell: bash
+        run: |
+          pip install -e test/
+      - name: Install Fibratus
+        shell: bash
+        run: |
+         test-runner install --msi fibratus-0.0.0-amd64.msi
+      - name: Check service is running
+        shell: bash
+        run: |
+          test-runner check-service
+          sleep 20
+      - name: Fire rules and verify alerts
+        shell: bash
+        run: |
+          test-runner check-rules
+      - name: Collect diagnostics
+        shell: bash
+        run: |
+          test-runner collect-diagnostics --output-dir system-test-output
+      - name: Upload diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: "system-test-diagnostics"
+          path: system-test-output
+          if-no-files-found: ignore
 
   lint:
     runs-on: windows-latest
@@ -324,3 +376,4 @@ jobs:
               exit 1
             fi
           done
+
