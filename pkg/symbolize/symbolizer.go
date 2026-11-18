@@ -429,7 +429,7 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *event.Event) callstack.Fra
 	// process state
 	if e.IsSurrogateProcess() {
 		var ok bool
-		ok, ps = s.psnap.Find(e.Params.GetUint32ByName(params.ProcessRealParentID))
+		ps, ok = s.psnap.Find(e.Params.GetUint32ByName(params.ProcessRealParentID))
 		if !ok {
 			ps = e.PS
 		}

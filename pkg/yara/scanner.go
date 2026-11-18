@@ -349,7 +349,7 @@ func (s scanner) scan(target any) (yara.MatchRules, error) {
 	switch n := target.(type) {
 	case uint32: // pid
 		// skip the scan for this process?
-		ok, proc := s.psnap.Find(n)
+		proc, ok := s.psnap.Find(n)
 		if ok && s.config.ShouldSkipProcess(proc.Exe) {
 			return matches, nil
 		}
