@@ -30,8 +30,6 @@ import (
 const (
 	// InvalidProcessID represents the value of an invalid process identifier
 	InvalidProcessID uint32 = 0xffffffff
-	// ProcessStatusStillActive represents the status of the running process
-	ProcessStatusStillActive uint32 = 259
 )
 
 // ModuleHandleFromAddress is the flag of the GetModuleHandleEx
@@ -99,12 +97,8 @@ func ReadProcessMemory[S any](proc windows.Handle, addr uintptr) (*S, error) {
 
 // IsProcessRunning determines whether the process is in a running state.
 func IsProcessRunning(proc windows.Handle) bool {
-	var exitcode uint32
-	err := windows.GetExitCodeProcess(proc, &exitcode)
-	if err != nil {
-		return false
-	}
-	return exitcode == ProcessStatusStillActive
+	wait, err := windows.WaitForSingleObject(proc, 0)
+	return err == nil && wait == uint32(windows.WAIT_TIMEOUT)
 }
 
 // IsProcessPackaged determines if the process is packaged by trying
