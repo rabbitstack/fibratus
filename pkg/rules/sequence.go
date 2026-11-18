@@ -497,7 +497,7 @@ func (s *sequenceState) evalSequence(e *event.Event, v *filter.ValuerCache) bool
 					}
 					// try to initialize process state before evaluating the event
 					if evt.PS == nil {
-						_, evt.PS = s.psnap.Find(evt.PID)
+						evt.PS, _ = s.psnap.Find(evt.PID)
 					}
 
 					v := filter.AcquireValuerCache()

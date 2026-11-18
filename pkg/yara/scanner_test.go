@@ -121,7 +121,7 @@ func TestScan(t *testing.T) {
 					Cwd:       `C:\Windows\`,
 					SessionID: 1,
 				}
-				psnap.On("Find", pi.ProcessId).Return(true, proc)
+				psnap.On("Find", pi.ProcessId).Return(proc, true)
 
 				e := &event.Event{
 					Type: event.CreateProcess,
@@ -201,7 +201,7 @@ func TestScan(t *testing.T) {
 					Cwd:       `C:\Windows\`,
 					SessionID: 1,
 				}
-				psnap.On("Find", pi.ProcessId).Return(true, proc)
+				psnap.On("Find", pi.ProcessId).Return(proc, true)
 
 				e := &event.Event{
 					Type: event.CreateProcess,
@@ -277,7 +277,7 @@ func TestScan(t *testing.T) {
 					Cwd:       `C:\ProgramData\`,
 					SessionID: 1,
 				}
-				psnap.On("Find", pid).Return(true, proc)
+				psnap.On("Find", pid).Return(proc, true)
 
 				exe, err := os.Executable()
 				require.NoError(t, err)
@@ -337,7 +337,7 @@ func TestScan(t *testing.T) {
 					Cwd:       `C:\ProgramData\`,
 					SessionID: 1,
 				}
-				psnap.On("Find", 565).Return(true, proc)
+				psnap.On("Find", 565).Return(proc, true)
 
 				e := &event.Event{
 					Type: event.CreateFile,
@@ -388,7 +388,7 @@ func TestScan(t *testing.T) {
 					Cwd:       `C:\ProgramData\`,
 					SessionID: 1,
 				}
-				psnap.On("Find", 565).Return(true, proc)
+				psnap.On("Find", 565).Return(proc, true)
 
 				e := &event.Event{
 					Type: event.CreateFile,
@@ -437,7 +437,7 @@ func TestScan(t *testing.T) {
 					Cwd:       `C:\ProgramData\`,
 					SessionID: 1,
 				}
-				psnap.On("Find", 565).Return(true, proc)
+				psnap.On("Find", 565).Return(proc, true)
 
 				e := &event.Event{
 					Type: event.CreateFile,
@@ -483,7 +483,7 @@ func TestScan(t *testing.T) {
 					Cwd:       `C:\ProgramData\`,
 					SessionID: 1,
 				}
-				psnap.On("Find", 565).Return(true, proc)
+				psnap.On("Find", 565).Return(proc, true)
 
 				e := &event.Event{
 					Type: event.CreateFile,
@@ -543,7 +543,7 @@ func TestScan(t *testing.T) {
 					Cwd:       `C:\ProgramData\`,
 					SessionID: 1,
 				}
-				psnap.On("Find", 565).Return(true, proc)
+				psnap.On("Find", 565).Return(proc, true)
 
 				e := &event.Event{
 					Type: event.CreateFile,
@@ -624,7 +624,7 @@ func TestScan(t *testing.T) {
 					Cwd:       `C:\ProgramData\`,
 					SessionID: 1,
 				}
-				psnap.On("Find", pid).Return(true, proc)
+				psnap.On("Find", pid).Return(proc, true)
 
 				e := &event.Event{
 					Type: event.VirtualAlloc,
@@ -706,7 +706,7 @@ func TestScan(t *testing.T) {
 					Cwd:       `C:\ProgramData\`,
 					SessionID: 1,
 				}
-				psnap.On("Find", pid).Return(true, proc)
+				psnap.On("Find", pid).Return(proc, true)
 
 				e := &event.Event{
 					Type: event.MapViewOfSection,
@@ -758,7 +758,7 @@ func TestScan(t *testing.T) {
 					Cwd:       `C:\ProgramData\`,
 					SessionID: 1,
 				}
-				psnap.On("Find", uint32(321321)).Return(true, proc)
+				psnap.On("Find", uint32(321321)).Return(proc, true)
 
 				e := &event.Event{
 					Type: event.MapViewOfSection,
@@ -805,7 +805,7 @@ func TestScan(t *testing.T) {
 					Cwd:       `C:\ProgramData\`,
 					SessionID: 1,
 				}
-				psnap.On("Find", 1123).Return(true, proc)
+				psnap.On("Find", 1123).Return(proc, true)
 
 				e := &event.Event{
 					Type: event.MapViewOfSection,
@@ -858,7 +858,7 @@ func TestScan(t *testing.T) {
 					Cwd:       `C:\ProgramData\`,
 					SessionID: 1,
 				}
-				psnap.On("Find", 1123).Return(true, proc)
+				psnap.On("Find", 1123).Return(proc, true)
 
 				data := []byte{0x6F, 0x66, 0x74, 0x2E, 0x4E, 0x6F, 0x74, 0x65, 0x70, 0x61, 0x64, 0x00, 0x13, 0x00, 0x01, 0x1A}
 				e := &event.Event{
