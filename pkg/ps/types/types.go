@@ -22,17 +22,21 @@ package types
 // invoked on each ancestor visit walk.
 type Visitor func(*PS)
 
-// Walk recursively visits all ancestors of the given process
-// and invokes the visitor function on each parent process.
+// Walk visits all ancestors of the given process, starting from the
+// direct parent, and invokes the visitor function on each of them. The
+// walk stops if the chain of parents loops back to an already visited
+// process. Process identifiers are reused, so a stale parent link can
+// make such cycles possible.
 func Walk(v Visitor, ps *PS) {
 	if ps == nil {
 		return
 	}
-	if ps.Parent == nil {
-		return
-	}
-	v(ps.Parent)
-	if ps.Parent != nil {
-		Walk(v, ps.Parent)
+	visited := map[*PS]struct{}{ps: {}}
+	for cur := ps; cur.Parent != nil; cur = cur.Parent {
+		if _, ok := visited[cur.Parent]; ok {
+			return
+		}
+		visited[cur.Parent] = struct{}{}
+		v(cur.Parent)
 	}
 }
