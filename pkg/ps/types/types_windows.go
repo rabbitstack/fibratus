@@ -28,6 +28,7 @@ import (
 
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/hashers"
+	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"github.com/rabbitstack/fibratus/pkg/util/wildcard"
 	"golang.org/x/sys/windows"
@@ -822,4 +823,108 @@ func (ps *PS) findModuleByVa(addr va.Address) *Module {
 		}
 	}
 	return nil
+}
+
+// Open returns the native OS handle for this process instance. The caller
+// must close the handle once done.
+func (ps *PS) Open() (windows.Handle, error) {
+	pid := ps.PID
+	access := uint32(windows.PROCESS_QUERY_INFORMATION | windows.PROCESS_VM_READ)
+	process, err := windows.OpenProcess(access, false, pid)
+	if err != nil {
+		// the access to protected / system process can't be achieved
+		// through `PROCESS_VM_READ` or `PROCESS_QUERY_INFORMATION` flags.
+		// Try to acquire the process handle again but with restricted access
+		// rights to be able to obtain other attributes such as the full process's
+		// module executable path or process times
+		return windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION, false, pid)
+	}
+	return process, nil
+}
+
+// GetParentID resolves the parent process identifier by querying the OS API.
+func (ps *PS) ResolveParentID(proc windows.Handle) error {
+	info, err := sys.QueryInformationProcess[windows.PROCESS_BASIC_INFORMATION](proc, windows.ProcessBasicInformation)
+	if err != nil {
+		return err
+	}
+	ps.Ppid = uint32(info.InheritedFromUniqueProcessId)
+	return nil
+}
+
+// ResolveStartTime resolves the process start time by querying the OS API.
+func (ps *PS) ResolveStartTime(proc windows.Handle) error {
+	var (
+		ct windows.Filetime
+		xt windows.Filetime
+		kt windows.Filetime
+		ut windows.Filetime
+	)
+	if err := windows.GetProcessTimes(proc, &ct, &xt, &kt, &ut); err != nil {
+		return err
+	}
+	ps.StartTime = time.Unix(0, ct.Nanoseconds())
+	return nil
+}
+
+// GetTokenInformation returns the process token user information.
+func GetTokenUserInformation(proc windows.Handle) (*windows.Tokenuser, error) {
+	var token windows.Token
+	if err := windows.OpenProcessToken(proc, windows.TOKEN_QUERY, &token); err != nil {
+		return nil, err
+	}
+	defer token.Close()
+	user, err := token.GetTokenUser()
+	return user, err
+}
+
+// GetTokenIntegrityInformation returns the process token mandatory label and the flag
+// indicating if the process token was elevated.
+func GetTokenIntegrityInformation(proc windows.Handle) (*windows.SID, bool, error) {
+	var token windows.Token
+	if err := windows.OpenProcessToken(proc, windows.TOKEN_QUERY, &token); err != nil {
+		return nil, false, err
+	}
+	defer token.Close()
+	label, err := sys.GetProcessTokenInformation[windows.Tokenmandatorylabel](token, windows.TokenIntegrityLevel)
+	if err != nil {
+		return nil, false, err
+	}
+	return label.Label.Sid, token.IsElevated(), nil
+}
+
+// ResolveExecutable resolves the full executable path of the given process handle.
+func (ps *PS) ResolveExecutable(proc windows.Handle) error {
+	var size uint32 = windows.MAX_PATH
+	n := make([]uint16, size)
+	err := windows.QueryFullProcessImageName(proc, 0, &n[0], &size)
+	if err != nil {
+		return err
+	}
+	ps.Exe = windows.UTF16ToString(n)
+	if ps.Name == "" {
+		ps.Name = filepath.Base(ps.Exe)
+	}
+	return nil
+}
+
+// ResolveFlags resolves the process flags for the given process handle.
+func (ps *PS) ResolveFlags(proc windows.Handle) error {
+	var errs []error
+	if err := windows.IsWow64Process(proc, &ps.IsWOW64); err != nil {
+		errs = append(errs, err)
+	}
+	var err error
+	if ps.IsPackaged, err = sys.IsProcessPackaged(proc); err != nil {
+		errs = append(errs, err)
+	}
+	prot, err := sys.QueryInformationProcess[sys.PsProtection](proc, sys.ProcessProtectionInformation)
+	if err != nil {
+		errs = append(errs, err)
+		return multierror.Wrap(errs...)
+	}
+	if prot != nil {
+		ps.IsProtected = prot.IsProtected()
+	}
+	return multierror.Wrap(errs...)
 }
