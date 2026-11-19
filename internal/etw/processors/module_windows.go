@@ -40,7 +40,8 @@ func (*moduleProcessor) Name() ProcessorType { return Module }
 
 func (m *moduleProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, error) {
 	if e.IsLoadModuleInternal() {
-		return e, false, m.psnap.AddModule(e)
+		m.psnap.AddModule(ps.DefaultMapper().Module(e))
+		return e, false, nil
 	}
 
 	if e.IsUnloadModule() {
@@ -49,7 +50,8 @@ func (m *moduleProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, erro
 		if pid == 0 {
 			pid = e.PID
 		}
-		return e, false, m.psnap.RemoveModule(pid, addr)
+		m.psnap.RemoveModule(pid, addr)
+		return e, false, nil
 	}
 
 	if e.IsLoadModule() || e.IsModuleRundown() {
@@ -73,7 +75,8 @@ func (m *moduleProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, erro
 		// request module file metadata by queueing async work
 		fs.GetMetadataStore().DoRequestAsync(e.GetParamAsString(params.ModulePath), e.IsModuleRundown())
 
-		return e, false, m.psnap.AddModule(e)
+		m.psnap.AddModule(ps.DefaultMapper().Module(e))
+		return e, false, nil
 	}
 
 	return e, true, nil

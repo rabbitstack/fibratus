@@ -134,3 +134,16 @@ var PsTokenElevationTypes = Enumeration{
 	TokenElevationTypeFull:    "FULL",
 	TokenElevationTypeLimited: "LIMITED",
 }
+
+// StringToElevationType converts the elevation string to its type.
+func StringToElevationType(s string) uint32 {
+	switch s {
+	case "DEFAULT":
+		return TokenElevationTypeDefault
+	case "FULL":
+		return TokenElevationTypeFull
+	case "LIMITED":
+		return TokenElevationTypeLimited
+	}
+	return 0
+}

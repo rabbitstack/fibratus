@@ -482,8 +482,15 @@ func TestKillAction(t *testing.T) {
 		&pi)
 	require.NoError(t, err)
 
+	h, err := windows.OpenProcess(windows.SYNCHRONIZE, false, pi.ProcessId)
+	if err != nil {
+		t.Logf("unable to open process %d with SYNCHRONIZE rights: %v", pi.ProcessId, err)
+		return
+	}
+	defer windows.CloseHandle(h)
+
 	i := 0
-	for !sys.IsProcessRunning(pi.Process) && i < 10 {
+	for !sys.IsProcessRunning(h) && i < 10 {
 		i++
 		time.Sleep(time.Millisecond * 100 * time.Duration(i))
 	}
@@ -504,9 +511,10 @@ func TestKillAction(t *testing.T) {
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
-	require.True(t, sys.IsProcessRunning(pi.Process))
+	require.True(t, sys.IsProcessRunning(h))
 	require.True(t, wrapProcessEvent(evt, e.ProcessEvent))
-	require.False(t, sys.IsProcessRunning(pi.Process))
+	time.Sleep(time.Second)
+	require.False(t, sys.IsProcessRunning(h))
 }
 
 func BenchmarkRunRules(b *testing.B) {

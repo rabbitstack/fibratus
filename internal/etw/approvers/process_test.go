@@ -116,7 +116,7 @@ func TestProcApproverOpenProcessProcessNotInSnapshot(t *testing.T) {
 	a := newTestProcApprover(psnap, nil)
 
 	const pid = uint32(1234)
-	psnap.On("Find", pid).Return(false, (*pstypes.PS)(nil))
+	psnap.On("Find", pid).Return((*pstypes.PS)(nil), false)
 
 	r := openProcRecord(pid)
 	_, approved := a.Approve(r)
@@ -131,7 +131,7 @@ func TestProcApproverOpenProcessNilPS(t *testing.T) {
 	a := newTestProcApprover(psnap, nil)
 
 	const pid = uint32(1234)
-	psnap.On("Find", pid).Return(true, (*pstypes.PS)(nil))
+	psnap.On("Find", pid).Return((*pstypes.PS)(nil), true)
 
 	r := openProcRecord(pid)
 	_, approved := a.Approve(r)
@@ -152,7 +152,7 @@ func TestProcApproverOpenProcessExeApproved(t *testing.T) {
 	a := newTestProcApprover(psnap, rules)
 
 	const pid = uint32(1234)
-	psnap.On("Find", pid).Return(true, &pstypes.PS{Exe: `C:\Windows\System32\svchost.exe`})
+	psnap.On("Find", pid).Return(&pstypes.PS{Exe: `C:\Windows\System32\svchost.exe`}, true)
 
 	r := openProcRecord(pid)
 	_, approved := a.Approve(r)
@@ -173,7 +173,7 @@ func TestProcApproverOpenProcessExeRejected(t *testing.T) {
 	a := newTestProcApprover(psnap, rules)
 
 	const pid = uint32(5678)
-	psnap.On("Find", pid).Return(true, &pstypes.PS{Exe: `C:\Users\Administrator\cmd.exe`})
+	psnap.On("Find", pid).Return(&pstypes.PS{Exe: `C:\Users\Administrator\cmd.exe`}, true)
 
 	r := openProcRecord(pid)
 	_, approved := a.Approve(r)
@@ -194,7 +194,7 @@ func TestProcApproverOpenProcessEmptyExeApproved(t *testing.T) {
 	a := newTestProcApprover(psnap, rules)
 
 	const pid = uint32(9999)
-	psnap.On("Find", pid).Return(true, &pstypes.PS{Exe: ""})
+	psnap.On("Find", pid).Return(&pstypes.PS{Exe: ""}, true)
 
 	r := openProcRecord(pid)
 	_, approved := a.Approve(r)
@@ -217,7 +217,7 @@ func TestProcApproverOpenThreadSameProcessExeApproved(t *testing.T) {
 	a := newTestProcApprover(psnap, rules)
 	r := openThreadRecord(pid, pid)
 
-	psnap.On("Find", pid).Return(true, &pstypes.PS{Exe: `C:\Windows\System32\lsass.exe`})
+	psnap.On("Find", pid).Return(&pstypes.PS{Exe: `C:\Windows\System32\lsass.exe`}, true)
 
 	_, approved := a.Approve(r)
 	if !approved {
@@ -239,7 +239,7 @@ func TestProcApproverOpenThreadSameProcessExeRejected(t *testing.T) {
 	a := newTestProcApprover(psnap, rules)
 	r := openThreadRecord(pid, pid)
 
-	psnap.On("Find", pid).Return(true, &pstypes.PS{Exe: `C:\suspicious\inject.exe`})
+	psnap.On("Find", pid).Return(&pstypes.PS{Exe: `C:\suspicious\inject.exe`}, true)
 
 	_, approved := a.Approve(r)
 	if approved {

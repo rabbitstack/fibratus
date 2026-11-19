@@ -70,7 +70,7 @@ func (p *proc) Approve(r *etw.EventRecord) (*etw.EventRecord, bool) {
 	// we can find the process in snapshot
 	// or the executable path is not resolve,
 	// the event is approved
-	ok, ps := p.psnap.Find(pid)
+	ps, ok := p.psnap.Find(pid)
 	if !ok || ps == nil || ps.Exe == "" {
 		return r, true
 	}

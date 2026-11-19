@@ -35,34 +35,48 @@ type PS struct {
 	sync.RWMutex
 	// PID is the thread group identifier. It is also the thread identifier of the main thread.
 	PID uint32 `json:"pid"`
+
 	// Ppid is the thread group identifier of the parent process.
 	Ppid uint32 `json:"ppid"`
+
 	// Name is the process name.
 	Name string `json:"name"`
+
 	// Cmdline is the full process command line.
 	Cmdline string `json:"cmdline"`
+
 	// Exe is the full path to the process executable.
 	Exe string `json:"exe"`
+
 	// Cwd is the current working directory of the process.
 	Cwd string `json:"cwd"`
 	// Args contains the process command-line arguments.
 	Args []string `json:"args"`
+
 	// StartTime is the wall-clock time when the process started.
 	StartTime time.Time `json:"started"`
+
 	// StartBootTime is the process start time measured from system boot.
 	StartBootTime uint64 `json:"start_boot_time"`
+
 	// UID is the real user identifier of the process.
 	UID uint32 `json:"uid"`
+
 	// GID is the real group identifier of the process.
 	GID uint32 `json:"gid"`
+
 	// Username is the name associated with UID.
 	Username string `json:"username"`
+
 	// Envs contains process environment variables indexed by name.
 	Envs map[string]string `json:"envs"`
+
 	// Parent references the parent process state when it is available.
 	Parent *PS `json:"parent"`
+
 	// Threads contains the threads that belong to this process.
 	Threads map[uint32]Thread `json:"-"`
+
 	// Mmaps contains the process memory mappings, including shared objects.
 	Mmaps []Mmap `json:"mmaps"`
 }

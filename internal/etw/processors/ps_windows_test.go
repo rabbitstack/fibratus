@@ -53,13 +53,13 @@ func TestPsProcessor(t *testing.T) {
 			},
 			func() *ps.SnapshotterMock {
 				psnap := new(ps.SnapshotterMock)
-				psnap.On("Write", mock.Anything).Return(nil)
+				psnap.On("AddProcess", mock.Anything).Return(nil)
 				return psnap
 			},
 			func(e *event.Event, t *testing.T, psnap *ps.SnapshotterMock) {
 				require.True(t, e.Params.Contains(params.Exe))
 				require.Equal(t, "C:\\Windows\\system32\\svchost.exe", e.GetParamAsString(params.Exe))
-				psnap.AssertNumberOfCalls(t, "Write", 1)
+				psnap.AssertNumberOfCalls(t, "AddProcess", 1)
 			},
 		},
 		{
@@ -76,14 +76,14 @@ func TestPsProcessor(t *testing.T) {
 			},
 			func() *ps.SnapshotterMock {
 				psnap := new(ps.SnapshotterMock)
-				psnap.On("Write", mock.Anything).Return(nil)
+				psnap.On("AddProcess", mock.Anything).Return(nil)
 				return psnap
 			},
 			func(e *event.Event, t *testing.T, psnap *ps.SnapshotterMock) {
 				require.True(t, e.Params.Contains(params.Exe))
 				require.Equal(t, "csrss.exe", e.GetParamAsString(params.Cmdline))
 				require.Equal(t, "C:\\Windows\\System32\\csrss.exe", e.GetParamAsString(params.Exe))
-				psnap.AssertNumberOfCalls(t, "Write", 1)
+				psnap.AssertNumberOfCalls(t, "AddProcess", 1)
 			},
 		},
 		{
@@ -98,14 +98,14 @@ func TestPsProcessor(t *testing.T) {
 			},
 			func() *ps.SnapshotterMock {
 				psnap := new(ps.SnapshotterMock)
-				psnap.On("Write", mock.Anything).Return(nil)
+				psnap.On("AddProcess", mock.Anything).Return(nil)
 				return psnap
 			},
 			func(e *event.Event, t *testing.T, psnap *ps.SnapshotterMock) {
 				require.True(t, e.Params.Contains(params.Exe))
 				require.Equal(t, "\"C:\\Windows\\System32\\smss.exe\"", e.GetParamAsString(params.Cmdline))
 				require.Equal(t, "C:\\Windows\\System32\\smss.exe", e.GetParamAsString(params.Exe))
-				psnap.AssertNumberOfCalls(t, "Write", 1)
+				psnap.AssertNumberOfCalls(t, "AddProcess", 1)
 			},
 		},
 		{
@@ -120,14 +120,14 @@ func TestPsProcessor(t *testing.T) {
 			},
 			func() *ps.SnapshotterMock {
 				psnap := new(ps.SnapshotterMock)
-				psnap.On("Write", mock.Anything).Return(nil)
+				psnap.On("AddProcess", mock.Anything).Return(nil)
 				return psnap
 			},
 			func(e *event.Event, t *testing.T, psnap *ps.SnapshotterMock) {
 				require.True(t, e.Params.Contains(params.Exe))
 				require.Equal(t, `\SystemRoot\System32\smss.exe`, e.GetParamAsString(params.Cmdline))
 				require.Equal(t, "C:\\Windows\\System32\\smss.exe", e.GetParamAsString(params.Exe))
-				psnap.AssertNumberOfCalls(t, "Write", 1)
+				psnap.AssertNumberOfCalls(t, "AddProcess", 1)
 			},
 		},
 		{
@@ -143,12 +143,15 @@ func TestPsProcessor(t *testing.T) {
 			},
 			func() *ps.SnapshotterMock {
 				psnap := new(ps.SnapshotterMock)
-				psnap.On("Write", mock.Anything).Return(nil)
+				psnap.On("AddProcess", mock.Anything).Return(nil)
 				return psnap
 			},
 			func(e *event.Event, t *testing.T, psnap *ps.SnapshotterMock) {
 				require.True(t, e.Params.Contains(params.StartTime))
 				require.NotEqual(t, e.Timestamp, e.Params.GetTimeByName(params.StartTime))
+				psnap.AssertCalled(t, "AddProcess", mock.Anything)
+				require.NotNil(t, e.PS)
+				require.Equal(t, uint32(os.Getpid()), e.PS.PID)
 			},
 		},
 		{
@@ -164,15 +167,16 @@ func TestPsProcessor(t *testing.T) {
 			},
 			func() *ps.SnapshotterMock {
 				psnap := new(ps.SnapshotterMock)
-				psnap.On("Remove", mock.Anything).Return(nil)
+				psnap.On("RemoveProcess", mock.Anything)
 				return psnap
 			},
 			func(e *event.Event, t *testing.T, psnap *ps.SnapshotterMock) {
 				require.True(t, e.Params.Contains(params.Exe))
 				require.Equal(t, `\SystemRoot\System32\smss.exe`, e.GetParamAsString(params.Cmdline))
 				require.Equal(t, "C:\\Windows\\System32\\smss.exe", e.GetParamAsString(params.Exe))
-				psnap.AssertNumberOfCalls(t, "Remove", 1)
-				psnap.AssertNotCalled(t, "Write")
+				psnap.AssertNumberOfCalls(t, "RemoveProcess", 1)
+				psnap.AssertCalled(t, "RemoveProcess", uint32(760))
+				psnap.AssertNotCalled(t, "AddProcess", mock.Anything)
 			},
 		},
 		{
@@ -188,13 +192,16 @@ func TestPsProcessor(t *testing.T) {
 			func() *ps.SnapshotterMock {
 				psnap := new(ps.SnapshotterMock)
 				psnap.On("FindAndPut", uint32(760)).Return(&pstypes.PS{Exe: "C:\\Windows\\System32\\smss.exe"})
-				psnap.On("AddThread", mock.Anything).Return(nil)
+				psnap.On("AddThread", mock.Anything)
 				return psnap
 			},
 			func(e *event.Event, t *testing.T, psnap *ps.SnapshotterMock) {
 				require.True(t, e.Params.Contains(params.Exe))
 				require.Equal(t, "C:\\Windows\\System32\\smss.exe", e.GetParamAsString(params.Exe))
 				psnap.AssertNumberOfCalls(t, "AddThread", 1)
+				psnap.AssertCalled(t, "AddThread", mock.MatchedBy(func(thread pstypes.Thread) bool {
+					return thread.Pid == 760 && thread.Tid == 10234
+				}))
 			},
 		},
 		{
@@ -210,14 +217,14 @@ func TestPsProcessor(t *testing.T) {
 			func() *ps.SnapshotterMock {
 				psnap := new(ps.SnapshotterMock)
 				psnap.On("FindAndPut", uint32(760)).Return(&pstypes.PS{Exe: "C:\\Windows\\System32\\smss.exe"})
-				psnap.On("RemoveThread", uint32(760), uint32(10234)).Return(nil)
+				psnap.On("RemoveThread", uint32(760), uint32(10234))
 				return psnap
 			},
 			func(e *event.Event, t *testing.T, psnap *ps.SnapshotterMock) {
 				require.True(t, e.Params.Contains(params.Exe))
 				require.Equal(t, "C:\\Windows\\System32\\smss.exe", e.GetParamAsString(params.Exe))
 				psnap.AssertNumberOfCalls(t, "RemoveThread", 1)
-				psnap.AssertNotCalled(t, "AddThread")
+				psnap.AssertNotCalled(t, "AddThread", mock.Anything)
 			},
 		},
 		{

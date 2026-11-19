@@ -26,22 +26,35 @@ var sep = ", "
 // When more than one error is wrapped, the Error() string is a concatenation
 // of the Error() values of all underlying errors.
 func Wrap(errs ...error) error {
-	return multiError(errs).flatten()
+	return MultiError(errs).flatten()
 }
 
 // WrapWithSeparator same as Wrap but uses a custom separator when joining
 // error messages.
 func WrapWithSeparator(s string, errs ...error) error {
 	sep = s
-	return multiError(errs).flatten()
+	return MultiError(errs).flatten()
 }
 
-// multiError bundles several errors together into a single error.
-type multiError []error
+// MultiError bundles several errors together into a single error.
+type MultiError []error
+
+// Add append a new error to the bundle.
+func (errors *MultiError) Add(err error) {
+	*errors = append(*errors, err)
+}
+
+// Wrap returns a single error that encapsulates those underlying errors.
+// Takes an optional slice of errors that are merged with the one in the
+// bundle.
+func (errors MultiError) Wrap(errs ...error) error {
+	s := append(errors, errs...)
+	return Wrap(s...)
+}
 
 // flatten returns either: nil, the only error, or the multiError instance itself
 // if there are 0, 1, or more errors in the slice respectively.
-func (errors multiError) flatten() error {
+func (errors MultiError) flatten() error {
 	switch len(errors) {
 	case 0:
 		return nil
@@ -57,7 +70,7 @@ func (errors multiError) flatten() error {
 
 // Error returns a string like "[e1, e2, ...]" where each eN is the Error() of
 // each error in the slice.
-func (errors multiError) Error() string {
+func (errors MultiError) Error() string {
 	parts := make([]string, 0)
 	for _, err := range errors {
 		if err == nil {

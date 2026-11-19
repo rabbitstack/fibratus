@@ -19,20 +19,20 @@
 package ps
 
 import (
+	"errors"
 	"expvar"
-	"path/filepath"
+	"maps"
+	"slices"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/rabbitstack/fibratus/pkg/sys"
+	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
 
 	"github.com/rabbitstack/fibratus/pkg/config"
-	"github.com/rabbitstack/fibratus/pkg/event"
-	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/pe"
@@ -47,6 +47,15 @@ var (
 	// reapPeriod specifies the interval for triggering the housekeeping of dead processes
 	reapPeriod = time.Minute * 2
 
+	// dirtyPeriod specifies for how long the state of the terminated process
+	// is retained in the dirty map to serve the events that arrive late
+	dirtyPeriod = time.Second * 5
+
+	// startSkew is the tolerance applied when comparing event timestamps with the process
+	// start time. The start time is read from the OS, while the event timestamp is stamped
+	// by the tracing session, so the two clocks may disagree slightly.
+	startSkew = time.Millisecond * 100
+
 	processLookupFailureCount = expvar.NewMap("process.lookup.failure.count")
 	reapedProcesses           = expvar.NewInt("process.reaped")
 	processCount              = expvar.NewInt("process.count")
@@ -60,55 +69,79 @@ var (
 // Snapshotter is the interface that exposes a set of methods all process snapshotters have to satisfy. It stores the state
 // of all running processes in the system including its threads, dynamically loaded libraries, handles/file descriptors
 // and other metadata.
+//
+// The snapshotter is agnostic of the event layout. The events are converted into the process state types by the
+// mappers before they are handed to the snapshotter.
 type Snapshotter interface {
-	// Write appends a new process state to the snapshotter. It takes as an input the inbound event to fetch
-	// the basic data, but also enriches the process' state with extra metadata such as process' env variables, PE
-	// metadata for Windows binaries and so on.
-	Write(*event.Event) error
-	// AddThread builds thread state from the event representation.
-	AddThread(*event.Event) error
-	// AddModule builds module state from the event representation.
-	AddModule(*event.Event) error
+	// AddProcess appends a new process state to the snapshotter. If the state is derived
+	// from the NT kernel logger events, it is enriched with extra metadata such as process' env
+	// variables, handles, PE metadata for Windows binaries and so on. The process state that was
+	// derived from the internal events only enriches the existing state, or creates the
+	// state placeholder, if there is none.
+	AddProcess(*pstypes.PS) error
+
+	// RemoveProcess removes the process state from the snapshotter.
+	RemoveProcess(pid uint32)
+
+	// AddThread adds the thread to the process identified by the thread pid.
+	AddThread(pstypes.Thread)
+
 	// RemoveThread removes the thread from the given process.
-	RemoveThread(pid uint32, tid uint32) error
+	RemoveThread(pid uint32, tid uint32)
+
+	// AddModule adds the module to the specified process.
+	AddModule(pid uint32, mod pstypes.Module)
+
 	// RemoveModule removes the module the given process.
-	RemoveModule(pid uint32, addr va.Address) error
-	// AddMmap adds a new memory mapping (data memory-mapped file, image, or pagefile) to this process state.
-	AddMmap(*event.Event) error
+	RemoveModule(pid uint32, addr va.Address)
+
+	// AddMmap adds a new memory mapping (data memory-mapped file, image, or pagefile) to the specified process.
+	AddMmap(pid uint32, mmap pstypes.Mmap)
+
 	// RemoveMmap removes memory mapping at the given base address.
-	RemoveMmap(pid uint32, addr va.Address) error
-	// WriteFromCapture appends a new process state to the snapshotter from the captured event.
-	WriteFromCapture(evt *event.Event) error
-	// Remove deletes process's state from the snapshotter.
-	Remove(evt *event.Event) error
+	RemoveMmap(pid uint32, addr va.Address)
+
 	// Find attempts to retrieve process' state for the specified process identifier. Returns true
 	// if the process was find in the state. Otherwise, returns false and constructs a fresh process
 	// state by querying the OS via API functions.
-	Find(pid uint32) (bool, *pstypes.PS)
+	Find(pid uint32) (*pstypes.PS, bool)
+
 	// FindModule traverses loaded modules of all processes in the snapshot and
 	// if there is module with the specified base address, it returns its metadata.
-	FindModule(addr va.Address) (bool, *pstypes.Module)
+	FindModule(addr va.Address) (*pstypes.Module, bool)
+
 	// FindAllModules finds all unique modules across the snapshotter state.
 	FindAllModules() map[string]pstypes.Module
+
 	// FindAndPut attempts to retrieve process' state for the specified process identifier.
 	// If the process is found, the snapshotter state is updated with the new process.
 	FindAndPut(pid uint32) *pstypes.PS
+
 	// Put inserts the process state into snapshotter.
 	Put(*pstypes.PS)
+
 	// Size returns the total number of process state items.
 	Size() uint32
+
 	// Close closes process snapshotter and disposes all allocated resources.
 	Close() error
 }
 
 type snapshotter struct {
-	mu      sync.RWMutex
-	procs   map[uint32]*pstypes.PS
-	dirty   map[uint32]*pstypes.PS
-	dmu     sync.RWMutex
-	quit    chan struct{}
-	config  *config.Config
-	hsnap   handle.Snapshotter
+	sync.RWMutex
+	procs map[uint32]*pstypes.PS
+
+	dirty     map[uint32]*pstypes.PS
+	dirtyLock sync.RWMutex
+
+	quit      chan struct{}
+	closeOnce sync.Once
+	config    *config.Config
+
+	hsnap handle.Snapshotter
+
+	users *UserResolver
+
 	capture bool
 }
 
@@ -117,479 +150,318 @@ func NewSnapshotter(hsnap handle.Snapshotter, config *config.Config) Snapshotter
 	s := &snapshotter{
 		procs:  make(map[uint32]*pstypes.PS),
 		dirty:  make(map[uint32]*pstypes.PS),
-		quit:   make(chan struct{}, 1),
+		quit:   make(chan struct{}),
 		config: config,
 		hsnap:  hsnap,
+		users:  Users(),
 	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.hsnap.RegisterCreateCallback(s.onHandleCreated)
-	s.hsnap.RegisterDestroyCallback(s.onHandleDestroyed)
 
 	go s.gcDeadProcesses()
 
 	return s
 }
 
-// NewSnapshotterFromCapture restores the snapshotter state from the cap file.
+// NewSnapshotterFromCapture restores the snapshotter state from the capture file.
 func NewSnapshotterFromCapture(hsnap handle.Snapshotter, config *config.Config) Snapshotter {
 	s := &snapshotter{
 		procs:   make(map[uint32]*pstypes.PS),
 		dirty:   make(map[uint32]*pstypes.PS),
-		quit:    make(chan struct{}, 1),
+		quit:    make(chan struct{}),
 		config:  config,
 		hsnap:   hsnap,
+		users:   Users(),
 		capture: true,
 	}
-
-	s.hsnap.RegisterCreateCallback(s.onHandleCreated)
-	s.hsnap.RegisterDestroyCallback(s.onHandleDestroyed)
 
 	return s
 }
 
-func (s *snapshotter) WriteFromCapture(e *event.Event) error {
-	switch e.Type {
-	case event.CreateProcess, event.ProcessRundown:
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		proc := e.PS
-		if proc == nil {
-			return nil
-		}
-		pid := e.Params.GetPid()
-		ppid := e.Params.GetPpid()
-		if proc.PID == proc.Ppid ||
-			(e.IsProcessRundown() && pid == sys.InvalidProcessID) {
-			return nil
-		}
-		if e.IsProcessRundown() {
-			proc.Parent = s.procs[ppid]
-		} else {
-			var err error
-			proc, err = s.newProcState(pid, ppid, e)
-			if err != nil {
-				return err
-			}
-		}
-		s.procs[pid] = proc
-	case event.CreateThread, event.ThreadRundown:
-		return s.AddThread(e)
-	case event.LoadModule, event.ModuleRundown:
-		return s.AddModule(e)
+func (s *snapshotter) AddProcess(proc *pstypes.PS) error {
+	if proc == nil {
+		return nil
 	}
-	return nil
-}
 
-func (s *snapshotter) Write(e *event.Event) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	processCount.Add(1)
+	if s.capture {
+		s.addProcessFromCapture(proc)
+		return nil
+	}
 
-	pid := e.Params.GetPid()
-	ppid := e.Params.GetPpid()
+	s.RLock()
+	existing := s.procs[proc.PID]
+	s.RUnlock()
 
-	proc, err := s.newProcState(pid, ppid, e)
-	if ps := s.procs[pid]; ps == nil && (e.IsCreateProcessInternal() || e.IsProcessRundownInternal()) {
-		// only modify the state if there is no process derived from the NT kernel logger process events
-		s.procs[pid] = proc
-	} else if ps, ok := s.procs[pid]; ok && (e.IsCreateProcessInternal() || e.IsProcessRundownInternal()) && ps.IsCreatedFromSystemLogger {
-		// process state derived from the core kernel events exists - enrich it
-		ps.TokenIntegrityLevel = proc.TokenIntegrityLevel
-		ps.TokenElevationType = proc.TokenElevationType
-		ps.IsTokenElevated = proc.IsTokenElevated
-		if strings.EqualFold(ps.Name, filepath.Base(proc.Exe)) && len(proc.Exe) > len(ps.Exe) {
-			// prefer full executable path
-			ps.Exe = proc.Exe
+	var err error
+	if !proc.IsCreatedFromSystemLogger {
+		// the internal events carry the process sequence number, so the
+		// UUID is derived from it without querying the OS
+		if proc.SeqNum != 0 {
+			proc.InitUUID()
 		}
-		s.procs[pid] = ps
-	} else if ps, ok := s.procs[pid]; ok && (e.IsCreateProcess() || e.IsProcessRundown()) && !ps.IsCreatedFromSystemLogger {
-		// enrich the existing process state with the newly arrived NT kernel logger process events
-		// but obtain the integrity level and executable path from the previous proc state
-		processEnrichments.Add(1)
-		proc.TokenIntegrityLevel = ps.TokenIntegrityLevel
-		proc.TokenElevationType = ps.TokenElevationType
-		proc.IsTokenElevated = ps.IsTokenElevated
-
-		if strings.EqualFold(proc.Name, filepath.Base(ps.Exe)) && len(ps.Exe) > len(proc.Exe) {
-			// prefer full executable path
-			proc.Exe = ps.Exe
-			e.SetParam(params.Exe, params.Str(ps.Exe))
-		}
-
-		// if the process UUID has been initialized when
-		// the internal event arrived, reassign it to the
-		// current process state
-		proc.AssignUUID(ps)
-
-		e.SetParam(params.ProcessTokenIntegrityLevel, params.Str(ps.TokenIntegrityLevel))
-		e.SetParam(params.ProcessTokenElevationType, params.Str(ps.TokenElevationType))
-		e.SetParam(params.ProcessTokenIsElevated, params.Boolean(ps.IsTokenElevated))
-
-		s.procs[pid] = proc
 	} else {
-		// in all other cases append the process state
-		s.procs[pid] = proc
+		// the sequence number that came with the internal event is
+		// preferred over querying the OS for it, so inherit it before
+		// the UUID is derived
+		if existing != nil && !existing.IsCreatedFromSystemLogger && existing.Equals(proc, startSkew) {
+			proc.InheritSeqNum(existing)
+		}
+		// the token attributes are queried only if the process state isn't going
+		// to be enriched by the internal event that carries them. Enrichment is
+		// best-effort
+		err = s.populateProc(proc, existing == nil || existing.IsCreatedFromSystemLogger)
+		// derive the UUID while the process is most likely alive. If it was
+		// deferred until the first request, the process could be gone by
+		// then, and the less robust variant of the UUID would be computed
+		// for the same process instance
+		proc.InitUUID()
 	}
 
-	// assign process state to the event
-	e.PS = proc
+	s.Lock()
+	defer s.Unlock()
+
+	current := s.procs[proc.PID]
+
+	if !proc.IsCreatedFromSystemLogger {
+		switch {
+		case current == nil:
+			// no state yet, so keep the placeholder until the NT kernel logger events show up
+			s.procs[proc.PID] = proc
+			processCount.Add(1)
+		case current.IsCreatedFromSystemLogger:
+			// state exists derived from the core kernel events exists so we enrich it
+			current.Merge(proc)
+			// the sequence number from the internal event wins over the one
+			// that may have been queried from the OS
+			current.AssignUUID(proc)
+		default:
+			s.procs[proc.PID] = proc
+		}
+		return err
+	}
+
+	switch {
+	case current == nil:
+		processCount.Add(1)
+	case !current.IsCreatedFromSystemLogger:
+		// enrich the newly arrived process state with the state previously derived
+		// from the internal event
+		proc.Merge(current)
+		// if the process UUID has been initialized when the internal event arrived,
+		// reassign it to the current process state
+		proc.AssignUUID(current)
+		processEnrichments.Add(1)
+	}
+
+	// assign the parent reference
+	if proc.Ppid != proc.PID {
+		proc.Parent = s.findParentProc(proc)
+	}
+	s.procs[proc.PID] = proc
 
 	return err
 }
 
-func (s *snapshotter) AddThread(e *event.Event) error {
-	pid := e.Params.GetPid()
-	threadCount.Add(1)
+func (s *snapshotter) RemoveProcess(pid uint32) {
+	s.Lock()
+	defer s.Unlock()
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	proc, ok := s.procs[pid]
-	if !ok {
-		return nil
+	proc := s.procs[pid]
+	if proc == nil {
+		return
 	}
+	delete(s.procs, pid)
+	processCount.Add(-1)
 
-	thread := pstypes.Thread{}
-	thread.Tid = e.Params.GetTid()
-	thread.UstackBase = e.Params.GetAddressByName(params.UstackBase)
-	thread.UstackLimit = e.Params.GetAddressByName(params.UstackLimit)
-	thread.KstackBase = e.Params.GetAddressByName(params.KstackBase)
-	thread.KstackLimit = e.Params.GetAddressByName(params.KstackLimit)
-	thread.IOPrio = e.Params.GetUint8ByName(params.IOPrio)
-	thread.BasePrio = e.Params.GetUint8ByName(params.BasePrio)
-	thread.PagePrio = e.Params.GetUint8ByName(params.PagePrio)
-	thread.StartAddress = e.Params.GetAddressByName(params.StartAddress)
+	// move the process to the dirty map. This is required
+	// to prevent dropping process state from events when
+	// TerminateProcess event is emitted before subsequent
+	// events arrive
+	s.dirtyLock.Lock()
+	s.dirty[pid] = proc
+	s.dirtyLock.Unlock()
 
-	proc.AddThread(thread)
+	// schedule the removal. The pid can be reused in the
+	// meantime, so the removal must not drop the dirty
+	// state of the process that reused it
+	time.AfterFunc(dirtyPeriod, func() {
+		s.dirtyLock.Lock()
+		defer s.dirtyLock.Unlock()
+		if s.dirty[pid] == proc {
+			delete(s.dirty, pid)
+			log.Debugf("dirty process removed: %s. Dirty procs: %d", proc.Name, len(s.dirty))
+		}
+	})
 
-	return nil
-}
-
-func (s *snapshotter) AddModule(e *event.Event) error {
-	pid := e.Params.GetPid()
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if pid == 0 && e.IsModuleRundown() {
-		// assume system process if pid is zero
-		pid = SystemPID
-	}
-	proc, ok := s.procs[pid]
-	if !ok {
-		return nil
-	}
-
-	module := pstypes.Module{}
-	module.Size = e.Params.GetUint64ByName(params.ModuleSize)
-	module.Checksum = e.Params.GetUint32ByName(params.ModuleCheckSum)
-	module.TimedateStamp = e.Params.GetUint32ByName(params.ModuleTimeDateStamp)
-	module.Name = e.GetParamAsString(params.ModulePath)
-	module.BaseAddress = e.Params.GetAddressByName(params.ModuleBase)
-	module.DefaultBaseAddress = e.Params.GetAddressByName(params.ModuleDefaultBase)
-
-	if e.IsLoadModuleInternal() {
-		proc.AddModule(module)
-		return nil
-	}
-
-	moduleCount.Add(1)
-
-	module.SignatureLevel = e.Params.GetUint32ByName(params.ModuleSignatureLevel)
-	module.SignatureType = e.Params.GetUint32ByName(params.ModuleSignatureType)
-
-	if strings.EqualFold(proc.Name, filepath.Base(module.Name)) && len(proc.Exe) < len(module.Name) {
-		// if the module is loaded for the process executable, and
-		// we don't have the full executable path, override with
-		// the one from the Module path
-		proc.Exe = module.Name
-	}
-
-	proc.AddModule(module)
-
-	return nil
-}
-
-func (s *snapshotter) RemoveThread(pid uint32, tid uint32) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	proc, ok := s.procs[pid]
-	if !ok {
-		return nil
-	}
-	proc.RemoveThread(tid)
-	threadCount.Add(-1)
-	return nil
-}
-
-func (s *snapshotter) RemoveModule(pid uint32, addr va.Address) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	proc, ok := s.procs[pid]
-	if !ok {
-		return nil
-	}
-	proc.RemoveModule(addr)
-	moduleCount.Add(-1)
-	return nil
-}
-
-func (s *snapshotter) FindModule(addr va.Address) (bool, *pstypes.Module) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	for _, proc := range s.procs {
-		for _, mod := range proc.Modules {
-			if mod.BaseAddress == addr {
-				return true, &mod
-			}
+	// resets the parent of all child processes
+	for _, child := range s.procs {
+		if child.Ppid == pid && child.PID != pid {
+			child.Parent = nil
 		}
 	}
-	return false, nil
+}
+
+func (s *snapshotter) AddThread(thread pstypes.Thread) {
+	proc := s.findProc(thread.Pid)
+	// the thread rundown events can be delivered for the thread that
+	// was previously added, so count only the threads that are new
+	if proc != nil && proc.AddThread(thread) {
+		threadCount.Add(1)
+	}
+}
+
+func (s *snapshotter) RemoveThread(pid uint32, tid uint32) {
+	proc := s.findProc(pid)
+	if proc != nil && proc.RemoveThread(tid) {
+		threadCount.Add(-1)
+	}
+}
+
+func (s *snapshotter) AddModule(pid uint32, mod pstypes.Module) {
+	proc := s.findProc(pid)
+	// the module may be already present, e.g. the rundown event
+	// is delivered for the module that was previously loaded. The
+	// counter is bumped only if the module was really appended
+	if proc != nil && proc.AddModule(mod) {
+		moduleCount.Add(1)
+	}
+}
+
+func (s *snapshotter) RemoveModule(pid uint32, addr va.Address) {
+	proc := s.findProc(pid)
+	if proc != nil && proc.RemoveModule(addr) {
+		moduleCount.Add(-1)
+	}
+}
+
+func (s *snapshotter) FindModule(addr va.Address) (*pstypes.Module, bool) {
+	s.RLock()
+	defer s.RUnlock()
+	for _, proc := range s.procs {
+		proc.RLock()
+
+		idx := slices.IndexFunc(proc.Modules, func(mod pstypes.Module) bool {
+			return mod.BaseAddress == addr
+		})
+
+		if idx >= 0 {
+			mod := &proc.Modules[idx]
+			proc.RUnlock()
+			return mod, true
+		}
+
+		proc.RUnlock()
+	}
+	return nil, false
 }
 
 func (s *snapshotter) FindAllModules() map[string]pstypes.Module {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.RLock()
+	defer s.RUnlock()
+
 	mods := make(map[string]pstypes.Module)
+
 	for _, proc := range s.procs {
+		proc.RLock()
 		for _, mod := range proc.Modules {
-			if _, ok := mods[mod.Name]; ok {
-				continue
+			if _, exists := mods[mod.Name]; !exists {
+				mods[mod.Name] = mod
 			}
-			mods[mod.Name] = mod
 		}
+		proc.RUnlock()
 	}
 	return mods
 }
 
-func (s *snapshotter) AddMmap(e *event.Event) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	proc, ok := s.procs[e.PID]
-	if !ok {
-		return nil
+func (s *snapshotter) AddMmap(pid uint32, mmap pstypes.Mmap) {
+	proc := s.findProc(pid)
+	if proc != nil {
+		mmapCount.Add(1)
+		proc.AddMmap(mmap)
 	}
-
-	mmapCount.Add(1)
-
-	mmap := pstypes.Mmap{}
-	mmap.File = e.GetParamAsString(params.FilePath)
-	mmap.BaseAddress = e.Params.GetAddressByName(params.FileViewBase)
-	mmap.Size = e.Params.GetUint64ByName(params.FileViewSize)
-	mmap.Protection = e.Params.GetUint32ByName(params.MemProtect)
-	mmap.Type = e.GetParamAsString(params.FileViewSectionType)
-
-	proc.AddMmap(mmap)
-
-	return nil
 }
 
-func (s *snapshotter) RemoveMmap(pid uint32, addr va.Address) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	proc, ok := s.procs[pid]
-	if !ok {
-		return nil
+func (s *snapshotter) RemoveMmap(pid uint32, addr va.Address) {
+	proc := s.findProc(pid)
+	if proc != nil && proc.RemoveMmap(addr) {
+		mmapCount.Add(-1)
 	}
-	mmapCount.Add(-1)
-	proc.RemoveMmap(addr)
-	return nil
 }
 
 func (s *snapshotter) Close() error {
-	s.quit <- struct{}{}
-	return nil
-}
-
-func (s *snapshotter) newProcState(pid, ppid uint32, e *event.Event) (*pstypes.PS, error) {
-	if e.IsCreateProcessInternal() || e.IsProcessRundownInternal() {
-		proc := &pstypes.PS{
-			PID:                 pid,
-			Ppid:                ppid,
-			Exe:                 e.GetParamAsString(params.Exe),
-			Name:                filepath.Base(e.GetParamAsString(params.Exe)),
-			TokenIntegrityLevel: e.GetParamAsString(params.ProcessTokenIntegrityLevel),
-			TokenElevationType:  e.GetParamAsString(params.ProcessTokenElevationType),
-			IsTokenElevated:     e.Params.GetBoolByName(params.ProcessTokenIsElevated),
-			Threads:             make(map[uint32]pstypes.Thread),
-			Modules:             make([]pstypes.Module, 0),
-			Handles:             make([]htypes.Handle, 0),
-			Mmaps:               make([]pstypes.Mmap, 0),
-		}
-
-		return proc, nil
-	}
-
-	proc := pstypes.New(
-		pid,
-		ppid,
-		e.GetParamAsString(params.ProcessName),
-		e.GetParamAsString(params.Cmdline),
-		e.GetParamAsString(params.Exe),
-		e.Params.GetSID(),
-		e.Params.GetUint32ByName(params.SessionID),
-	)
-
-	proc.Parent = s.procs[ppid]
-	proc.StartTime = e.Params.GetTimeByName(params.StartTime)
-	proc.IsWOW64 = (e.Params.GetUint32ByName(params.ProcessFlags) & params.PsWOW64) != 0
-	proc.IsPackaged = (e.Params.GetUint32ByName(params.ProcessFlags) & params.PsPackaged) != 0
-	proc.IsProtected = (e.Params.GetUint32ByName(params.ProcessFlags) & params.PsProtected) != 0
-	proc.IsCreatedFromSystemLogger = true
-
-	if !s.capture {
-		if proc.Username != "" {
-			e.SetParam(params.Username, params.Str(proc.Username))
-		}
-		if proc.Domain != "" {
-			e.SetParam(params.Domain, params.Str(proc.Domain))
-		}
-		// retrieve process handles
-		var err error
-		proc.Handles, err = s.hsnap.FindHandles(pid)
-		if err != nil {
-			return proc, err
-		}
-	}
-
-	// return early if we're reading from the capture file
-	if s.capture {
-		// reset username/domain from captured event parameters
-		proc.Domain = e.GetParamAsString(params.Domain)
-		proc.Username = e.GetParamAsString(params.Username)
-		return proc, nil
-	}
-
-	// retrieve Portable Executable data
-	var err error
-	proc.PE, err = pe.ParseFileWithConfig(proc.Exe, s.config.PE)
-	if err != nil {
-		return proc, err
-	}
-
-	// try to read the PEB (Process Environment Block)
-	// to access environment variables and the process
-	// current working directory
-	access := uint32(windows.PROCESS_QUERY_INFORMATION | windows.PROCESS_VM_READ)
-	process, err := windows.OpenProcess(access, false, pid)
-	if err != nil {
-		process, err = windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION, false, pid)
-		if err != nil {
-			return proc, nil
-		}
-	}
-	//nolint:errcheck
-	defer windows.CloseHandle(process)
-
-	// query token attributes if not enriched by internal event
-	if s.procs[pid] == nil {
-		var token windows.Token
-		err = windows.OpenProcessToken(process, windows.TOKEN_QUERY, &token)
-		if err != nil {
-			goto readPEB
-		}
-		defer token.Close()
-
-		// get process token integrity level
-		tokenMandatoryLabel, err := sys.GetProcessTokenInformation[windows.Tokenmandatorylabel](token, windows.TokenIntegrityLevel)
-		if err != nil {
-			goto readPEB
-		}
-
-		proc.TokenIntegrityLevel = sys.RidToString(tokenMandatoryLabel.Label.Sid)
-		proc.IsTokenElevated = token.IsElevated()
-
-		e.SetParam(params.ProcessTokenIntegrityLevel, params.Str(proc.TokenIntegrityLevel))
-		e.SetParam(params.ProcessTokenIsElevated, params.Boolean(proc.IsTokenElevated))
-	}
-
-readPEB:
-	// read PEB (Process Environment Block)
-	peb, err := ReadPEB(process)
-	if err != nil {
-		pebReadErrors.Add(1)
-		return proc, err
-	}
-	proc.Envs = peb.GetEnvs()
-	proc.Cwd = peb.GetCurrentWorkingDirectory()
-
-	return proc, nil
-}
-
-func (s *snapshotter) Remove(e *event.Event) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	pid := e.Params.GetPid()
-	// remove process from primary map and
-	// move to dirty map. This is required
-	// to prevent dropping process state from
-	// events when TerminateProcess event is
-	// emitted before subsequent events
-	if proc := s.procs[pid]; proc != nil {
-		s.dmu.Lock()
-		defer s.dmu.Unlock()
-		s.dirty[pid] = proc
-		// schedule removal
-		remove := func(pid uint32) func() {
-			return func() {
-				s.dmu.Lock()
-				defer s.dmu.Unlock()
-				if ps, ok := s.dirty[pid]; ok {
-					delete(s.dirty, pid)
-					log.Debugf("dirty process removed: %s. Dirty procs: %d", ps.Name, len(s.dirty))
-				}
-			}
-		}
-		time.AfterFunc(time.Second*5, remove(pid))
-	}
-	delete(s.procs, pid)
-	processCount.Add(-1)
-	// reset parent if it died after spawning a process
-	for procID, proc := range s.procs {
-		if proc.Ppid == pid {
-			s.procs[procID].Parent = nil
-		}
-	}
+	s.closeOnce.Do(func() { close(s.quit) })
 	return nil
 }
 
 func (s *snapshotter) Put(proc *pstypes.PS) {
 	if proc != nil {
-		s.mu.Lock()
-		defer s.mu.Unlock()
+		s.Lock()
+		defer s.Unlock()
 		s.procs[proc.PID] = proc
 	}
 }
 
 func (s *snapshotter) FindAndPut(pid uint32) *pstypes.PS {
-	ok, proc := s.Find(pid)
+	proc, ok := s.Find(pid)
 	if !ok {
 		s.Put(proc)
 	}
 	return proc
 }
 
-func (s *snapshotter) Find(pid uint32) (bool, *pstypes.PS) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+func (s *snapshotter) Find(pid uint32) (*pstypes.PS, bool) {
+	s.RLock()
 	ps, ok := s.procs[pid]
+	s.RUnlock()
 	if ok {
-		return true, ps
+		return ps, true
 	}
 	if s.capture || pid == sys.InvalidProcessID {
-		return false, nil
+		return nil, false
 	}
 
 	// check if the process is in dirty map
-	s.dmu.RLock()
-	defer s.dmu.RUnlock()
-	if ps := s.dirty[pid]; ps != nil {
-		return true, ps
+	s.dirtyLock.RLock()
+	ps = s.dirty[pid]
+	s.dirtyLock.RUnlock()
+	if ps != nil {
+		return ps, true
 	}
 
 	processLookupFailureCount.Add(strconv.Itoa(int(pid)), 1)
 
+	// the OS API query is slow, so it must not run with the lock held
+	return s.getProcSnapshot(pid), false
+}
+
+// findProc returns the state of the live process. The per-process state
+// guards its own collections, so the snapshotter lock is held only for
+// the lookup.
+func (s *snapshotter) findProc(pid uint32) *pstypes.PS {
+	s.RLock()
+	defer s.RUnlock()
+	return s.procs[pid]
+}
+
+// findParentProc resolves the parent process state. The parent pid may have been
+// reused by an unrelated process, so when the parent sequence number is known,
+// the candidate is accepted only if it is the same process instance. A terminated
+// parent is not linked, which is consistent with orphaning the children when
+// the parent process terminates. The caller must hold the snapshotter lock.
+func (s *snapshotter) findParentProc(proc *pstypes.PS) *pstypes.PS {
+	parent := s.procs[proc.Ppid]
+	if parent == nil || proc.ParentSeqNum == 0 {
+		return parent
+	}
+	if parent.IsUUIDExact() && parent.UUID() != proc.ParentUUID() {
+		return nil
+	}
+	return parent
+}
+
+// getProcSnapshot builds the process state by querying the OS API. Returns
+// the minimal process state if the process handle can't be opened. Otherwise,
+// the process executable, parent id, start time, token information and PEB are
+// attached to the process state.
+func (s *snapshotter) getProcSnapshot(pid uint32) *pstypes.PS {
 	proc := &pstypes.PS{
 		PID:     pid,
 		Ppid:    sys.InvalidProcessID,
@@ -598,125 +470,106 @@ func (s *snapshotter) Find(pid uint32) (bool, *pstypes.PS) {
 		Handles: make([]htypes.Handle, 0),
 	}
 
-	getProcExecutable := func(process windows.Handle) (string, string) {
-		var size uint32 = windows.MAX_PATH
-		n := make([]uint16, size)
-		err := windows.QueryFullProcessImageName(process, 0, &n[0], &size)
-		if err != nil {
-			return "", ""
-		}
-		return windows.UTF16ToString(n), filepath.Base(windows.UTF16ToString(n))
-	}
-
-	access := uint32(windows.PROCESS_QUERY_INFORMATION | windows.PROCESS_VM_READ)
-	process, err := windows.OpenProcess(access, false, pid)
+	process, err := proc.Open()
 	if err != nil {
-		// the access to protected / system process can't be achieved
-		// through `PROCESS_VM_READ` or `PROCESS_QUERY_INFORMATION` flags.
-		// Try to acquire the process handle again but with restricted access
-		// rights to be able to obtain other attributes such as the full process's
-		// Module executable path or process times
-		process, err = windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
-		if err != nil {
-			return false, nil
-		}
+		return proc
 	}
-	//nolint:errcheck
-	defer windows.CloseHandle(process)
+	defer windows.CloseHandle(process) //nolint:errcheck
 
-	// get process executable full path and name
-	proc.Exe, proc.Name = getProcExecutable(process)
-
-	// consult process parent id
-	info, err := sys.QueryInformationProcess[windows.PROCESS_BASIC_INFORMATION](process, windows.ProcessBasicInformation)
-	if err != nil {
-		return false, proc
-	}
-	proc.Ppid = uint32(info.InheritedFromUniqueProcessId)
+	// attempt to resolve fundamental process attributes
+	_ = proc.ResolveFlags(process)
+	_ = proc.ResolveParentID(process)
+	_ = proc.ResolveStartTime(process)
+	_ = proc.ResolveExecutable(process)
 
 	// retrieve Portable Executable data
-	proc.PE, err = pe.ParseFileWithConfig(proc.Exe, s.config.PE)
-	if err != nil {
-		return false, proc
+	proc.PE, _ = pe.ParseFileWithConfig(proc.Exe, s.config.PE)
+
+	// obtain process token user information
+	user, err := pstypes.GetTokenUserInformation(process)
+	if err == nil {
+		proc.SID = user.User.Sid.String()
+		proc.Domain, proc.Username = splitDomainUser(s.users.GetUser(proc.SID))
 	}
 
-	// get process times
-	var (
-		ct windows.Filetime
-		xt windows.Filetime
-		kt windows.Filetime
-		ut windows.Filetime
-	)
-	err = windows.GetProcessTimes(process, &ct, &xt, &kt, &ut)
-	if err != nil {
-		return false, proc
-	}
-	proc.StartTime = time.Unix(0, ct.Nanoseconds())
-
-	// get process creation attributes
-	var isWOW64 bool
-	if err := windows.IsWow64Process(process, &isWOW64); err == nil && isWOW64 {
-		proc.IsWOW64 = true
-	}
-	if isPackaged, err := sys.IsProcessPackaged(process); err == nil && isPackaged {
-		proc.IsPackaged = true
-	}
-	if prot, err := sys.QueryInformationProcess[sys.PsProtection](process, sys.ProcessProtectionInformation); err == nil && prot != nil {
-		proc.IsProtected = prot.IsProtected()
+	// obtain process token integrity level
+	var sidIntegrityLevel *windows.SID
+	sidIntegrityLevel, proc.IsTokenElevated, err = pstypes.GetTokenIntegrityInformation(process)
+	if err == nil {
+		proc.TokenIntegrityLevel = sys.RidToString(sidIntegrityLevel)
 	}
 
-	// get process token attributes
-	var (
-		token               windows.Token
-		tokenUser           *windows.Tokenuser
-		tokenMandatoryLabel *windows.Tokenmandatorylabel
-	)
-
-	err = windows.OpenProcessToken(process, windows.TOKEN_QUERY, &token)
-	if err != nil {
-		goto readPEB
-	}
-	defer token.Close()
-	tokenUser, err = token.GetTokenUser()
-	if err != nil {
-		goto readPEB
-	}
-	proc.SID = tokenUser.User.Sid.String()
-	proc.Username, proc.Domain, _, _ = tokenUser.User.Sid.LookupAccount("")
-
-	// get process token integrity level
-	tokenMandatoryLabel, err = sys.GetProcessTokenInformation[windows.Tokenmandatorylabel](token, windows.TokenIntegrityLevel)
-	if err != nil {
-		goto readPEB
-	}
-
-	proc.TokenIntegrityLevel = sys.RidToString(tokenMandatoryLabel.Label.Sid)
-	proc.IsTokenElevated = token.IsElevated()
-
-	// retrieve process handles
-	proc.Handles, err = s.hsnap.FindHandles(pid)
-	if err != nil {
-		goto readPEB
-	}
-
-readPEB:
-	// read PEB (Process Environment Block)
+	// populate environment variables, command line, cwd and session id from PEB
 	peb, err := ReadPEB(process)
 	if err != nil {
 		pebReadErrors.Add(1)
-		return false, proc
+		return proc
 	}
 	proc.Envs = peb.GetEnvs()
 	proc.Cmdline = peb.GetCommandLine()
 	proc.SessionID = peb.GetSessionID()
 	proc.Cwd = peb.GetCurrentWorkingDirectory()
 
-	return false, proc
+	return proc
+}
+
+// populateProc augments the existing process state derived from the
+// NT Kernel Logger provider with extra attributes, including the process
+// token integrity level, the current working directory and env variables.
+func (s *snapshotter) populateProc(proc *pstypes.PS, inspectToken bool) error {
+	var err error
+	var errs multierror.MultiError
+
+	// retrieve process handles
+	proc.Handles, err = s.hsnap.FindHandles(proc.PID)
+	if err != nil {
+		errs.Add(err)
+	}
+	// retrieve Portable Executable data
+	proc.PE, err = pe.ParseFileWithConfig(proc.Exe, s.config.PE)
+	if err != nil {
+		errs.Add(err)
+	}
+
+	process, err := proc.Open()
+	if err != nil {
+		if errors.Is(err, windows.ERROR_NOT_FOUND) ||
+			errors.Is(err, windows.ERROR_ACCESS_DENIED) ||
+			errors.Is(err, windows.ERROR_INVALID_PARAMETER) {
+			return nil
+		}
+		return errs.Wrap(err)
+	}
+	defer windows.Close(process)
+
+	// query token integrity info if not enriched by internal event
+	if inspectToken {
+		var sid *windows.SID
+		sid, proc.IsTokenElevated, err = pstypes.GetTokenIntegrityInformation(process)
+		if err != nil {
+			errs.Add(err)
+		} else {
+			proc.TokenIntegrityLevel = sys.RidToString(sid)
+		}
+	}
+
+	// try to read the PEB (Process Environment Block) to access
+	// environment variables and the current working directory
+	var peb *PEB
+	peb, err = ReadPEB(process)
+	if err != nil {
+		pebReadErrors.Add(1)
+		return errs.Wrap(err)
+	}
+	proc.Envs = peb.GetEnvs()
+	proc.Cwd = peb.GetCurrentWorkingDirectory()
+
+	return errs.Wrap()
 }
 
 func (s *snapshotter) Size() uint32 {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.RLock()
+	defer s.RUnlock()
 	return uint32(len(s.procs))
 }
 
@@ -725,56 +578,75 @@ func (s *snapshotter) Size() uint32 {
 // in case we miss process' terminate events.
 func (s *snapshotter) gcDeadProcesses() {
 	tick := time.NewTicker(reapPeriod)
+	defer tick.Stop()
 	for {
 		select {
 		case <-tick.C:
-			s.mu.Lock()
-			ss := len(s.procs)
-			log.Debugf("scanning for dead processes on the snapshot of %d items", ss)
-
-			for pid := range s.procs {
-				proc, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
-				if err != nil {
-					continue
-				}
-				if !sys.IsProcessRunning(proc) {
-					delete(s.procs, pid)
-				}
-				_ = windows.CloseHandle(proc)
-			}
-
-			if ss > len(s.procs) {
-				reaped := ss - len(s.procs)
-				reapedProcesses.Add(int64(reaped))
-				log.Debugf("%d dead process(es) reaped", reaped)
-			}
-			s.mu.Unlock()
+			s.reap()
 		case <-s.quit:
-			tick.Stop()
+			return
 		}
 	}
 }
 
-func (s *snapshotter) onHandleCreated(pid uint32, handle htypes.Handle) {
-	s.mu.RLock()
-	ps, ok := s.procs[pid]
-	s.mu.RUnlock()
-	if ok {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		ps.AddHandle(handle)
-		s.procs[pid] = ps
+func (s *snapshotter) reap() {
+	// take the copy of the snapshot, so the OS calls don't
+	// run with the lock held and block the event processing
+	s.RLock()
+	snap := make(map[uint32]*pstypes.PS, len(s.procs))
+	maps.Copy(snap, s.procs)
+	s.RUnlock()
+
+	log.Debugf("scanning for dead processes on the snapshot of %d items", len(snap))
+
+	dead := make([]uint32, 0)
+	for pid := range snap {
+		proc, err := windows.OpenProcess(windows.SYNCHRONIZE, false, pid)
+		if err != nil {
+			continue
+		}
+		if !sys.IsProcessRunning(proc) {
+			dead = append(dead, pid)
+		}
+		_ = windows.CloseHandle(proc)
+	}
+	if len(dead) == 0 {
+		return
+	}
+
+	var reaped int64
+	s.Lock()
+	defer s.Unlock()
+	for _, pid := range dead {
+		// the pid might have been reused in the meantime
+		// by the new process, so make sure we're about to
+		// delete the same state we have inspected
+		if proc, ok := s.procs[pid]; ok && proc == snap[pid] {
+			delete(s.procs, pid)
+			reaped++
+		}
+	}
+
+	if reaped > 0 {
+		processCount.Add(-reaped)
+		reapedProcesses.Add(reaped)
+		log.Debugf("%d dead process(es) reaped", reaped)
 	}
 }
 
-func (s *snapshotter) onHandleDestroyed(pid uint32, rawHandle windows.Handle) {
-	s.mu.RLock()
-	ps, ok := s.procs[pid]
-	s.mu.RUnlock()
-	if ok {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		ps.RemoveHandle(rawHandle)
-		s.procs[pid] = ps
+// addProcessFromCapture adds the process state restored from the capture file. There's
+// nothing to enrich since the OS state doesn't correspond to the captured state.
+func (s *snapshotter) addProcessFromCapture(proc *pstypes.PS) {
+	if proc.PID == proc.Ppid || proc.PID == sys.InvalidProcessID {
+		return
 	}
+	s.Lock()
+	defer s.Unlock()
+	if proc.Ppid != proc.PID {
+		proc.Parent = s.procs[proc.Ppid]
+	}
+	if _, exists := s.procs[proc.PID]; !exists {
+		processCount.Add(1)
+	}
+	s.procs[proc.PID] = proc
 }

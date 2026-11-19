@@ -53,7 +53,7 @@ func applyProcessState(psnap ps.Snapshotter, evt *event.Event) {
 	case evt.Type == event.Execve && succeeded(evt):
 		ps := buildPS(evt, psnap)
 		evt.PS = ps
-		_ = psnap.Write(evt)
+		_ = psnap.AddProcess(ps)
 	case evt.Type == event.Clone && succeeded(evt) && evt.IsCreateProcess():
 		ps := buildPS(evt, psnap)
 		evt.PS = ps
@@ -62,7 +62,7 @@ func applyProcessState(psnap ps.Snapshotter, evt *event.Event) {
 		ok, existing := psnap.Find(evt.PID)
 		if ok && existing != nil {
 			evt.PS = existing
-			_ = psnap.AddThread(evt)
+			_ = psnap.AddThread(pstypes.Thread{Tid: evt.Tid, Pid: evt.PID})
 		}
 	case evt.Type == event.Mmap && succeeded(evt):
 		ok, existing := psnap.Find(evt.PID)
@@ -82,7 +82,7 @@ func applyProcessState(psnap ps.Snapshotter, evt *event.Event) {
 		if ok {
 			evt.PS = existing
 		}
-		_ = psnap.Remove(evt)
+		_ = psnap.RemoveProcess(evt.PID)
 	default:
 		ok, existing := psnap.Find(evt.PID)
 		if ok {

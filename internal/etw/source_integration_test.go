@@ -17,6 +17,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
  */
+
 package etw
 
 import (
@@ -70,17 +71,17 @@ func (l *MockListener) ProcessEvent(e *event.Event) (bool, error) {
 
 func TestEventSourceStartTraces(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
-	psnap.On("Write", mock.Anything).Return(nil)
-	psnap.On("AddThread", mock.Anything).Return(nil)
-	psnap.On("AddModule", mock.Anything).Return(nil)
-	psnap.On("AddMmap", mock.Anything).Return(nil)
-	psnap.On("RemoveMmap", mock.Anything, mock.Anything).Return(nil)
-	psnap.On("RemoveThread", mock.Anything, mock.Anything).Return(nil)
-	psnap.On("RemoveModule", mock.Anything, mock.Anything).Return(nil)
-	psnap.On("FindModule", mock.Anything).Return(false, nil)
+	psnap.On("AddProcess", mock.Anything).Return(nil)
+	psnap.On("AddThread", mock.Anything)
+	psnap.On("AddModule", mock.Anything, mock.Anything)
+	psnap.On("AddMmap", mock.Anything, mock.Anything)
+	psnap.On("RemoveMmap", mock.Anything, mock.Anything)
+	psnap.On("RemoveThread", mock.Anything, mock.Anything)
+	psnap.On("RemoveModule", mock.Anything, mock.Anything)
+	psnap.On("FindModule", mock.Anything).Return(nil, false)
 	psnap.On("FindAndPut", mock.Anything).Return(&pstypes.PS{})
-	psnap.On("Find", mock.Anything).Return(true, &pstypes.PS{})
-	psnap.On("Remove", mock.Anything).Return(nil)
+	psnap.On("Find", mock.Anything).Return(&pstypes.PS{}, true)
+	psnap.On("RemoveProcess", mock.Anything)
 
 	hsnap := new(handle.SnapshotterMock)
 	hsnap.On("FindByObject", mock.Anything).Return(htypes.Handle{}, false)
@@ -150,17 +151,17 @@ func TestEventSourceStartTraces(t *testing.T) {
 
 func TestEventSourceEnableFlagsDynamically(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
-	psnap.On("Write", mock.Anything).Return(nil)
-	psnap.On("AddThread", mock.Anything).Return(nil)
-	psnap.On("AddModule", mock.Anything).Return(nil)
-	psnap.On("AddMmap", mock.Anything).Return(nil)
-	psnap.On("RemoveMmap", mock.Anything, mock.Anything).Return(nil)
-	psnap.On("RemoveThread", mock.Anything, mock.Anything).Return(nil)
-	psnap.On("RemoveModule", mock.Anything, mock.Anything).Return(nil)
-	psnap.On("FindModule", mock.Anything).Return(false, nil)
+	psnap.On("AddProcess", mock.Anything).Return(nil)
+	psnap.On("AddThread", mock.Anything)
+	psnap.On("AddModule", mock.Anything, mock.Anything)
+	psnap.On("AddMmap", mock.Anything, mock.Anything)
+	psnap.On("RemoveMmap", mock.Anything, mock.Anything)
+	psnap.On("RemoveThread", mock.Anything, mock.Anything)
+	psnap.On("RemoveModule", mock.Anything, mock.Anything)
+	psnap.On("FindModule", mock.Anything).Return(nil, false)
 	psnap.On("FindAndPut", mock.Anything).Return(&pstypes.PS{})
-	psnap.On("Find", mock.Anything).Return(true, &pstypes.PS{})
-	psnap.On("Remove", mock.Anything).Return(nil)
+	psnap.On("Find", mock.Anything).Return(&pstypes.PS{}, true)
+	psnap.On("RemoveProcess", mock.Anything)
 
 	hsnap := new(handle.SnapshotterMock)
 	hsnap.On("FindByObject", mock.Anything).Return(htypes.Handle{}, false)
@@ -230,17 +231,17 @@ func TestEventSourceEnableFlagsDynamically(t *testing.T) {
 
 func TestEventSourceEnableFlagsDynamicallyWithYaraEnabled(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
-	psnap.On("Write", mock.Anything).Return(nil)
-	psnap.On("AddThread", mock.Anything).Return(nil)
-	psnap.On("AddModule", mock.Anything).Return(nil)
-	psnap.On("AddMmap", mock.Anything).Return(nil)
-	psnap.On("RemoveMmap", mock.Anything, mock.Anything).Return(nil)
-	psnap.On("RemoveThread", mock.Anything, mock.Anything).Return(nil)
-	psnap.On("RemoveModule", mock.Anything, mock.Anything).Return(nil)
-	psnap.On("FindModule", mock.Anything).Return(false, nil)
+	psnap.On("AddProcess", mock.Anything).Return(nil)
+	psnap.On("AddThread", mock.Anything)
+	psnap.On("AddModule", mock.Anything, mock.Anything)
+	psnap.On("AddMmap", mock.Anything, mock.Anything)
+	psnap.On("RemoveMmap", mock.Anything, mock.Anything)
+	psnap.On("RemoveThread", mock.Anything, mock.Anything)
+	psnap.On("RemoveModule", mock.Anything, mock.Anything)
+	psnap.On("FindModule", mock.Anything).Return(nil, false)
 	psnap.On("FindAndPut", mock.Anything).Return(&pstypes.PS{})
-	psnap.On("Find", mock.Anything).Return(true, &pstypes.PS{})
-	psnap.On("Remove", mock.Anything).Return(nil)
+	psnap.On("Find", mock.Anything).Return(&pstypes.PS{}, true)
+	psnap.On("RemoveProcess", mock.Anything)
 
 	hsnap := new(handle.SnapshotterMock)
 	hsnap.On("FindByObject", mock.Anything).Return(htypes.Handle{}, false)
@@ -308,17 +309,17 @@ func TestEventSourceEnableFlagsDynamicallyWithYaraEnabled(t *testing.T) {
 
 func TestEventSourceRundownEvents(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
-	psnap.On("Write", mock.Anything).Return(nil)
-	psnap.On("AddThread", mock.Anything).Return(nil)
-	psnap.On("AddModule", mock.Anything).Return(nil)
-	psnap.On("AddMmap", mock.Anything).Return(nil)
-	psnap.On("RemoveMmap", mock.Anything, mock.Anything).Return(nil)
-	psnap.On("RemoveThread", mock.Anything, mock.Anything).Return(nil)
-	psnap.On("RemoveModule", mock.Anything, mock.Anything).Return(nil)
-	psnap.On("FindModule", mock.Anything).Return(false, nil)
+	psnap.On("AddProcess", mock.Anything).Return(nil)
+	psnap.On("AddThread", mock.Anything)
+	psnap.On("AddModule", mock.Anything, mock.Anything)
+	psnap.On("AddMmap", mock.Anything, mock.Anything)
+	psnap.On("RemoveMmap", mock.Anything, mock.Anything)
+	psnap.On("RemoveThread", mock.Anything, mock.Anything)
+	psnap.On("RemoveModule", mock.Anything, mock.Anything)
+	psnap.On("FindModule", mock.Anything).Return(nil, false)
 	psnap.On("FindAndPut", mock.Anything).Return(&pstypes.PS{})
-	psnap.On("Find", mock.Anything).Return(true, &pstypes.PS{})
-	psnap.On("Remove", mock.Anything).Return(nil)
+	psnap.On("Find", mock.Anything).Return(&pstypes.PS{}, true)
+	psnap.On("RemoveProcess", mock.Anything)
 
 	hsnap := new(handle.SnapshotterMock)
 	hsnap.On("FindByObject", mock.Anything).Return(htypes.Handle{}, false)
@@ -668,8 +669,8 @@ func TestEventSourceAllEvents(t *testing.T) {
 	hsnap := new(handle.SnapshotterMock)
 	hsnap.On("FindByObject", mock.Anything).Return(htypes.Handle{}, false)
 	hsnap.On("FindHandles", mock.Anything).Return([]htypes.Handle{}, nil)
-	hsnap.On("Write", mock.Anything).Return(nil)
-	hsnap.On("Remove", mock.Anything).Return(nil)
+	hsnap.On("AddProcess", mock.Anything).Return(nil)
+	hsnap.On("RemoveProcess", mock.Anything).Return(nil)
 
 	evsConfig := config.EventSourceConfig{
 		EnableThreadEvents:   true,
@@ -746,8 +747,8 @@ func TestCallstackEnrichment(t *testing.T) {
 	hsnap := new(handle.SnapshotterMock)
 	hsnap.On("FindByObject", mock.Anything).Return(htypes.Handle{}, false)
 	hsnap.On("FindHandles", mock.Anything).Return([]htypes.Handle{}, nil)
-	hsnap.On("Write", mock.Anything).Return(nil)
-	hsnap.On("Remove", mock.Anything).Return(nil)
+	hsnap.On("AddProcess", mock.Anything).Return(nil)
+	hsnap.On("RemoveProcess", mock.Anything)
 
 	// use a real process snapshotter to
 	// enrich the callstacks. This way, we
@@ -1263,8 +1264,8 @@ func TestEvasionScanner(t *testing.T) {
 	hsnap := new(handle.SnapshotterMock)
 	hsnap.On("FindByObject", mock.Anything).Return(htypes.Handle{}, false)
 	hsnap.On("FindHandles", mock.Anything).Return([]htypes.Handle{}, nil)
-	hsnap.On("Write", mock.Anything).Return(nil)
-	hsnap.On("Remove", mock.Anything).Return(nil)
+	hsnap.On("AddProcess", mock.Anything).Return(nil)
+	hsnap.On("RemoveProcess", mock.Anything).Return(nil)
 
 	cfg := &config.Config{EventSource: evsConfig, Filters: &config.Filters{}}
 

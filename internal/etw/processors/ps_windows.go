@@ -19,14 +19,17 @@
 package processors
 
 import (
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/ps"
+	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
-	"time"
 )
 
 type psProcessor struct {
@@ -44,11 +47,19 @@ func (p psProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, error) {
 	case event.CreateProcess, event.CreateProcessInternal, event.TerminateProcess, event.ProcessRundown, event.ProcessRundownInternal:
 		evt, err := p.processEvent(e)
 		if evt.IsTerminateProcess() {
-			p.regionProber.Remove(evt.Params.GetPid())
-			return evt, false, multierror.Wrap(err, p.psnap.Remove(evt))
+			pid := evt.Params.GetPid()
+			p.regionProber.Remove(pid)
+			p.psnap.RemoveProcess(pid)
+			return evt, false, err
 		}
 
-		return evt, false, multierror.Wrap(err, p.psnap.Write(evt))
+		proc := ps.DefaultMapper().Proc(e)
+		err = multierror.Wrap(err, p.psnap.AddProcess(proc))
+		if !evt.IsCreateProcessInternal() && !evt.IsProcessRundownInternal() {
+			p.assignProcess(evt, proc)
+		}
+
+		return evt, false, err
 	case event.CreateThread, event.TerminateThread, event.ThreadRundown:
 		pid := e.Params.GetPid()
 		proc := p.psnap.FindAndPut(pid)
@@ -56,11 +67,12 @@ func (p psProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, error) {
 			e.SetParam(params.Exe, params.Str(proc.Exe))
 		}
 		if !e.IsTerminateThread() {
-			return e, false, p.psnap.AddThread(e)
+			p.psnap.AddThread(ps.DefaultMapper().Thread(e))
+			return e, false, nil
 		}
 		tid := e.Params.GetTid()
-
-		return e, false, p.psnap.RemoveThread(pid, tid)
+		p.psnap.RemoveThread(pid, tid)
+		return e, false, nil
 	case event.OpenProcess, event.OpenThread:
 		pid := e.Params.GetPid()
 		proc := p.psnap.FindAndPut(pid)
@@ -73,6 +85,29 @@ func (p psProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, error) {
 	}
 
 	return e, true, nil
+}
+
+// assignProcess attaches the process state to the event and reflects the attributes
+// that were enriched by the snapshotter (user, token properties, executable path)
+// in the event parameters.
+func (p psProcessor) assignProcess(e *event.Event, proc *pstypes.PS) {
+	e.PS = proc
+	if proc.Username != "" {
+		e.SetParam(params.Username, params.Str(proc.Username))
+	}
+	if proc.Domain != "" {
+		e.SetParam(params.Domain, params.Str(proc.Domain))
+	}
+	if proc.Exe != "" {
+		e.SetParam(params.Exe, params.Str(proc.Exe))
+	}
+	if proc.TokenIntegrityLevel != "" {
+		e.SetParam(params.ProcessTokenIntegrityLevel, params.Bin(sys.RidStringToSIDBytes(proc.TokenIntegrityLevel)))
+		e.SetParam(params.ProcessTokenIsElevated, params.Boolean(proc.IsTokenElevated))
+	}
+	if proc.TokenElevationType != "" {
+		e.SetParam(params.ProcessTokenElevationType, params.U32(params.StringToElevationType(proc.TokenElevationType)))
+	}
 }
 
 //nolint:unparam
