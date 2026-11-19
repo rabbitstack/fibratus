@@ -21,7 +21,6 @@
 package ps
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/event"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"github.com/stretchr/testify/mock"
@@ -32,31 +31,30 @@ type SnapshotterMock struct {
 	mock.Mock
 }
 
-// Write method
-func (s *SnapshotterMock) Write(evt *event.Event) error {
-	args := s.Called(evt)
+// AddProcess method
+func (s *SnapshotterMock) AddProcess(proc *pstypes.PS) error {
+	args := s.Called(proc)
 	return args.Error(0)
 }
 
-// Remove method
-func (s *SnapshotterMock) Remove(evt *event.Event) error {
-	args := s.Called(evt)
-	return args.Error(0)
+// RemoveProcess method
+func (s *SnapshotterMock) RemoveProcess(pid uint32) {
+	s.Called(pid)
 }
 
 // Find method
-func (s *SnapshotterMock) Find(pid uint32) (bool, *pstypes.PS) {
+func (s *SnapshotterMock) Find(pid uint32) (*pstypes.PS, bool) {
 	args := s.Called(pid)
-	return args.Bool(0), args.Get(1).(*pstypes.PS)
+	return args.Get(0).(*pstypes.PS), args.Bool(1)
 }
 
-func (s *SnapshotterMock) FindModule(addr va.Address) (bool, *pstypes.Module) {
+func (s *SnapshotterMock) FindModule(addr va.Address) (*pstypes.Module, bool) {
 	args := s.Called(addr)
-	mod := args.Get(1)
+	mod := args.Get(0)
 	if mod != nil {
-		return args.Bool(0), mod.(*pstypes.Module)
+		return mod.(*pstypes.Module), args.Bool(1)
 	}
-	return args.Bool(0), nil
+	return nil, args.Bool(1)
 }
 
 func (s *SnapshotterMock) FindAllModules() map[string]pstypes.Module {
@@ -86,40 +84,31 @@ func (s *SnapshotterMock) GetSnapshot() []*pstypes.PS {
 }
 
 // AddThread method
-func (s *SnapshotterMock) AddThread(evt *event.Event) error {
-	args := s.Called(evt)
-	return args.Error(0)
+func (s *SnapshotterMock) AddThread(thread pstypes.Thread) {
+	s.Called(thread)
 }
 
 // AddModule method
-func (s *SnapshotterMock) AddModule(evt *event.Event) error {
-	args := s.Called(evt)
-	return args.Error(0)
+func (s *SnapshotterMock) AddModule(pid uint32, mod pstypes.Module) {
+	s.Called(pid, mod)
 }
 
 // RemoveThread method
-func (s *SnapshotterMock) RemoveThread(pid uint32, tid uint32) error {
-	args := s.Called(pid, tid)
-	return args.Error(0)
+func (s *SnapshotterMock) RemoveThread(pid uint32, tid uint32) {
+	s.Called(pid, tid)
 }
 
 // RemoveModule method
-func (s *SnapshotterMock) RemoveModule(pid uint32, addr va.Address) error {
-	args := s.Called(pid, addr)
-	return args.Error(0)
+func (s *SnapshotterMock) RemoveModule(pid uint32, addr va.Address) {
+	s.Called(pid, addr)
 }
 
-// WriteFromCapture method
-func (s *SnapshotterMock) WriteFromCapture(evt *event.Event) error { return nil }
-
 // AddMmap method
-func (s *SnapshotterMock) AddMmap(evt *event.Event) error {
-	args := s.Called(evt)
-	return args.Error(0)
+func (s *SnapshotterMock) AddMmap(pid uint32, mmap pstypes.Mmap) {
+	s.Called(pid, mmap)
 }
 
 // RemoveMmap method
-func (s *SnapshotterMock) RemoveMmap(pid uint32, address va.Address) error {
-	args := s.Called(pid, address)
-	return args.Error(0)
+func (s *SnapshotterMock) RemoveMmap(pid uint32, address va.Address) {
+	s.Called(pid, address)
 }

@@ -21,6 +21,8 @@
 package sys
 
 import (
+	"encoding/binary"
+
 	"golang.org/x/sys/windows"
 )
 
@@ -56,6 +58,19 @@ const (
 	ProtectedProcessRid = 0x00005000
 )
 
+var integrityLevels = []struct {
+	rid  uint32
+	name string
+}{
+	{UntrustedRid, "UNTRUSTED"},
+	{LowRid, "LOW"},
+	{MediumRid, "MEDIUM"},
+	{MediumPlusRid, "MEDIUM+"},
+	{HighRid, "HIGH"},
+	{SystemRid, "SYSTEM"},
+	{ProtectedProcessRid, "PROTECTED"},
+}
+
 // RidToString given the SID representing the token mandatory label
 // returns the string representation of the integrity level.
 func RidToString(sid *windows.SID) string {
@@ -80,4 +95,32 @@ func RidToString(sid *windows.SID) string {
 	default:
 		return "UNKNOWN"
 	}
+}
+
+// StringToRid is the inverse of RidToString. It returns false for
+// "UNKNOWN" and anything else that isn't a known integrity level.
+func StringToRid(s string) (uint32, bool) {
+	for _, l := range integrityLevels {
+		if l.name == s {
+			return l.rid, true
+		}
+	}
+	return 0, false
+}
+
+// RidToSIDBytes builds the binary mandatory label SID (S-1-16-<rid>).
+func RidToSIDBytes(rid uint32) []byte {
+	// revision=1, subauthority count=1, identifier authority={0,0,0,0,0,16}
+	b := []byte{1, 1, 0, 0, 0, 0, 0, 16, 0, 0, 0, 0}
+	binary.LittleEndian.PutUint32(b[8:], rid)
+	return b
+}
+
+// RidStringToSIDBytes converts the integrity level label to bytes. "HIGH" > bytes of S-1-16-12288.
+func RidStringToSIDBytes(s string) []byte {
+	rid, ok := StringToRid(s)
+	if !ok {
+		return nil
+	}
+	return RidToSIDBytes(rid)
 }

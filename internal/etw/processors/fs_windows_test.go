@@ -223,13 +223,13 @@ func TestFsProcessor(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			hsnap := tt.hsnap()
 			psnap := new(ps.SnapshotterMock)
-			psnap.On("AddMmap", mock.Anything).Return(nil)
-			psnap.On("RemoveMmap", mock.Anything, mock.Anything).Return(nil)
-			psnap.On("Find", mock.Anything).Return(true, &pstypes.PS{
+			psnap.On("AddMmap", mock.Anything, mock.Anything)
+			psnap.On("RemoveMmap", mock.Anything, mock.Anything)
+			psnap.On("Find", mock.Anything).Return(&pstypes.PS{
 				Mmaps: []pstypes.Mmap{
 					{File: "C:\\Windows\\System32\\kernel32.dll", BaseAddress: va.Address(0xffff23433), Size: 3098},
 				},
-			})
+			}, true)
 			p := newFsProcessor(hsnap, psnap, &config.Config{})
 			if tt.setupProcessor != nil {
 				tt.setupProcessor(p)

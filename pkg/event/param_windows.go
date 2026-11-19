@@ -45,7 +45,7 @@ func (p Param) String() string {
 	case params.String, params.Path:
 		return v.Str()
 	case params.SID, params.WbemSID, params.TokenIntegrityLevel:
-		sid := convertToSID(p)
+		sid := bytesToSID(p)
 		if sid == nil {
 			return ""
 		}
@@ -149,20 +149,31 @@ func (pars Params) GetPpid() uint32 { return pars.GetUint32ByName(params.Process
 // GetTid returns the thread identifier.
 func (pars Params) GetTid() uint32 { return pars.GetUint32ByName(params.ThreadID) }
 
-// GetSID returns the raw Windows security identifier parameter.
+// GetSID returns the raw Windows security identifier parameter that
+// represents the identity of the running process.
 // It returns nil if the parameter is absent or has an invalid value.
-func (pars Params) GetSID() *windows.SID { return convertToSID(pars.GetByName(params.UserSID)) }
+func (pars Params) GetSID() *windows.SID {
+	return bytesToSID(pars.GetByName(params.UserSID))
+}
 
-func convertToSID(param Param) *windows.SID {
-	sid := param.Value.Bytes()
-	if len(sid) == 0 {
+func bytesToSID(param Param) *windows.SID {
+	b := param.Value.Bytes()
+	if len(b) < 8 { // minimum SID size: revision + subauth count + 6-byte authority
 		return nil
 	}
-	pointer := uintptr(unsafe.Pointer(&sid[0]))
-	if param.Type() == params.WbemSID {
+	pointer := uintptr(unsafe.Pointer(&b[0]))
+	if param.Type() == params.WbemSID { // handle WbemSID size
 		pointer += uintptr(8 * 2)
 	}
-	return (*windows.SID)(unsafe.Pointer(pointer))
+	sid := (*windows.SID)(unsafe.Pointer(pointer))
+	if !sid.IsValid() {
+		return nil
+	}
+	// ensure the declared length fits in the buffer
+	if sid.Len() > len(b) {
+		return nil
+	}
+	return sid
 }
 
 func DecodeParams(r *etw.EventRecord, e *Event) error {

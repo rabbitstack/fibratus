@@ -180,33 +180,36 @@ func (r *reader) read(evt *event.Event, eventsc chan *event.Event) {
 func (r *reader) updateSnapshotters(evt *event.Event) error {
 	switch evt.Type {
 	case event.TerminateProcess:
-		if err := r.psnapshotter.Remove(evt); err != nil {
-			return err
-		}
+		r.psnapshotter.RemoveProcess(evt.Params.GetPid())
 	case event.TerminateThread:
 		pid := evt.Params.GetPid()
 		tid := evt.Params.GetTid()
-		if err := r.psnapshotter.RemoveThread(pid, tid); err != nil {
-			return err
-		}
+		r.psnapshotter.RemoveThread(pid, tid)
 	case event.UnloadModule:
 		pid := evt.Params.GetPid()
 		addr := evt.Params.GetAddressByName(params.ModuleBase)
-		if err := r.psnapshotter.RemoveModule(pid, addr); err != nil {
-			return err
+		r.psnapshotter.RemoveModule(pid, addr)
+	case event.CreateProcess:
+		if evt.PS != nil {
+			if err := r.psnapshotter.AddProcess(ps.CaptureMapper().Proc(evt)); err != nil {
+				return err
+			}
 		}
-	case event.CreateProcess,
-		event.ProcessRundown,
-		event.LoadModule,
-		event.ModuleRundown,
-		event.CreateThread,
-		event.ThreadRundown:
-		if err := r.psnapshotter.WriteFromCapture(evt); err != nil {
-			return err
+	case event.ProcessRundown:
+		// the process state is restored from the event itself, since it
+		// was serialized in the capture file together with the event
+		if evt.PS != nil {
+			if err := r.psnapshotter.AddProcess(evt.PS); err != nil {
+				return err
+			}
 		}
+	case event.CreateThread, event.ThreadRundown:
+		r.psnapshotter.AddThread(ps.CaptureMapper().Thread(evt))
+	case event.LoadModule, event.ModuleRundown:
+		r.psnapshotter.AddModule(ps.CaptureMapper().Module(evt))
 	}
 	if evt.PS == nil {
-		_, evt.PS = r.psnapshotter.Find(evt.PID)
+		evt.PS, _ = r.psnapshotter.Find(evt.PID)
 	}
 	return nil
 }

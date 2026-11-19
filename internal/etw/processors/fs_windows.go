@@ -72,8 +72,8 @@ func newFsProcessor(
 
 func (f *fsProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, error) {
 	if e.Category() == event.File || e.Category() == event.Memory {
-		evt, err := f.processEvent(e)
-		return evt, false, err
+		evt := f.processEvent(e)
+		return evt, false, nil
 	}
 	return e, true, nil
 }
@@ -85,7 +85,7 @@ func (f *fsProcessor) getFileInfo(name string, opts uint32) *FileInfo {
 	return &FileInfo{Name: name, Type: fs.GetFileType(name, opts)}
 }
 
-func (f *fsProcessor) processEvent(e *event.Event) (*event.Event, error) {
+func (f *fsProcessor) processEvent(e *event.Event) *event.Event {
 	switch e.Type {
 	case event.FileRundown:
 		// when the file rundown event comes in we store the file info
@@ -105,8 +105,7 @@ func (f *fsProcessor) processEvent(e *event.Event) (*event.Event, error) {
 			totalMapRundownFiles.Add(1)
 			e.SetParam(params.FilePath, params.Str(fileinfo.Name))
 		}
-
-		return e, f.psnap.AddMmap(e)
+		f.psnap.AddMmap(ps.DefaultMapper().Mmap(e))
 	case event.CreateFile:
 		fileObject := e.Params.GetUint64ByName(params.FileObject)
 
@@ -135,14 +134,14 @@ func (f *fsProcessor) processEvent(e *event.Event) (*event.Event, error) {
 			fs.GetMetadataStore().DoRequestAsync(e.GetParamAsString(params.FilePath), false)
 		}
 
-		return e, nil
+		return e
 	case event.ReleaseFile:
 		fileReleaseCount.Add(1)
 		// delete file metadata by file object address
 		fileObject := e.Params.GetUint64ByName(params.FileObject)
 		delete(f.files, fileObject)
 	case event.UnmapViewOfSection:
-		ok, proc := f.psnap.Find(e.PID)
+		proc, ok := f.psnap.Find(e.PID)
 		addr := e.Params.GetAddressByName(params.FileViewBase)
 		if ok {
 			mmap := proc.FindMmap(addr)
@@ -152,10 +151,10 @@ func (f *fsProcessor) processEvent(e *event.Event) (*event.Event, error) {
 		}
 
 		totalMapRundownFiles.Add(-1)
-
-		return e, f.psnap.RemoveMmap(e.PID, addr)
+		f.psnap.RemoveMmap(e.PID, addr)
+		return e
 	case event.FileOpEnd:
-		return e, nil
+		return e
 	default:
 		var fileObject uint64
 		fileKey := e.Params.GetUint64ByName(params.FileKey)
@@ -191,7 +190,7 @@ func (f *fsProcessor) processEvent(e *event.Event) (*event.Event, error) {
 			if fileinfo != nil {
 				e.SetParam(params.FileDirectory, params.Str(fileinfo.Name))
 			}
-			return e, nil
+			return e
 		}
 
 		if fileinfo != nil {
@@ -202,11 +201,12 @@ func (f *fsProcessor) processEvent(e *event.Event) (*event.Event, error) {
 		}
 
 		if e.IsMapViewOfSection() {
-			return e, f.psnap.AddMmap(e)
+			f.psnap.AddMmap(ps.DefaultMapper().Mmap(e))
+			return e
 		}
 	}
 
-	return e, nil
+	return e
 }
 
 func (f *fsProcessor) findFile(fileKey, fileObject uint64) *FileInfo {

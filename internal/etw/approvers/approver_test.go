@@ -259,9 +259,9 @@ func TestApproversProcEventWithRulesApproved(t *testing.T) {
 	p := New(psnap, rules)
 
 	const pid = uint32(1234)
-	psnap.On("Find", pid).Return(true, &pstypes.PS{
+	psnap.On("Find", pid).Return(&pstypes.PS{
 		Exe: `C:\Windows\System32\svchost.exe`,
-	})
+	}, true)
 
 	buf := make([]byte, 4)
 	*(*uint32)(unsafe.Pointer(&buf[0])) = pid
@@ -284,9 +284,9 @@ func TestApproversProcEventWithRulesRejected(t *testing.T) {
 	p := New(psnap, rules)
 
 	const pid = uint32(5678)
-	psnap.On("Find", pid).Return(true, &pstypes.PS{
+	psnap.On("Find", pid).Return(&pstypes.PS{
 		Exe: `C:\Users\Administrator\cmd.exe`,
-	})
+	}, true)
 
 	buf := make([]byte, 4)
 	*(*uint32)(unsafe.Pointer(&buf[0])) = pid

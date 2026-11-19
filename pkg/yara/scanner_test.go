@@ -103,12 +103,14 @@ func TestScan(t *testing.T) {
 					return nil, err
 				}
 
+				pid := pi.ProcessId
+
 				for {
-					if sys.IsProcessRunning(pi.Process) {
+					if isProcessRunning(t, pid) {
 						break
 					}
 					time.Sleep(time.Millisecond * 100)
-					log.Infof("%d pid not yet ready", pi.Process)
+					log.Infof("%d pid not yet ready", pid)
 				}
 
 				proc := &pstypes.PS{
@@ -183,12 +185,14 @@ func TestScan(t *testing.T) {
 					return nil, err
 				}
 
+				pid := pi.ProcessId
+
 				for {
-					if sys.IsProcessRunning(pi.Process) {
+					if isProcessRunning(t, pid) {
 						break
 					}
 					time.Sleep(time.Millisecond * 100)
-					log.Infof("%d pid not yet ready", pi.Process)
+					log.Infof("%d pid not yet ready", pid)
 				}
 
 				proc := &pstypes.PS{
@@ -258,15 +262,16 @@ func TestScan(t *testing.T) {
 					return nil, err
 				}
 
+				pid := pi.ProcessId
+
 				for {
-					if sys.IsProcessRunning(pi.Process) {
+					if isProcessRunning(t, pid) {
 						break
 					}
 					time.Sleep(time.Millisecond * 100)
-					log.Infof("%d pid not yet ready", pi.Process)
+					log.Infof("%d pid not yet ready", pid)
 				}
 
-				pid := pi.ProcessId
 				proc := &pstypes.PS{
 					Name:      "tests.exe",
 					PID:       pid,
@@ -604,15 +609,15 @@ func TestScan(t *testing.T) {
 					return nil, err
 				}
 
+				pid := pi.ProcessId
+
 				for {
-					if sys.IsProcessRunning(pi.Process) {
+					if isProcessRunning(t, pid) {
 						break
 					}
 					time.Sleep(time.Millisecond * 100)
-					log.Infof("%d pid not yet ready", pi.Process)
+					log.Infof("%d pid not yet ready", pid)
 				}
-
-				pid := pi.ProcessId
 
 				proc := &pstypes.PS{
 					Name:      "tests.exe",
@@ -686,15 +691,15 @@ func TestScan(t *testing.T) {
 					return nil, err
 				}
 
+				pid := pi.ProcessId
+
 				for {
-					if sys.IsProcessRunning(pi.Process) {
+					if isProcessRunning(t, pid) {
 						break
 					}
 					time.Sleep(time.Millisecond * 100)
-					log.Infof("%d pid not yet ready", pi.Process)
+					log.Infof("%d pid not yet ready", pid)
 				}
-
-				pid := pi.ProcessId
 
 				proc := &pstypes.PS{
 					Name:      "tests.exe",
@@ -936,4 +941,15 @@ func TestScan(t *testing.T) {
 			}
 		})
 	}
+}
+
+func isProcessRunning(t *testing.T, pid uint32) bool {
+	h, err := windows.OpenProcess(windows.SYNCHRONIZE, false, pid)
+	if err != nil {
+		t.Logf("unable to open process %d with SYNCHRONIZE rights: %v", pid, err)
+		return false
+	}
+	defer windows.CloseHandle(h)
+	isRunning := sys.IsProcessRunning(h)
+	return isRunning
 }

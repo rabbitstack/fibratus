@@ -26,6 +26,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/ps"
+	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/util/signature"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"github.com/stretchr/testify/assert"
@@ -55,11 +56,14 @@ func TestModuleProcessor(t *testing.T) {
 			},
 			func() *ps.SnapshotterMock {
 				psnap := new(ps.SnapshotterMock)
-				psnap.On("AddModule", mock.Anything).Return(nil)
+				psnap.On("AddModule", mock.Anything, mock.Anything).Return(nil)
 				return psnap
 			},
 			func(e *event.Event, t *testing.T, psnap *ps.SnapshotterMock) {
 				psnap.AssertNumberOfCalls(t, "AddModule", 1)
+				psnap.AssertCalled(t, "AddModule", uint32(1023), mock.MatchedBy(func(mod pstypes.Module) bool {
+					return mod.BaseAddress == va.Address(0x7ffb313833a3) && mod.Checksum == 2323432 && mod.SignatureType == 1 && mod.SignatureLevel == 4
+				}))
 				// should get the signature verified
 				assert.Equal(t, "EMBEDDED", e.GetParamAsString(params.ModuleSignatureType))
 				assert.Equal(t, "AUTHENTICODE", e.GetParamAsString(params.ModuleSignatureLevel))
@@ -80,7 +84,7 @@ func TestModuleProcessor(t *testing.T) {
 			},
 			func() *ps.SnapshotterMock {
 				psnap := new(ps.SnapshotterMock)
-				psnap.On("AddModule", mock.Anything).Return(nil)
+				psnap.On("AddModule", mock.Anything, mock.Anything).Return(nil)
 				return psnap
 			},
 			func(e *event.Event, t *testing.T, psnap *ps.SnapshotterMock) {

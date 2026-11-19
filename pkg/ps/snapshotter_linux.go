@@ -23,17 +23,16 @@ package ps
 import (
 	"sync"
 
-	"github.com/rabbitstack/fibratus/pkg/event"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 )
 
 // Snapshotter stores Linux process state for enrichment and rule evaluation.
 type Snapshotter interface {
-	// Write appends or updates process state from an inbound event.
-	Write(*event.Event) error
-	// Remove deletes process state for the event process identifier.
-	Remove(*event.Event) error
+	// AddProcess appends or updates the process state.
+	AddProcess(*pstypes.PS) error
+	// RemoveProcess deletes the process state for the given process identifier.
+	RemoveProcess(pid uint32) error
 	// Find attempts to retrieve process state for the specified process identifier.
 	Find(pid uint32) (bool, *pstypes.PS)
 	// FindAndPut retrieves process state. Procfs fallback enrichment will be added
@@ -45,12 +44,12 @@ type Snapshotter interface {
 	Size() uint32
 	// Close closes the process snapshotter and disposes allocated resources.
 	Close() error
-	// AddThread builds thread state from the event representation.
-	AddThread(*event.Event) error
+	// AddThread adds the thread to the process identified by the thread pid.
+	AddThread(pstypes.Thread) error
 	// RemoveThread removes the thread from the given process.
 	RemoveThread(pid uint32, tid uint32) error
-	// AddMmap adds a memory mapping to the process state.
-	AddMmap(*event.Event) error
+	// AddMmap adds a memory mapping to the specified process.
+	AddMmap(pid uint32, mmap pstypes.Mmap) error
 	// RemoveMmap removes a memory mapping at the given base address.
 	RemoveMmap(pid uint32, addr va.Address) error
 }
@@ -89,21 +88,15 @@ func (s *snapshotter) Put(ps *pstypes.PS) {
 	s.procs[ps.PID] = ps
 }
 
-func (s *snapshotter) Write(evt *event.Event) error {
-	if evt == nil || evt.PS == nil {
-		return nil
-	}
-	s.Put(evt.PS)
+func (s *snapshotter) AddProcess(ps *pstypes.PS) error {
+	s.Put(ps)
 	return nil
 }
 
-func (s *snapshotter) Remove(evt *event.Event) error {
-	if evt == nil {
-		return nil
-	}
+func (s *snapshotter) RemoveProcess(pid uint32) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	delete(s.procs, evt.PID)
+	delete(s.procs, pid)
 	return nil
 }
 
@@ -120,16 +113,12 @@ func (s *snapshotter) Close() error {
 	return nil
 }
 
-func (s *snapshotter) AddThread(evt *event.Event) error {
-	if evt == nil || evt.PS == nil {
-		return nil
-	}
-	ok, ps := s.Find(evt.PID)
+func (s *snapshotter) AddThread(thread pstypes.Thread) error {
+	ok, ps := s.Find(thread.Pid)
 	if !ok || ps == nil {
-		s.Put(evt.PS)
 		return nil
 	}
-	ps.AddThread(pstypes.Thread{Tid: evt.Tid, Pid: evt.PID})
+	ps.AddThread(thread)
 	return nil
 }
 
@@ -142,18 +131,12 @@ func (s *snapshotter) RemoveThread(pid uint32, tid uint32) error {
 	return nil
 }
 
-func (s *snapshotter) AddMmap(evt *event.Event) error {
-	if evt == nil || evt.PS == nil {
-		return nil
-	}
-	ok, ps := s.Find(evt.PID)
+func (s *snapshotter) AddMmap(pid uint32, mmap pstypes.Mmap) error {
+	ok, ps := s.Find(pid)
 	if !ok || ps == nil {
-		s.Put(evt.PS)
 		return nil
 	}
-	for _, mmap := range evt.PS.Mmaps {
-		ps.AddMmap(mmap)
-	}
+	ps.AddMmap(mmap)
 	return nil
 }
 

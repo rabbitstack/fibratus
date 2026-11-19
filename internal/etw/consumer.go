@@ -111,7 +111,7 @@ func (c *Consumer) ProcessEvent(r *etw.EventRecord) error {
 	if err != nil {
 		return err
 	}
-	ok, proc := c.psnap.Find(evt.PID)
+	proc, ok := c.psnap.Find(evt.PID)
 	if !ok {
 		c.psnap.Put(proc)
 	}
