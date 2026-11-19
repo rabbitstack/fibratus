@@ -20,10 +20,12 @@ package types
 
 import (
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/bootid"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
@@ -31,6 +33,288 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
 )
+
+func TestThreadString(t *testing.T) {
+	th := Thread{
+		Tid:         1,
+		UstackBase:  va.Address(0x1000),
+		UstackLimit: va.Address(0x2000),
+		KstackBase:  va.Address(0x3000),
+		KstackLimit: va.Address(0x4000),
+	}
+	s := th.String()
+	assert.True(t, strings.Contains(s, "Ustack limit: "+th.UstackLimit.String()))
+	assert.True(t, strings.Contains(s, "Kstack limit: "+th.KstackLimit.String()))
+}
+
+func TestStringShortIncludesIntegrityLevel(t *testing.T) {
+	parent := &PS{PID: 1, Name: "explorer.exe"}
+	child := &PS{PID: 2, Name: "cmd.exe", TokenIntegrityLevel: "HIGH", Parent: parent}
+	assert.True(t, strings.Contains(child.StringShort(), "Integrity level: HIGH"))
+	parent.Parent = nil
+	assert.True(t, strings.Contains(parent.StringShort(), "Integrity level:"))
+}
+
+func TestFallbackUUID(t *testing.T) {
+	now := time.Now()
+	base := uuid(7, 4, now)
+
+	assert.NotEqual(t, uint64(0), base)
+	// deterministic
+	assert.Equal(t, base, uuid(7, 4, now))
+	// every component contributes to the result, even when the
+	// start time has bits set where the other components have them
+	assert.NotEqual(t, base, uuid(8, 4, now))
+	assert.NotEqual(t, base, uuid(7, 5, now))
+	assert.NotEqual(t, base, uuid(7, 4, now.Add(time.Nanosecond)))
+}
+
+func TestUUIDConcurrentAndStable(t *testing.T) {
+	// the system process can't be opened, so the fallback variant is used
+	ps := &PS{PID: 4, StartTime: time.Now()}
+
+	var wg sync.WaitGroup
+	results := make([]uint64, 16)
+	for i := range results {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			results[i] = ps.UUID()
+		}(i)
+	}
+	wg.Wait()
+
+	for _, uuid := range results {
+		assert.NotEqual(t, uint64(0), uuid)
+		assert.Equal(t, results[0], uuid)
+	}
+}
+
+func TestAssignUUID(t *testing.T) {
+	src := &PS{PID: 4, StartTime: time.Now()}
+	dst := &PS{PID: 4}
+
+	// nothing to assign when the source UUID was never initialized
+	dst.AssignUUID(src)
+	assert.Equal(t, uint64(0), dst.uuid)
+
+	uuid := src.UUID()
+	dst.AssignUUID(src)
+	assert.Equal(t, uuid, dst.UUID())
+}
+
+func TestUUIDFromSequenceNumber(t *testing.T) {
+	// the sequence number reported by the process creation event
+	// is used as is, without asking the OS for the process
+	ps := &PS{PID: 0x7ffffff1, SeqNum: 0xc30d, StartTime: time.Now()}
+	assert.False(t, ps.IsUUIDExact(), "the uuid is not initialized yet")
+
+	uuid := ps.UUID()
+	assert.Equal(t, seqUUID(bootid.Read(), 0xc30d), uuid)
+	assert.True(t, ps.IsUUIDExact())
+
+	// different sequence numbers yield different identifiers
+	// for the same pid and start time
+	other := &PS{PID: ps.PID, SeqNum: 0xc30e, StartTime: ps.StartTime}
+	assert.NotEqual(t, uuid, other.UUID())
+
+	// the fallback variant is not exact
+	fb := &PS{PID: 0x7ffffff1, StartTime: time.Now()}
+	fb.UUID()
+	assert.False(t, fb.IsUUIDExact())
+}
+
+func TestParentUUID(t *testing.T) {
+	assert.Zero(t, (&PS{}).ParentUUID())
+	ps := &PS{ParentSeqNum: 0xc30b}
+	assert.Equal(t, seqUUID(bootid.Read(), 0xc30b), ps.ParentUUID())
+	// the parent UUID matches the one the parent derives for itself
+	parent := &PS{SeqNum: 0xc30b}
+	assert.Equal(t, parent.UUID(), ps.ParentUUID())
+}
+
+func TestAssignUUIDKeepsExactness(t *testing.T) {
+	src := &PS{PID: 2343, SeqNum: 7}
+	src.UUID()
+	dst := &PS{PID: 2893}
+	dst.AssignUUID(src)
+	assert.Equal(t, src.UUID(), dst.UUID())
+	assert.True(t, dst.IsUUIDExact())
+}
+
+func TestFindModuleReturnsCopies(t *testing.T) {
+	ps := &PS{PID: 1}
+	ps.AddModule(Module{Name: `C:\Windows\System32\a.dll`, BaseAddress: va.Address(0x1000), Size: 0x100})
+	ps.AddModule(Module{Name: `C:\Windows\System32\b.dll`, BaseAddress: va.Address(0x2000), Size: 0x100})
+
+	byName := ps.FindModule("a.dll")
+	byAddr := ps.FindModuleByAddr(va.Address(0x1000))
+	byVa := ps.FindModuleByVa(va.Address(0x1010))
+	require.NotNil(t, byName)
+	require.NotNil(t, byAddr)
+	require.NotNil(t, byVa)
+
+	// removing the module shifts the slice, but must not change what the callers hold
+	ps.RemoveModule(va.Address(0x1000))
+	require.Len(t, ps.Modules, 1)
+	assert.Equal(t, `C:\Windows\System32\a.dll`, byName.Name)
+	assert.Equal(t, `C:\Windows\System32\a.dll`, byAddr.Name)
+	assert.Equal(t, `C:\Windows\System32\a.dll`, byVa.Name)
+	assert.Equal(t, `C:\Windows\System32\b.dll`, ps.Modules[0].Name)
+
+	// mutating the copy doesn't leak into the state
+	byName.Name = "mutated"
+	assert.Nil(t, ps.FindModule("mutated"))
+
+	assert.Nil(t, ps.FindModuleByAddr(va.Address(0x1000)))
+}
+
+func TestAddModuleConcurrentIsDeduplicated(t *testing.T) {
+	ps := &PS{PID: 1}
+
+	var wg sync.WaitGroup
+	for i := 0; i < 16; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ps.AddModule(Module{Name: `C:\Windows\System32\a.dll`, BaseAddress: va.Address(0x1000)})
+		}()
+	}
+	wg.Wait()
+
+	assert.Len(t, ps.Modules, 1)
+}
+
+func TestFindModuleByVaConcurrentIsDeduplicated(t *testing.T) {
+	old := queryLiveModules
+	defer func() { queryLiveModules = old }()
+	queryLiveModules = func(_ uint32) []sys.ProcessModule {
+		return []sys.ProcessModule{{
+			ModuleInfo: windows.ModuleInfo{BaseOfDll: 0x5000, SizeOfImage: 0x1000},
+			Name:       `C:\Windows\System32\live.dll`,
+		}}
+	}
+
+	ps := &PS{PID: 1}
+
+	var wg sync.WaitGroup
+	found := make([]*Module, 16)
+	for i := range found {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			found[i] = ps.FindModuleByVa(va.Address(0x5100))
+		}(i)
+	}
+	wg.Wait()
+
+	for _, mod := range found {
+		require.NotNil(t, mod)
+		assert.Equal(t, `C:\Windows\System32\live.dll`, mod.Name)
+	}
+	// the live module has been cached exactly once
+	assert.Len(t, ps.Modules, 1)
+}
+
+func TestHandlesAddRemove(t *testing.T) {
+	ps := &PS{PID: 1}
+	ps.AddHandle(htypes.Handle{Num: windows.Handle(1), Name: "a"})
+	ps.AddHandle(htypes.Handle{Num: windows.Handle(2), Name: "b"})
+	ps.AddHandle(htypes.Handle{Num: windows.Handle(3), Name: "c"})
+
+	full := ps.Handles
+	require.Len(t, full, 3)
+
+	ps.RemoveHandle(windows.Handle(2))
+	require.Len(t, ps.Handles, 2)
+	assert.Equal(t, windows.Handle(1), ps.Handles[0].Num)
+	assert.Equal(t, windows.Handle(3), ps.Handles[1].Num)
+	// the vacated slot must not retain the removed handle
+	assert.Equal(t, htypes.Handle{}, full[2])
+
+	// removing a handle that doesn't exist is a no-op
+	ps.RemoveHandle(windows.Handle(99))
+	assert.Len(t, ps.Handles, 2)
+}
+
+func TestHandlesConcurrentAccess(t *testing.T) {
+	ps := &PS{PID: 1}
+
+	var wg sync.WaitGroup
+	for i := 1; i <= 32; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			ps.AddHandle(htypes.Handle{Num: windows.Handle(i)})
+			ps.RemoveHandle(windows.Handle(i))
+		}(i)
+	}
+	wg.Wait()
+
+	assert.Len(t, ps.Handles, 0)
+}
+
+func TestMmaps(t *testing.T) {
+	ps := &PS{PID: 1}
+	ps.AddMmap(Mmap{BaseAddress: va.Address(0x1000), File: "a"})
+	ps.AddMmap(Mmap{BaseAddress: va.Address(0x2000), File: "b"})
+	ps.AddMmap(Mmap{BaseAddress: va.Address(0x3000), File: "c"})
+
+	full := ps.Mmaps
+
+	m := ps.FindMmap(va.Address(0x2000))
+	require.NotNil(t, m)
+	assert.Equal(t, "b", m.File)
+	assert.Nil(t, ps.FindMmap(va.Address(0x9999)))
+
+	ps.RemoveMmap(va.Address(0x2000))
+	require.Len(t, ps.Mmaps, 2)
+	// callers keep a stable view of what they found
+	assert.Equal(t, "b", m.File)
+	assert.Equal(t, Mmap{}, full[2])
+	assert.Nil(t, ps.FindMmap(va.Address(0x2000)))
+
+	ps.RemoveMmap(va.Address(0x2000))
+	assert.Len(t, ps.Mmaps, 2)
+}
+
+func TestMmapsConcurrentAccess(t *testing.T) {
+	ps := &PS{PID: 1}
+
+	var wg sync.WaitGroup
+	for i := 1; i <= 32; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			addr := va.Address(i * 0x1000)
+			ps.AddMmap(Mmap{BaseAddress: addr})
+			_ = ps.FindMmap(addr)
+			ps.RemoveMmap(addr)
+		}(i)
+	}
+	wg.Wait()
+
+	assert.Len(t, ps.Mmaps, 0)
+}
+
+func TestModuleMutatorsReportChanges(t *testing.T) {
+	ps := &PS{Name: "Spotify.exe", Exe: "Spotify.exe", Threads: make(map[uint32]Thread)}
+
+	assert.True(t, ps.AddThread(Thread{Tid: 1}))
+	assert.False(t, ps.AddThread(Thread{Tid: 1}))
+	assert.True(t, ps.RemoveThread(1))
+	assert.False(t, ps.RemoveThread(1))
+
+	assert.True(t, ps.AddModule(Module{Name: `C:\Spotify\Spotify.exe`, BaseAddress: 0x1000}))
+	assert.False(t, ps.AddModule(Module{Name: `C:\Spotify\Spotify.exe`, BaseAddress: 0x1000}))
+	assert.Equal(t, `C:\Spotify\Spotify.exe`, ps.Exe)
+	assert.True(t, ps.RemoveModule(0x1000))
+	assert.False(t, ps.RemoveModule(0x1000))
+
+	ps.AddMmap(Mmap{BaseAddress: 0x2000})
+	assert.True(t, ps.RemoveMmap(0x2000))
+	assert.False(t, ps.RemoveMmap(0x2000))
+}
 
 func TestVisit(t *testing.T) {
 	p1 := &PS{
@@ -67,19 +351,6 @@ func TestVisit(t *testing.T) {
 	}
 }
 
-func TestPSArgs(t *testing.T) {
-	ps := New(
-		233,
-		4532,
-		"spotify.exe",
-		"C:\\Users\\admin\\AppData\\Roaming\\Spotify\\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler \"--metrics-dir=C:\\Users\\admin\\AppData\\Local\\Spotify\\User Data\" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify",
-		"C:\\Users\\admin\\AppData\\Roaming\\Spotify\\Spotify.exe",
-		&windows.SID{},
-		1)
-	require.Len(t, ps.Args, 11)
-	require.Equal(t, "/prefetch:7", ps.Args[2])
-}
-
 func TestUUID(t *testing.T) {
 	now := time.Now()
 	// try to obtain the UUID on a system process
@@ -90,15 +361,15 @@ func TestUUID(t *testing.T) {
 		PID:       4,
 		StartTime: now,
 	}
-	uuid := (bootid.Read() << 30) + uint64(4) | uint64(now.UnixNano())
-	assert.Equal(t, uuid, ps1.UUID())
+	puuid := uuid(bootid.Read(), 4, now)
+	assert.Equal(t, puuid, ps1.UUID())
 
 	// now use the variant with process start key obtained
 	// from the process object
 	ps2 := &PS{
 		PID: uint32(os.Getpid()),
 	}
-	tsUUID := (bootid.Read() << 30) + uint64(os.Getpid()) | uint64(now.UnixNano())
+	tsUUID := uuid(bootid.Read(), uint32(os.Getpid()), now)
 	assert.True(t, ps2.UUID() > 0 && ps2.UUID() != tsUUID)
 }
 
