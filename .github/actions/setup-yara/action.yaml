@@ -1,0 +1,71 @@
+name: Setup YARA (MSYS2)
+description: Installs MSYS2 and builds/installs YARA from source, with caching.
+
+inputs:
+  version:
+    description: YARA git branch or tag to build
+    required: false
+    default: "4.2.x"
+
+  build-yara:
+    description: Whether to build YARA
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Setup MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        release: false
+        install: >-
+          base-devel
+          mingw-w64-x86_64-gcc
+          mingw-w64-x86_64-pkg-config
+          git
+          automake
+          libtool
+          autoconf
+          bison
+          flex
+
+    - name: Pin OpenSSL 3.4.1
+      shell: msys2 {0}
+      run: |
+        pacman -U --noconfirm \
+          https://repo.msys2.org/mingw/mingw64/mingw-w64-x86_64-openssl-3.4.1-1-any.pkg.tar.zst
+        sed -i 's/^#IgnorePkg.*/IgnorePkg = mingw-w64-x86_64-openssl/' /etc/pacman.conf
+        pacman -Q mingw-w64-x86_64-openssl
+        openssl version
+
+    - name: Cache yara
+      uses: actions/cache@v4
+      id: cache
+      with:
+        path: |
+          **/yara
+        key: ${{ runner.os }}-yara-${{ hashFiles('**/pkg/yara') }}
+        restore-keys: |
+          ${{ runner.os }}-yara-${{ hashFiles('**/pkg/yara') }}
+
+    - name: Clone YARA
+      if: inputs.build-yara == 'true' && steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+      run: git clone --depth 1 --branch "$VERSION" https://github.com/VirusTotal/yara.git
+
+    - name: Configure YARA
+      if: inputs.build-yara == 'true' && steps.cache.outputs.cache-hit != 'true'
+      shell: msys2 {0}
+      run: |
+        cd yara
+        autoreconf -fiv
+        ./configure --host=x86_64-w64-mingw32
+
+    - name: Install YARA
+      shell: msys2 {0}
+      run: |
+        cd yara
+        make install
