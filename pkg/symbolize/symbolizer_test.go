@@ -92,7 +92,7 @@ func TestLoadKernelModuleSymbolTables(t *testing.T) {
 	r.On("LoadModule", windows.CurrentProcess(), mock.Anything, mock.Anything).Return(nil)
 	r.On("UnloadModule", mock.Anything, mock.Anything)
 
-	s := NewSymbolizer(r, psnap, c, false)
+	s := NewSymbolizer(r, psnap, c)
 	require.NotNil(t, s)
 	defer s.Close()
 

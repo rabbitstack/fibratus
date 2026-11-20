@@ -26,13 +26,13 @@ import (
 )
 
 // ToEpoch converts file timestamp to Unix time.
-func ToEpoch(ts uint64) time.Time { return time.Unix(0, nanoseconds(ts)) }
+func ToEpoch(ts uint64) time.Time { return time.Unix(0, Nanoseconds(ts)) }
 
-// nanoseconds returns Filetime ft in nanoseconds
+// Nanoseconds returns Filetime ft in nanoseconds
 // since Epoch (00:00:00 UTC, January 1, 1970). This
 // function is copied from the stdlib to avoid allocating
 // the FileTime structure in the `ToEpoch` function.
-func nanoseconds(ts uint64) int64 {
+func Nanoseconds(ts uint64) int64 {
 	// 100-nanosecond intervals since January 1, 1601
 	nsec := int64(uint32(ts>>32))<<32 + int64(uint32(ts))
 	// change starting time to the Epoch (00:00:00 UTC, January 1, 1970)

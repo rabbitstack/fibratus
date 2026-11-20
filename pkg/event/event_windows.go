@@ -50,29 +50,50 @@ var (
 
 // New constructs a fresh event instance with basic fields and parameters
 // from the raw ETW event record.
-func New(seq uint64, r *etw.EventRecord, typ Type) *Event {
+func New(rec *etw.EventRecord) *Event {
 	var (
-		pid = r.Header.ProcessID
-		tid = r.Header.ThreadID
-		cpu = *(*uint8)(unsafe.Pointer(&r.BufferContext.ProcessorIndex[0]))
-		ts  = filetime.ToEpoch(r.Header.Timestamp)
+		pid = rec.Header.ProcessID
+		tid = rec.Header.ThreadID
+		cpu = *(*uint8)(unsafe.Pointer(&rec.BufferContext.ProcessorIndex[0]))
+		ts  = filetime.ToEpoch(rec.Header.Timestamp)
 	)
 
+	t := TypeFromEventRecord(rec)
 	e := &Event{
-		Seq:       seq,
 		PID:       pid,
 		Tid:       tid,
 		CPU:       cpu,
-		Type:      typ,
-		Params:    NewParams(typ),
+		Type:      t,
+		Params:    NewParams(t),
 		Timestamp: ts,
 		Host:      hostname.Get(),
 	}
 
-	_ = DecodeParams(r, e)
+	_ = DecodeParams(rec, e)
 	e.adjustPID()
 
 	return e
+}
+
+// Parse constructs the event from the reused ring buffer instance.
+func (e *Event) Parse(rec *etw.EventRecord) {
+	var (
+		pid = rec.Header.ProcessID
+		tid = rec.Header.ThreadID
+		cpu = *(*uint8)(unsafe.Pointer(&rec.BufferContext.ProcessorIndex[0]))
+		ts  = filetime.ToEpoch(rec.Header.Timestamp)
+	)
+
+	e.PID = pid
+	e.Tid = tid
+	e.CPU = cpu
+	e.Type = TypeFromEventRecord(rec)
+	e.Params = e.Params.Init(e.Type)
+	e.Timestamp = ts
+	e.Host = hostname.Get()
+
+	_ = DecodeParams(rec, e)
+	e.adjustPID()
 }
 
 // RawTimestamp returns the raw event record system timestamp.
@@ -144,12 +165,24 @@ func (e *Event) IsDropped(capture bool) bool {
 	if e.IsRundown() && e.IsRundownProcessed() {
 		return true
 	}
-	return IsCurrentProcDropped(e.PID)
+	return DropCurrentProc && e.PID == currentPid
 }
 
-// IsCurrentProcDropped determines if the event originated from the
-// current process is dropped.
-func IsCurrentProcDropped(pid uint32) bool { return DropCurrentProc && pid == currentPid }
+// IsCurrentProcDropped determines if the event originated from the current process is dropped.
+func IsCurrentProcDropped(rec *etw.EventRecord) bool {
+	var pid uint32
+	if rec.Header.EventDescriptor.Opcode == StackWalkID && rec.Header.ProviderID == StackWalkEventGUID {
+		pid = rec.ReadUint32(8)
+	} else {
+		pid = rec.Header.ProcessID
+	}
+	return DropCurrentProc && pid == currentPid && rec.Header.ProviderID != etw.WindowsKernelProcessGUID
+}
+
+// IsCurrentPIDDropped similar to IsCurrentProcDropped but receives the pid value instead of event record.
+func IsCurrentPIDDropped(pid uint32) bool {
+	return DropCurrentProc && currentPid == pid
+}
 
 // IsNetworkTCP determines whether the event pertains to network TCP events.
 func (e *Event) IsNetworkTCP() bool {

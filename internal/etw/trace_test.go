@@ -1,3 +1,5 @@
+//go:build windows
+
 /*
  * Copyright 2021-2022 by Nedim Sabic Sabic
  * https://www.fibratus.io
@@ -19,10 +21,11 @@
 package etw
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/config"
-	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
+
+	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/stretchr/testify/require"
 )
 
 func TestStartTrace(t *testing.T) {

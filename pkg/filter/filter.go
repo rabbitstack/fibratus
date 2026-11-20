@@ -35,9 +35,43 @@ import (
 var (
 	// ErrNoFields signals an error that happens when the filter is declared without any fields
 	ErrNoFields = errors.New("expected at least one field or operator but zero found")
+
+	// ErrEventFilteredOut is returned by the event handler to indicate that the event has been
+	// filtered out by CLI filter expression.
+	ErrEventFilteredOut = errors.New("event filtered out")
+
 	// accessorErrors counts the errors produced by the field accessors
 	accessorErrors = expvar.NewMap("filter.accessor.errors")
 )
+
+// eventHandlerID identifies the event handler
+const eventHandlerID = "filter"
+
+// EvalEventHandler evaluates the filter expression against the event.
+type EvalEventHandler struct {
+	filter Filter
+}
+
+func NewEvalEventHandler(filter Filter) *EvalEventHandler {
+	return &EvalEventHandler{filter: filter}
+}
+
+// HandleEvent evaluates the CLI filter expression against the event.
+// If the expression matches, the event is fan out to downstream consumers.
+// On the contrary, ErrEventFilteredOut is returned and the event in rejected.
+func (e *EvalEventHandler) HandleEvent(evt *event.Event) error {
+	if e.filter == nil {
+		return nil
+	}
+
+	if e.filter.Eval(evt) {
+		return nil
+	}
+
+	return ErrEventFilteredOut
+}
+
+func (EvalEventHandler) ID() string { return eventHandlerID }
 
 // Filter is the main interface for the filter engine implementors. Filter can either
 // be a single expression combined by various subexpressions connected by operators, or

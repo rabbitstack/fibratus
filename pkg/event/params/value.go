@@ -403,3 +403,16 @@ func (v Value) ParamType() Type {
 		return Null
 	}
 }
+
+// Clone returns a value that doesn't alias the memory of the original.
+func (v Value) Clone() Value {
+	switch v.kind {
+	case KindBytes:
+		return Bin(append([]byte(nil), v.Bytes()...))
+	case KindUintSlice:
+		return U64Slice(append([]uint64(nil), v.U64Slice()...))
+	case KindStringSlice:
+		return StrSlice(append([]string(nil), v.StrSlice()...))
+	}
+	return v // scalars, strings (immutable) and IPs (immutable) are safe to share
+}
