@@ -338,7 +338,7 @@ func (s *sequenceState) addPartial(seqID int, e *event.Event, isOOO bool) {
 	}
 	log.Debugf("adding partial to sequence [%s] slot [%d] for expression %q, ooo: %t: %s", s.name, seqID, s.expr(seqID), isOOO, e)
 	partialsPerSequence.Add(s.name, 1)
-	s.partials[seqID] = append(s.partials[seqID], e)
+	s.partials[seqID] = append(s.partials[seqID], e.Clone())
 	sort.Slice(s.partials[seqID], func(n, m int) bool { return s.partials[seqID][n].Timestamp.Before(s.partials[seqID][m].Timestamp) })
 }
 

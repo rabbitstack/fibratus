@@ -348,7 +348,7 @@ func (d *ParamDecoder) Decode(r *etw.EventRecord, e *Event) error {
 			ft := windows.NsecToFiletime(int64(d.cur.U64()))
 			e.Params.Set(i, params.Timestamp(filetime.ToEpoch(uint64(ft.Nanoseconds()))))
 		case params.WireAddrs:
-			e.Params.Set(i, params.Addresses(d.cur.Addresses(va.GetCallstack())))
+			e.Params.Set(i, params.Addresses(d.cur.Addresses(va.GetCallstackFromPool())))
 		case params.WireU32Bits:
 			v := d.cur.U32()
 			e.Params.Set(i, params.U32(v))

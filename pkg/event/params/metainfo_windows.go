@@ -649,6 +649,7 @@ var DeleteFileDescriptor = []ParamInfo{
 	{Name: ThreadID, Type: TID, WireFormat: WireU32},
 	{Name: FileInfoClass, Type: Enum, WireFormat: WireU32, Enum: fs.FileInfoClasses},
 	{Name: FilePath, Type: Path},
+	{Name: NTStatus, Type: Status},
 	{Name: FileType, Type: Enum, Enum: fs.FileTypes},
 	{Name: Callstack, Type: Slice},
 }

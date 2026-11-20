@@ -56,6 +56,10 @@ var drives = []string{
 	"Y",
 	"Z"}
 
+const IoReparse uint32 = 0
+const IoRemount uint32 = 1
+const IoReparseGlobal uint32 = 2
+
 const FileFsDeviceInformationClass = 4
 
 // FileFsDeviceInformation provides file system device information about

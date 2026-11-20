@@ -1,7 +1,5 @@
-//go:build linux
-
 /*
- * Copyright 2026 by Mostafa Moradian
+ * Copyright 2019-2026 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -18,19 +16,4 @@
  * limitations under the License.
  */
 
-package event
-
-import (
-	"testing"
-
-	"github.com/stretchr/testify/require"
-)
-
-func TestQueuePush(t *testing.T) {
-	queue := NewQueue(1, false, false)
-	t.Cleanup(queue.Close)
-
-	event := &Event{Type: Execve, PID: 42, Tid: 43}
-	require.NoError(t, queue.Push(event))
-	require.Same(t, event, <-queue.Events())
-}
+package probe

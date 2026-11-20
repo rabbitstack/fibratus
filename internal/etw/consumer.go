@@ -18,136 +18,136 @@
 
 package etw
 
-import (
-	"github.com/rabbitstack/fibratus/internal/etw/approvers"
-	"github.com/rabbitstack/fibratus/internal/etw/processors"
-	"github.com/rabbitstack/fibratus/pkg/config"
-	"github.com/rabbitstack/fibratus/pkg/event"
-	"github.com/rabbitstack/fibratus/pkg/filter"
-	"github.com/rabbitstack/fibratus/pkg/ps"
-	"github.com/rabbitstack/fibratus/pkg/sys/etw"
-)
+// import (
+// 	"github.com/rabbitstack/fibratus/internal/etw/approvers"
+// 	"github.com/rabbitstack/fibratus/internal/etw/processors"
+// 	"github.com/rabbitstack/fibratus/pkg/config"
+// 	"github.com/rabbitstack/fibratus/pkg/event"
+// 	"github.com/rabbitstack/fibratus/pkg/filter"
+// 	"github.com/rabbitstack/fibratus/pkg/ps"
+// 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
+// )
 
-// Consumer is the core component in the event processing pipeline.
-// The raw event is offloaded from the session buffer, then parsed
-// and converted to typed representation with process state attached
-// to it. The event consumer is responsible for enriching the event
-// with additional attributes. The event is sent to the queue where
-// all registered listeners are executed.
-type Consumer struct {
-	q          *event.Queue
-	sequencer  *event.Sequencer
-	processors *processors.Chain
-	approvers  approvers.Approvers
-	psnap      ps.Snapshotter
-	config     *config.Config
-	filter     filter.Filter
-	isClosing  bool
-}
+// // Consumer is the core component in the event processing pipeline.
+// // The raw event is offloaded from the session buffer, then parsed
+// // and converted to typed representation with process state attached
+// // to it. The event consumer is responsible for enriching the event
+// // with additional attributes. The event is sent to the queue where
+// // all registered listeners are executed.
+// type Consumer struct {
+// 	q          *event.Queue
+// 	sequencer  *event.Sequencer
+// 	processors *processors.Chain
+// 	approvers  approvers.Approvers
+// 	psnap      ps.Snapshotter
+// 	config     *config.Config
+// 	filter     filter.Filter
+// 	isClosing  bool
+// }
 
-// NewConsumer builds a new event consumer.
-func NewConsumer(
-	psnap ps.Snapshotter,
-	config *config.Config,
-	sequencer *event.Sequencer,
-	evts chan *event.Event,
-	processors *processors.Chain,
-	r *config.RulesCompileResult,
-) *Consumer {
-	return &Consumer{
-		q:          event.NewQueueWithChannel(evts, config.EventSource.StackEnrichment, config.ForwardMode || config.IsCaptureSet()),
-		sequencer:  sequencer,
-		processors: processors,
-		psnap:      psnap,
-		config:     config,
-		approvers:  approvers.New(psnap, r),
-	}
-}
+// // NewConsumer builds a new event consumer.
+// func NewConsumer(
+// 	psnap ps.Snapshotter,
+// 	config *config.Config,
+// 	sequencer *event.Sequencer,
+// 	evts chan *event.Event,
+// 	processors *processors.Chain,
+// 	r *config.RulesCompileResult,
+// ) *Consumer {
+// 	return &Consumer{
+// 		q:          event.NewQueueWithChannel(evts, config.EventSource.StackEnrichment, config.ForwardMode || config.IsCaptureSet()),
+// 		sequencer:  sequencer,
+// 		processors: processors,
+// 		psnap:      psnap,
+// 		config:     config,
+// 		approvers:  approvers.New(psnap, r),
+// 	}
+// }
 
-func (c *Consumer) SetFilter(f filter.Filter) {
-	c.filter = f
-}
+// func (c *Consumer) SetFilter(f filter.Filter) {
+// 	c.filter = f
+// }
 
-func (c *Consumer) Close() error {
-	c.isClosing = true
-	return c.processors.Close()
-}
+// func (c *Consumer) Close() error {
+// 	c.isClosing = true
+// 	return c.processors.Close()
+// }
 
-func (c *Consumer) ProcessEvent(r *etw.EventRecord) error {
-	if c.isClosing {
-		return nil
-	}
+// func (c *Consumer) ProcessEvent(r *etw.EventRecord) error {
+// 	if c.isClosing {
+// 		return nil
+// 	}
 
-	etype := event.NewTypeFromEventRecord(r)
-	if etype == event.Unknown {
-		return nil
-	}
-	if event.IsCurrentProcDropped(r.Header.ProcessID) && r.Header.ProviderID != etw.WindowsKernelProcessGUID {
-		return nil
-	}
+// 	etype := event.NewTypeFromEventRecord(r)
+// 	if etype == event.Unknown {
+// 		return nil
+// 	}
+// 	if event.IsCurrentProcDropped(r.Header.ProcessID) && r.Header.ProviderID != etw.WindowsKernelProcessGUID {
+// 		return nil
+// 	}
 
-	rec, approved := c.approvers.Approve(r)
-	if !approved {
-		return nil
-	}
-	defer c.approvers.Cleanup(rec)
+// 	rec, approved := c.approvers.Approve(r)
+// 	if !approved {
+// 		return nil
+// 	}
+// 	defer c.approvers.Cleanup(rec)
 
-	if c.config.EventSource.ExcludeEvent(etype) {
-		eventsExcluded.Add(1)
-		return nil
-	}
+// 	if c.config.EventSource.ExcludeEvent(etype) {
+// 		eventsExcluded.Add(1)
+// 		return nil
+// 	}
 
-	eventsProcessed.Add(1)
-	evt := event.New(c.sequencer.Get(), rec, etype)
+// 	eventsProcessed.Add(1)
+// 	evt := event.New(c.sequencer.Get(), rec, etype)
 
-	// Dispatch each event to the processor chain.
-	// Processors may further augment the event with
-	// useful fields or play the role of state managers.
-	// Scanning open files and registry control blocks
-	// at the beginning of the kernel trace session is an
-	// example of state management
-	var err error
-	evt, err = c.processors.ProcessEvent(evt)
-	if err != nil {
-		return err
-	}
-	ok, proc := c.psnap.Find(evt.PID)
-	if !ok {
-		c.psnap.Put(proc)
-	}
+// 	// Dispatch each event to the processor chain.
+// 	// Processors may further augment the event with
+// 	// useful fields or play the role of state managers.
+// 	// Scanning open files and registry control blocks
+// 	// at the beginning of the kernel trace session is an
+// 	// example of state management
+// 	var err error
+// 	evt, err = c.processors.ProcessEvent(evt)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	ok, proc := c.psnap.Find(evt.PID)
+// 	if !ok {
+// 		c.psnap.Put(proc)
+// 	}
 
-	// Associate process' state with the event.
-	// We only override the process' state if it hasn't
-	// been set previously such as in the situation where
-	// captures are being taken. Events that construct
-	// the process' snapshot also have attached process
-	// state, so simply by replaying the flow of these
-	// events we are able to reconstruct system-wide
-	// process state.
-	if evt.PS == nil {
-		evt.PS = proc
-	}
-	// Drop any events if it is originated by the
-	// current process, state event, or if the
-	// process image is in the exclusion list.
-	// Stack walk events are forwarded to the
-	// event queue for stack enrichment. Lastly,
-	// the filter is evaluated on the event to
-	// decide whether it should get dropped
-	if (evt.IsDropped(c.config.IsCaptureSet()) ||
-		c.config.EventSource.ExcludeProcess(evt.PS)) && !evt.IsStackWalk() {
-		eventsExcluded.Add(1)
-		return nil
-	}
+// 	// Associate process' state with the event.
+// 	// We only override the process' state if it hasn't
+// 	// been set previously such as in the situation where
+// 	// captures are being taken. Events that construct
+// 	// the process' snapshot also have attached process
+// 	// state, so simply by replaying the flow of these
+// 	// events we are able to reconstruct system-wide
+// 	// process state.
+// 	if evt.PS == nil {
+// 		evt.PS = proc
+// 	}
+// 	// Drop any events if it is originated by the
+// 	// current process, state event, or if the
+// 	// process image is in the exclusion list.
+// 	// Stack walk events are forwarded to the
+// 	// event queue for stack enrichment. Lastly,
+// 	// the filter is evaluated on the event to
+// 	// decide whether it should get dropped
+// 	if (evt.IsDropped(c.config.IsCaptureSet()) ||
+// 		c.config.EventSource.ExcludeProcess(evt.PS)) && !evt.IsStackWalk() {
+// 		eventsExcluded.Add(1)
+// 		return nil
+// 	}
 
-	if c.filter != nil && !evt.IsStackWalk() && !c.filter.Eval(evt) {
-		return nil
-	}
+// 	if c.filter != nil && !evt.IsStackWalk() && !c.filter.Eval(evt) {
+// 		return nil
+// 	}
 
-	// Increment sequence
-	if !evt.IsState() {
-		c.sequencer.Increment()
-	}
+// 	// Increment sequence
+// 	if !evt.IsState() {
+// 		c.sequencer.Increment()
+// 	}
 
-	return c.q.Push(evt)
-}
+// 	return c.q.Push(evt)
+// }

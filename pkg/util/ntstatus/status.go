@@ -21,10 +21,11 @@
 package ntstatus
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/sys"
-	"golang.org/x/sys/windows"
 	"sync"
 	"unicode/utf16"
+
+	"github.com/rabbitstack/fibratus/pkg/sys"
+	"golang.org/x/sys/windows"
 )
 
 // Success determines the success system message
@@ -33,9 +34,9 @@ const Success = "Success"
 var statusCache = map[uint32]string{}
 var mux sync.Mutex
 
-// isSuccess determines if the status code is in success or information value ranges.
+// IsSuccess determines if the status code is in success or information value ranges.
 // https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/using-ntstatus-values
-func isSuccess(status uint32) bool {
+func IsSuccess(status uint32) bool {
 	return status <= 0x3FFFFFFF || (status >= 0x40000000 && status <= 0x7FFFFFFF)
 }
 
@@ -43,7 +44,7 @@ func isSuccess(status uint32) bool {
 // messages is kept to speed up status code translation and alleviate the pressure on
 // API call invocations.
 func FormatMessage(status uint32) string {
-	if isSuccess(status) {
+	if IsSuccess(status) {
 		return Success
 	}
 	mux.Lock()

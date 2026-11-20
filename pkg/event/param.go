@@ -131,6 +131,34 @@ func NewParams(typ Type) Params {
 	return pars
 }
 
+// Init readies the params for type, reusing the backing array when it is large enough.
+func (pars Params) Init(typ Type) Params {
+	schema := table[typ].Params
+	n := len(schema)
+	if cap(pars) < n {
+		pars = make(Params, n)
+	} else {
+		pars = pars[:n]
+	}
+	for i := range schema {
+		pars[i].info = &schema[i]
+	}
+	return pars
+}
+
+// Clone clones the params.
+func (pars Params) Clone() Params {
+	if len(pars) == 0 {
+		return nil
+	}
+	c := make(Params, len(pars))
+	copy(c, pars)
+	for i := range c {
+		c[i].Value = c[i].Value.Clone()
+	}
+	return c
+}
+
 // NewParam creates a standalone parameter with its own descriptor, which is not part of the
 // event schema. It is useful to build parameters for events that are not tied to the table
 // schema, such as synthetic events or the test fixtures.
@@ -420,7 +448,7 @@ func (pars Params) GetStringSliceByName(name string) []string {
 }
 
 // GetAddressesByName returns the slice of addresses of the parameter with the given name.
-func (pars Params) GetAddressesByName(name string) []va.Address {
+func (pars Params) GetAddressesByName(name string) va.Callstack {
 	return addresses(pars.ValueByName(name).U64Slice())
 }
 
