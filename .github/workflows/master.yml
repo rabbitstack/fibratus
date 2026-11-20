@@ -33,47 +33,10 @@ jobs:
         shell: bash
         run: |
            sed -i 's/C:\/Python37/C:\/hostedtoolcache\/windows\/Python\/3.7.9\/x64/' pkg-config/python-37.pc
-      - name: Setup msys2
-        uses: msys2/setup-msys2@v2
+      - name: Install YARA
+        uses: ./.github/actions/setup-yara
         with:
-          release: false
-          install: >-
-            base-devel
-            mingw-w64-x86_64-gcc
-            mingw-w64-x86_64-openssl
-            mingw-w64-x86_64-pkg-config
-            git
-            automake
-            libtool
-            autoconf
-      - name: Cache yara
-        uses: actions/cache@v4
-        id: cache
-        with:
-          path: |
-            **/yara
-          key: ${{ runner.os }}-yara-${{ hashFiles('**/pkg/yara') }}
-          restore-keys: |
-            ${{ runner.os }}-yara-${{ hashFiles('**/pkg/yara') }}
-      - name: Clone yara
-        if: steps.cache.outputs.cache-hit != 'true'
-        shell: bash
-        env:
-          VERSION: "4.2.x"
-        run: |
-          git clone --depth 1 --branch $VERSION https://github.com/VirusTotal/yara.git
-      - name: Configure yara
-        if: steps.cache.outputs.cache-hit != 'true'
-        shell: msys2 {0}
-        run: |
-          cd yara
-          autoreconf -fiv
-          ./configure --host=x86_64-w64-mingw32
-      - name: Install yara
-        shell: msys2 {0}
-        run: |
-          cd yara
-          make install
+          build-yara: true
       - name: Build
         shell: bash
         run: |
@@ -143,32 +106,8 @@ jobs:
         shell: bash
         run: |
            sed -i 's/C:\/Python37/C:\/hostedtoolcache\/windows\/Python\/3.7.9\/x64/' pkg-config/python-37.pc
-      - name: Setup msys2
-        uses: msys2/setup-msys2@v2
-        with:
-         release: false
-         install: >-
-           base-devel
-           mingw-w64-x86_64-gcc
-           mingw-w64-x86_64-pkg-config
-           mingw-w64-x86_64-openssl
-           automake
-           libtool
-           autoconf
-      - name: Cache yara
-        uses: actions/cache@v4
-        id: cache
-        with:
-          path: |
-            **/yara
-          key: ${{ runner.os }}-yara-${{ hashFiles('**/pkg/yara') }}
-          restore-keys: |
-            ${{ runner.os }}-yara-${{ hashFiles('**/pkg/yara') }}
-      - name: Install yara
-        shell: msys2 {0}
-        run: |
-          cd yara
-          make install
+      - name: Install YARA
+        uses: ./.github/actions/setup-yara
       - name: Test
         shell: bash
         run: |
@@ -200,32 +139,8 @@ jobs:
         shell: bash
         run: |
            sed -i 's/C:\/Python37/C:\/hostedtoolcache\/windows\/Python\/3.7.9\/x64/' pkg-config/python-37.pc
-      - name: Setup msys2
-        uses: msys2/setup-msys2@v2
-        with:
-         release: false
-         install: >-
-           base-devel
-           mingw-w64-x86_64-gcc
-           mingw-w64-x86_64-pkg-config
-           mingw-w64-x86_64-openssl
-           automake
-           libtool
-           autoconf
-      - name: Cache yara
-        uses: actions/cache@v4
-        id: cache
-        with:
-          path: |
-            **/yara
-          key: ${{ runner.os }}-yara-${{ hashFiles('**/pkg/yara') }}
-          restore-keys: |
-            ${{ runner.os }}-yara-${{ hashFiles('**/pkg/yara') }}
-      - name: Install yara
-        shell: msys2 {0}
-        run: |
-          cd yara
-          make install
+      - name: Install YARA
+        uses: ./.github/actions/setup-yara
       - name: Setup test fixtures
         run: |
           choco install -y go-task
@@ -310,32 +225,8 @@ jobs:
         shell: bash
         run: |
            sed -i 's/C:\/Python37/C:\/hostedtoolcache\/windows\/Python\/3.7.9\/x64/' pkg-config/python-37.pc
-      - name: Setup msys2
-        uses: msys2/setup-msys2@v2
-        with:
-         release: false
-         install: >-
-           base-devel
-           mingw-w64-x86_64-gcc
-           mingw-w64-x86_64-pkg-config
-           mingw-w64-x86_64-openssl
-           automake
-           libtool
-           autoconf
-      - name: Cache yara
-        uses: actions/cache@v4
-        id: cache
-        with:
-          path: |
-            **/yara
-          key: ${{ runner.os }}-yara-${{ hashFiles('**/pkg/yara') }}
-          restore-keys: |
-            ${{ runner.os }}-yara-${{ hashFiles('**/pkg/yara') }}
-      - name: Install yara
-        shell: msys2 {0}
-        run: |
-          cd yara
-          make install
+      - name: Install YARA
+        uses: ./.github/actions/setup-yara
       - name: Install golangci-lint
         shell: bash
         run: |
