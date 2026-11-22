@@ -887,6 +887,7 @@ func (p *Probe) handleRegSetValue(evt *event.Event) error {
 		return nil
 	}
 
+	// Join registry path with the registry value
 	path := evt.GetParamAsString(params.RegPath)
 	evt.SetParam(params.RegPath, params.Str(filepath.Join(path, evt.GetParamAsString(params.RegValue))))
 
