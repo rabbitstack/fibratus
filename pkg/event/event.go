@@ -40,8 +40,6 @@ type MetadataKey string
 // Metadata is a type alias for event metadata. Any tag, i.e. key/value pair could be attached to metadata.
 type Metadata map[MetadataKey]any
 
-const maxFramesCap = 80
-
 const (
 	// YaraMatchesKey is the tag name for the yara matches JSON representation
 	YaraMatchesKey MetadataKey = "yara.matches"
@@ -123,7 +121,8 @@ func (e *Event) Description() string {
 	return table[e.Type].Description
 }
 
-// Reset clears the event for reuse while keeping the backing arrays.
+// Reset clears the event for reuse while keeping the backing arrays. Drops strings,
+// slices and info pointers so nothing is pinned.
 func (e *Event) Reset() {
 	e.Seq = 0
 	e.Timestamp = time.Time{}
@@ -131,15 +130,11 @@ func (e *Event) Reset() {
 	e.Type = 0
 	e.Host = ""
 
-	if cap(e.Callstack) > maxFramesCap {
-		e.Callstack = nil
-	} else {
-		clear(e.Callstack)
-		e.Callstack = e.Callstack[:0]
-	}
+	clear(e.Callstack)
+	e.Callstack = e.Callstack[:0]
 
-	clear(e.Params)         // drop strings, slices and info pointers so nothing is pinned
-	e.Params = e.Params[:0] // keep the array storage
+	clear(e.Params)
+	e.Params = e.Params[:0]
 
 	clear(e.Metadata)
 
@@ -224,6 +219,7 @@ func (e *Event) String() string {
 		Params: %s
 		Metadata: %s
 	    %s
+		Callstack: %s
 	`,
 			e.Seq,
 			e.PID,
@@ -238,6 +234,7 @@ func (e *Event) String() string {
 			e.Params,
 			e.Metadata,
 			e.PS,
+			e.Callstack,
 		)
 	}
 	return fmt.Sprintf(`
@@ -253,6 +250,7 @@ func (e *Event) String() string {
 		Timestamp: %s
 		Params: %s
 		Metadata: %s
+		Callstack: %s
 	`,
 		e.Seq,
 		e.PID,
@@ -266,6 +264,7 @@ func (e *Event) String() string {
 		e.Timestamp,
 		e.Params,
 		e.Metadata,
+		e.Callstack,
 	)
 }
 

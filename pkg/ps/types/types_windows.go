@@ -291,6 +291,7 @@ func (ps *PS) Merge(proc *PS) {
 	ps.TokenIntegrityLevel = proc.TokenIntegrityLevel
 	ps.TokenElevationType = proc.TokenElevationType
 	ps.IsTokenElevated = proc.IsTokenElevated
+	ps.StartTime = proc.StartTime
 	if strings.EqualFold(ps.Name, filepath.Base(proc.Exe)) {
 		ps.Exe = proc.Exe
 	}

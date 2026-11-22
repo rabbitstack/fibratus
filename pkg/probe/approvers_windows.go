@@ -85,11 +85,11 @@ func (p *Probe) isExecutablePathApproved(pid uint32, remote bool) bool {
 	// Attempt to find the target process iin the snapshotter state and pass
 	// the executable path to the approver. If we can't find the process in the
 	// snapshotter or the executable path is not resolved, the event is approved
-	ok, ps := p.psnap.Find(pid)
-	if !ok || ps == nil || ps.Exe == "" {
+	proc, exists := p.psnap.Find(pid)
+	if !exists || proc == nil || proc.Exe == "" {
 		return true
 	}
-	return p.matchesApprover(p.rs.Approvers.Executables, ps.Exe)
+	return p.matchesApprover(p.rs.Approvers.Executables, proc.Exe)
 }
 
 func (*Probe) matchesApprover(m map[string][]string, v string) bool {

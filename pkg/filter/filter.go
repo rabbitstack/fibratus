@@ -37,7 +37,7 @@ var (
 	ErrNoFields = errors.New("expected at least one field or operator but zero found")
 
 	// ErrEventFilteredOut is returned by the event handler to indicate that the event has been
-	// filtered out by CLI filter expression.
+	// filtered out by the CLI filter expression.
 	ErrEventFilteredOut = errors.New("event filtered out")
 
 	// accessorErrors counts the errors produced by the field accessors

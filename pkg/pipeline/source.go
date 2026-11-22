@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2026 by Nedim Sabic Sabic
+ * Copyright 2026 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -18,12 +18,15 @@
 
 package pipeline
 
+// ProducerID is the unique source index.
+type SourceID int
+
 const (
-	// ProducerUser is the producer ID for the user trace
-	ProducerUser ProducerID = iota
+	// ProducerUser is the source ID for the user trace.
+	SourceUser SourceID = iota
 
-	// ProducerKernel is the procuer ID for the kernel trace
-	ProducerKernel
+	// ProducerKernel is the source ID for the kernel trace.
+	SourceKernel
 
-	ProducerMax
+	SourceMax
 )

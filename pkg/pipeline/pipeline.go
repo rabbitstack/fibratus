@@ -1,85 +1,116 @@
-/*
- * Copyright 2019-2026 by Nedim Sabic Sabic
- * https://www.fibratus.io
- * All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *  http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
+// Package pipeline moves ETW events from the session callbacks to a single
+// sink, in timestamp order, without a queue in between.
+//
+//	ETW session 0 callback ─▶ Emit(0, fill) ─┐
+//	                                         ├─▶ Reorderer ─▶ Sink (the Probe)
+//	ETW session 1 callback ─▶ Emit(1, fill) ─┘
+//
+// The pieces are:
+//
+//   - a pool of reusable events: callbacks fill pooled events in place (pool.go);
+//   - the Reorderer: a timestamp min-heap with per-session watermarks that
+//     restores a total order across sessions (see reorder.go);
+//   - the delivery rule below, which keeps the sink single-threaded.
+//
+// # Delivery
+//
+// There is no consumer goroutine. Publish inserts the event into the reorderer
+// under a short mutex and then tries to become the drainer. Exactly one
+// goroutine drains at a time (a compare-and-swap flag): it pops the events the
+// watermark allows, in order, in batches, and calls Sink.Handle outside the
+// mutex. A callback that loses the race returns immediately and its event is
+// delivered by the current drainer. So:
+//
+//   - Handle is never called concurrently and sees events in reorderer order,
+//     with a happens-before edge between consecutive calls, so the sink needs
+//     no locking;
+//   - Handle may run on either session's callback goroutine, and on the flusher:
+//     do not rely on goroutine or thread affinity;
+//   - a slow sink slows the draining callback directly, and the other callbacks
+//     as soon as the reorderer holds MaxPending events: Acquire then blocks
+//     them (back-pressure) until the drainer makes room.
+//
+// A flusher goroutine ticks every FlushInterval so that events leave when the
+// traffic stops (a quiet session is declared caught up after IdleTimeout).
 package pipeline
 
 import (
 	"errors"
-	"fmt"
 	"math"
-	"runtime"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/rabbitstack/fibratus/pkg/event"
 )
 
-// Handler is entrypoint to the processing chain. It can contain multiple stages
-// that run sequentially on the pipeline goroutine, in order, for every event.
+// ErrClosed is returned by Acquire/Publish after Close.
+var ErrClosed = errors.New("pipeline is closed")
+
+// Sink is the single consumer of the pipeline: the Probe implements it and
+// distributes the events to the other handlers.
 //
-// The event is recycled as soon as the handler returns. A stage that keeps the
-// event (sequence rules holding partial matches, async sinks, anything handed
-// to another goroutine) must clone the event first.
-type Handler interface {
+// Handle is called sequentially, in order. The event is recycled as soon as
+// Handle returns. A sink that keeps it (sequence rules holding partial
+// matches, async consumers, anything handed to another goroutine) must Clone
+// it first.
+type Sink interface {
 	Handle(*event.Event)
 }
 
+// SinkFunc adapts a function to Sink.
+type SinkFunc func(*event.Event)
+
+// Handle calls f(ev).
+func (f SinkFunc) Handle(ev *event.Event) { f(ev) }
+
 // Config configures a Pipeline. Start from DefaultConfig.
 type Config struct {
-	// Producers is the number of rings and producers.
-	Producers int
-	// RingSize is the slot count of each producer's ring (rounded up to a
-	// power of two).
-	RingSize int
+	// Sources is the number of event sources. The reorderer keeps one watermark
+	// frontier per source.
+	Sources int
 
-	// MaxPending bounds the events held by the reorderer (and so the pooled
-	// events alive). Memory is bounded by RingSize*Producers + MaxPending.
+	// MaxPending bounds the events held by the reorderer, and with them the
+	// memory the pipeline can pin. It is both the point where the reorderer
+	// releases its oldest event early (out of strict order) instead of waiting
+	// for the watermark, and the point where Acquire blocks the callbacks until
+	// the drainer has made room.
 	MaxPending int
 
-	// BatchSize is the maximum number of slots claimed per ring per pass.
+	// BatchSize is the maximum number of events popped per mutex acquisition.
 	BatchSize int
 
 	// Slack is the skew the reorderer tolerates before declaring an event
-	// late. The larger the slack, the more conservative the reorderer is:
-	// it waits longer, but has a better chance of catching events delivered
-	// out of timestamp order.
+	// late. IdleTimeout is how long a silent session may hold the watermark.
 	Slack time.Duration
 
-	// Lag is the longest an event can sit before it is delivered to the reorderer.
+	// FlushInterval is the flusher's tick: the worst-case extra latency of an
+	// event when traffic is too low for Publish to drain it.
+	FlushInterval time.Duration
+
+	// Lag is the longest an event can sit in an ETW buffer before it is delivered:
+	// the largest FlushTimer among the sessions plus scheduling jitter. A quiet
+	// session is assumed to hold events newer than now-Lag, so it holds the
+	// watermark back by at most Lag. Worst-case emission latency is about
+	// Lag+Slack, and MaxPending must cover peak rate × (Lag+Slack).
 	Lag time.Duration
 
-	// IdleSleep is the consumer's sleep when it has nothing to do (after a
-	// short spin and a few yields).
-	IdleSleep time.Duration
+	// OnLate, if set, is called (under the pipeline lock: keep it fast) for
+	// events that arrive behind the released stream. behind and delay are in
+	// nanoseconds; the p99.9 of delay per session is the value to give Lag.
+	OnLate LateHook
 
-	// FreeListSize caps how many empty events are kept for reuse. Default
-	// is 4096. 0 means the default, while negative value means unbounded.
-	FreeListSize int
-
-	// RecycleMaxFrames stop one outlier from pinning memory forever: a recycled
+	// RecycleMaxFrames stop one outlier from pinning memory forever. A recycled
 	// event whose call stack capacity exceeds RecycleMaxFrames gives that storage
 	// back instead of keeping it.
 	RecycleMaxFrames int
 
-	Classifier Classifier
-	Handler    Handler
+	// Sink receives the events. Must be set.
+	Sink Sink
 
-	Shed ShedConfig
+	// OnPanic is called when Sink.Handle panics. The event is dropped and the
+	// pipeline keeps running (a panic must not leave the drain flag held).
+	OnPanic func(ev *event.Event, v any)
 
 	// Clock returns the current time in the same domain as Event.Timestamp
 	// (UnixNano). Defaults to time.Now.
@@ -87,318 +118,341 @@ type Config struct {
 }
 
 // DefaultConfig returns a configuration to start tuning from.
-func DefaultConfig(producers int) Config {
+func DefaultConfig(sources int) Config {
 	return Config{
-		Producers:        producers,
-		RingSize:         1 << 16,
+		Sources:          sources,
 		MaxPending:       1 << 16,
-		BatchSize:        256,
-		FreeListSize:     4096,
-		Lag:              2650 * time.Millisecond,
+		BatchSize:        128,
 		Slack:            100 * time.Millisecond,
-		IdleSleep:        50 * time.Microsecond,
-		Shed:             DefaultShedConfig(),
+		Lag:              2650 * time.Millisecond,
+		FlushInterval:    5 * time.Millisecond,
 		RecycleMaxFrames: 80,
 	}
 }
 
 func (c *Config) validate() error {
 	switch {
-	case c.Producers < 1:
-		return errors.New("pipeline: Producers must be >= 1")
-	case c.RingSize < 2:
-		return errors.New("pipeline: RingSize must be >= 2")
+	case c.Sink == nil:
+		return errors.New("pipeline: Sink is required")
+	case c.Sources < 1:
+		return errors.New("pipeline: Sources must be >= 1")
 	case c.MaxPending < 1:
 		return errors.New("pipeline: MaxPending must be >= 1")
 	case c.BatchSize < 1:
 		return errors.New("pipeline: BatchSize must be >= 1")
-	case c.Slack < 0 || c.IdleSleep < 0:
-		return errors.New("pipeline: Slack and IdleSleep must be >= 0")
-	case c.Lag < c.Slack:
-		return fmt.Errorf("reorderer lag (%s) must not be smaller than slack (%s)", c.Lag, c.Slack)
-	}
-	if err := c.Shed.validate(); err != nil {
-		return fmt.Errorf("shed config: %w", err)
+	case c.Slack < 0:
+		return errors.New("pipeline: Slack must be >= 0")
+	case c.FlushInterval <= 0:
+		return errors.New("pipeline: FlushInterval must be > 0")
+	case c.RecycleMaxFrames < 0:
+		return errors.New("pipeline: Recycle limits must be >= 0")
 	}
 	return nil
 }
 
-// Stats is a snapshot of the whole pipeline.
-type Stats struct {
-	Producers []ProducerStats
-	Reorder   ReorderStats
-	Free      FreeStats
-}
-
-// FreeStats describes the event free list.
-type FreeStats struct {
-	Len     int    // empty events currently held for reuse
-	Dropped uint64 // events released to the GC because the list was full
-	Trimmed uint64 // recycled events that gave back oversized params or call stack
-}
-
-// Pipeline owns the rings, the reorderer and the consumer goroutine.
+// Pipeline owns the pool, the reorderer and the flusher.
 type Pipeline struct {
 	cfg     Config
 	clock   func() int64
-	rings   []*Ring[event.Event]
-	prods   []*Producer
-	ro      *Reorderer
-	handler Handler
+	sink    Sink
+	pool    *pool
+	sources []sourceStats
 
-	free    []*event.Event // recycled events that are touched only by the consumer goroutine
-	emitSeq uint64
+	mu          sync.Mutex // guards ro and pendingHigh
+	cond        *sync.Cond // on mu: signalled by every pop and by Close
+	ro          *Reorderer
+	pendingHigh int
+	pending     atomic.Int64 // len(ro), written under mu, read lock-free by Acquire
+	maxPending  int64
 
-	started atomic.Bool
-	stop    atomic.Bool
-	done    chan struct{}
-	pending atomic.Int64
+	added    atomic.Uint64  // events inserted; lets a drainer detect a missed wake-up
+	draining atomic.Bool    // single-flight flag: held by the goroutine delivering
+	batch    []*event.Event // drainer-owned scratch
 
-	freeLen     atomic.Int64
-	freeDropped atomic.Uint64
-	freeTrimmed atomic.Uint64
+	// beforeRelease, if set, runs after the last empty pop and before the drain
+	// flag is released: the window a missed wake-up lives in. Tests only.
+	beforeRelease func()
+	emitSeq       uint64
+
+	started   atomic.Bool
+	closed    atomic.Bool
+	closeOnce sync.Once
+	quit      chan struct{}
+	done      chan struct{}
+	panics    atomic.Uint64
 }
 
-// New builds a pipeline. Call Start to launch the consumer.
+// New builds a pipeline. Call Start to launch the flusher.
 func New(cfg Config) (*Pipeline, error) {
 	if err := cfg.validate(); err != nil {
 		return nil, err
-	}
-	switch {
-	case cfg.FreeListSize == 0:
-		cfg.FreeListSize = 4096
-	case cfg.FreeListSize < 0:
-		cfg.FreeListSize = math.MaxInt
-	}
-	if cfg.RecycleMaxFrames <= 0 {
-		cfg.RecycleMaxFrames = 64
 	}
 	clock := cfg.Clock
 	if clock == nil {
 		clock = func() int64 { return time.Now().UnixNano() }
 	}
-
 	p := &Pipeline{
-		cfg:     cfg,
-		clock:   clock,
-		handler: cfg.Handler,
-		done:    make(chan struct{}),
+		cfg:   cfg,
+		clock: clock,
+		sink:  cfg.Sink,
+		pool:  newPool(cfg.RecycleMaxFrames),
+		batch: make([]*event.Event, cfg.BatchSize),
+		quit:  make(chan struct{}),
+		done:  make(chan struct{}),
 	}
-
-	for i := 0; i < cfg.Producers; i++ {
-		r := NewRing[event.Event](cfg.RingSize)
-		prod, err := NewProducer(r, cfg.Classifier, cfg.Shed)
-		if err != nil {
-			return nil, err
-		}
-		p.rings = append(p.rings, r)
-		p.prods = append(p.prods, prod)
-	}
-
-	p.ro = NewReorderer(cfg.Producers, int64(cfg.Slack), int64(cfg.Lag), cfg.MaxPending)
-
+	p.sources = make([]sourceStats, cfg.Sources)
+	p.cond = sync.NewCond(&p.mu)
+	p.maxPending = int64(cfg.MaxPending)
+	p.ro = NewReorderer(cfg.Sources, int64(cfg.Slack), int64(cfg.Lag), cfg.MaxPending)
+	p.ro.SetLateHook(cfg.OnLate)
 	return p, nil
 }
 
-// Producer returns the producer at index i. Hand it to the goroutine that
-// runs that event collection. It must not be shared between goroutines.
-func (p *Pipeline) Producer(i ProducerID) *Producer { return p.prods[i] }
-
-// Publish acquires a slot, lets mut populate the event, and publishes it.
-// mut owns everything source-specific: parsing the raw record (ETW, eBPF, ...)
-// and any augmentation. The pipeline never sees the raw record.
-func (p *Pipeline) Publish(i ProducerID, t event.Type, mut func(*event.Event)) error {
-	producer := p.Producer(i)
-	evt := producer.Acquire(t)
-	if evt == nil {
-		return ErrRingNoSlots
-	}
-	if mut != nil {
-		mut(evt)
-	}
-	producer.Publish()
-	return nil
-}
-
-// Start launches the consumer loop. Calling it more than once is a no-op.
+// Start launches the flusher. Calling it more than once is a no-op.
 func (p *Pipeline) Start() {
 	if p.started.CompareAndSwap(false, true) {
-		p.run()
+		p.flusher()
 	}
 }
 
-// Close drains the rings, flushes the reorderer in timestamp order through the
-// stages and stops the consumer. Safe to call more than once.
+// Close stops the flusher, delivers everything that is left in timestamp
+// order and returns. Stop the ETW sessions (so no callback is publishing)
+// before calling it. Safe to call more than once. If the sink is wedged Close
+// waits for it, so run it with a timeout.
 func (p *Pipeline) Close() {
-	p.stop.Store(true)
-	if p.started.Load() {
-		<-p.done
-	}
+	p.closeOnce.Do(func() {
+		p.closed.Store(true)
+		p.mu.Lock()
+		p.cond.Broadcast() // wake callbacks blocked in Acquire
+		p.mu.Unlock()
+		if p.started.Load() {
+			close(p.quit)
+			<-p.done
+		}
+		for !p.draining.CompareAndSwap(false, true) { // wait out an active drainer
+			time.Sleep(50 * time.Microsecond)
+		}
+		p.run(true)
+		p.draining.Store(false)
+	})
 }
 
 // Stats returns a snapshot of all counters. Safe from any goroutine.
 func (p *Pipeline) Stats() Stats {
-	s := Stats{Reorder: p.ro.Stats()}
-	s.Reorder.Pending = int(p.pending.Load())
-	s.Free = FreeStats{Len: int(p.freeLen.Load()), Dropped: p.freeDropped.Load(), Trimmed: p.freeTrimmed.Load()}
-	for _, prod := range p.prods {
-		s.Producers = append(s.Producers, prod.Stats())
+	p.mu.Lock()
+	s := Stats{Reorder: p.ro.Stats(), PendingHigh: p.pendingHigh}
+	p.mu.Unlock()
+	s.Panics = p.panics.Load()
+	for i := range p.sources {
+		src := &p.sources[i]
+		s.Sources = append(s.Sources, SourceStats{
+			ID:         SourceID(i),
+			Acquired:   src.acquired.Load(),
+			Published:  src.published.Load(),
+			Blocked:    src.blocked.Load(),
+			BlockedFor: time.Duration(src.blockedNs.Load()),
+			Abandoned:  src.abandoned.Load(),
+		})
 	}
 	return s
 }
 
-func (p *Pipeline) run() {
-	defer close(p.done)
-	w := waiter{sleep: p.cfg.IdleSleep}
-	for {
-		// Read the stop flag before draining: once it is set no producer is
-		// running, so one more full pass sees everything that will ever arrive.
-		stopping := p.stop.Load()
-
-		ingested := 0
-		for s := range p.rings {
-			ingested += p.ingest(s)
-		}
-		emitted := p.emit(p.clock())
-		p.pending.Store(int64(p.ro.Len()))
-
-		if stopping && ingested == 0 && p.ringsEmpty() {
-			p.flush()
-			p.pending.Store(0)
-			return
-		}
-		if ingested+emitted == 0 {
-			w.wait()
-		} else {
-			w.reset()
-		}
-	}
-}
-
-// ingest moves one batch from ring s into the reorderer. Each claimed slot is
-// swapped into a pooled event and released right away, so a slot is never held
-// longer than this loop and the ring keeps flowing even while events wait in
-// the reorderer.
-func (p *Pipeline) ingest(s int) int {
-	room := p.cfg.MaxPending - p.ro.Len()
-	if room <= 0 {
-		return 0 // reorderer full: leave events in the ring, producers will shed
-	}
-	r := p.rings[s]
-	a, b := r.Claim(min(p.cfg.BatchSize, room))
-	n := len(a) + len(b)
-	if n == 0 {
-		return 0
+func (p *Pipeline) insert(sourceID SourceID, ev *event.Event) {
+	if p.closed.Load() { // a callback that outlived the sources' shutdown
+		p.pool.put(ev)
+		return
 	}
 	now := p.clock()
-	for i := range a {
-		p.take(s, &a[i], now)
+	p.mu.Lock()
+	p.ro.Add(sourceID, ev, now)
+	l := p.ro.Len()
+	p.pending.Store(int64(l))
+	if l > p.pendingHigh {
+		p.pendingHigh = l
 	}
-	for i := range b {
-		p.take(s, &b[i], now)
-	}
-	r.Release(n)
-	return n
+	p.mu.Unlock()
+	p.added.Add(1)
+	p.drain()
 }
 
-func (p *Pipeline) take(s int, slot *event.Event, now int64) {
-	ev := p.get()
-	ev.MoveFrom(slot)
-	p.ro.Add(s, ev, now)
-}
-
-// emit releases every event the watermark allows through the handler chain.
-func (p *Pipeline) emit(now int64) int {
-	wm := p.ro.Watermark(now)
-	n := 0
+func (p *Pipeline) flusher() {
+	defer close(p.done)
+	t := time.NewTicker(p.cfg.FlushInterval)
+	defer t.Stop()
 	for {
-		ev, more := p.ro.Next(wm)
-		if !more {
-			return n
-		}
-		p.dispatch(ev)
-		n++
-	}
-}
-
-// flush releases everything that is left, in order, ignoring the watermark.
-func (p *Pipeline) flush() {
-	for {
-		ev, more := p.ro.Next(math.MaxInt64)
-		if !more {
+		select {
+		case <-t.C:
+			p.drain()
+		case <-p.quit:
 			return
 		}
-		p.dispatch(ev)
 	}
+}
+
+// drain delivers whatever is ready, unless another goroutine is already doing
+// it. The added counter closes the window in which that goroutine decided it
+// was done just before our event arrived: if it moved, we go round again.
+func (p *Pipeline) drain() {
+	for {
+		if !p.draining.CompareAndSwap(false, true) {
+			return
+		}
+		seq := p.run(false)
+		if p.beforeRelease != nil {
+			p.beforeRelease()
+		}
+		p.draining.Store(false)
+		if p.added.Load() == seq {
+			return
+		}
+	}
+}
+
+// run delivers batches until a pop comes back short and returns the value of
+// added observed before that pop. A short batch means nothing more was
+// releasable at that moment, so no confirming empty pop is needed (it cost a
+// lock and a clock read per event): anything inserted afterwards moves added,
+// and drain goes round again. Only the drain-flag holder may call it.
+func (p *Pipeline) run(all bool) uint64 {
+	for {
+		seq := p.added.Load()
+		n := p.pop(all)
+		for i := 0; i < n; i++ {
+			ev := p.batch[i]
+			p.batch[i] = nil
+			p.dispatch(ev)
+		}
+		if n < len(p.batch) {
+			return seq
+		}
+	}
+}
+
+// pop moves up to BatchSize releasable events from the reorderer into p.batch.
+func (p *Pipeline) pop(all bool) int {
+	n := 0
+	p.mu.Lock()
+	var wm int64 = math.MaxInt64
+	if !all {
+		wm = p.ro.Watermark(p.clock())
+	}
+	for n < len(p.batch) {
+		ev, more := p.ro.Next(wm)
+		if !more {
+			break
+		}
+		p.batch[n] = ev
+		n++
+	}
+	if n > 0 {
+		p.cond.Broadcast() // room for blocked Acquire calls
+	}
+	p.mu.Unlock()
+	return n
 }
 
 func (p *Pipeline) dispatch(ev *event.Event) {
 	p.emitSeq++
 	ev.Seq = p.emitSeq
-
-	p.handler.Handle(ev)
-
-	ev.Reset()
-	p.recycle(ev)
+	p.handle(ev)
+	p.pool.put(ev)
 }
 
-// recycle returns an empty event to the free list, within the cap.
-func (p *Pipeline) recycle(ev *event.Event) {
-	if len(p.free) >= p.cfg.FreeListSize {
-		p.freeDropped.Add(1)
-		return
-	}
-	trimmed := false
-	if cap(ev.Callstack) > p.cfg.RecycleMaxFrames {
-		ev.Callstack, trimmed = nil, true
-	}
-	if trimmed {
-		p.freeTrimmed.Add(1)
-	}
-	p.free = append(p.free, ev)
+func (p *Pipeline) handle(ev *event.Event) {
+	defer func() {
+		if v := recover(); v != nil {
+			p.panics.Add(1)
+			if p.cfg.OnPanic != nil {
+				p.cfg.OnPanic(ev, v)
+			}
+		}
+	}()
+	p.sink.Handle(ev)
 }
 
-func (p *Pipeline) get() *event.Event {
-	if n := len(p.free); n > 0 {
-		ev := p.free[n-1]
-		p.free[n-1] = nil
-		p.free = p.free[:n-1]
-		return ev
-	}
-	return new(event.Event)
+// SourceStats are the per-source counters.
+type SourceStats struct {
+	ID         SourceID
+	Acquired   uint64        // events handed out
+	Published  uint64        // events handed to the reorderer
+	Abandoned  uint64        // acquired but released unpublished
+	Blocked    uint64        // Acquire calls that had to wait for room
+	BlockedFor time.Duration // total time spent waiting
 }
 
-func (p *Pipeline) ringsEmpty() bool {
-	for _, r := range p.rings {
-		if r.Len() != 0 {
+// sourceStats holds one event source counters. The padding keeps each source on
+// its own cache line. The callbacks of different sources run on different goroutines
+// and would otherwise false-share.
+type sourceStats struct {
+	acquired  atomic.Uint64
+	published atomic.Uint64
+	abandoned atomic.Uint64
+	blocked   atomic.Uint64
+	blockedNs atomic.Int64
+	_         [24]byte
+}
+
+// waitForRoom blocks until the reorderer has room or the pipeline closes.
+// It reports whether there is room.
+func (p *Pipeline) waitForRoom(stats *sourceStats) bool {
+	stats.blocked.Add(1)
+	t0 := time.Now()
+	defer func() { stats.blockedNs.Add(int64(time.Since(t0))) }()
+	for {
+		if p.closed.Load() {
 			return false
 		}
+		// Help: if nobody is delivering, becoming the drainer forces the
+		// oldest events out. If someone is, its next pop wakes us.
+		p.drain()
+
+		p.mu.Lock()
+		for p.ro.Len() >= p.cfg.MaxPending && !p.closed.Load() {
+			p.cond.Wait() // woken by every pop and by Close
+		}
+		full := p.ro.Len() >= p.cfg.MaxPending
+		p.mu.Unlock()
+		if !full {
+			return true
+		}
 	}
-	return true
 }
 
-// waiter is the consumer's idle strategy: spin briefly, then yield, then sleep.
-// It never burns a core while the system is quiet, and it re-polls often
-// enough that the reorderer's idle timeout fires on time.
-type waiter struct {
-	n     int
-	sleep time.Duration
+// Acquire returns a reset event for the caller to fill, or nil if the pipeline
+// is closed. session is the index of the ETW session (or eBPF source) the
+// event comes from.
+//
+// Acquire is where back-pressure happens: while the reorderer holds
+// MaxPending events it blocks (helping to drain meanwhile) until there is
+// room. The callback then stops returning, ETW's own session buffers absorb
+// the burst, and the kernel drops only once they are exhausted (visible in the
+// session's EventsLost). A sink that never returns therefore stalls the
+// callbacks: supervise it with a watchdog.
+//
+// A non-nil event must be handed back with exactly one of Publish or Release,
+// with the same session. Set Timestamp before Publish: the reorderer sorts on
+// it. All methods are safe for concurrent use.
+func (p *Pipeline) Acquire(sourceID SourceID) *event.Event {
+	if p.closed.Load() {
+		return nil
+	}
+	s := &p.sources[sourceID]
+	if p.pending.Load() >= p.maxPending && !p.waitForRoom(s) {
+		return nil
+	}
+	s.acquired.Add(1)
+	return p.pool.get()
 }
 
-func (w *waiter) reset() { w.n = 0 }
+// Publish hands an event to the reorderer. The event belongs to the
+// pipeline from here on and it should not be touched it again.
+func (p *Pipeline) Publish(sourceID SourceID, ev *event.Event) {
+	p.sources[sourceID].published.Add(1)
+	p.insert(sourceID, ev)
+}
 
-func (w *waiter) wait() {
-	if w.n < 1<<30 {
-		w.n++
-	}
-	switch {
-	case w.n <= 32:
-		// spin: poll again immediately
-	case w.n <= 64:
-		runtime.Gosched()
-	case w.sleep > 0:
-		time.Sleep(w.sleep)
-	default:
-		runtime.Gosched()
-	}
+// Release gives back an acquired event without publishing it.
+func (p *Pipeline) Release(sourceID SourceID, ev *event.Event) {
+	p.sources[sourceID].abandoned.Add(1)
+	p.pool.put(ev)
 }

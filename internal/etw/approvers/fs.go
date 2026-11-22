@@ -47,25 +47,25 @@ var (
 // event processors scope, along with the extended data items
 // and the event callstack.
 type irp struct {
-	rec       *etw.EventRecord           // keeps the original even record
-	items     *etw.FileExtendedDataItems // keeps the extended data items alive
-	buf       []byte                     // keeps the data buffer alive
-	callstack va.Callstack               // CreateFile stack return addresses
+	rec *etw.EventRecord // keeps the original even record
+	//items     *etw.FileExtendedDataItems // keeps the extended data items alive
+	buf       []byte       // keeps the data buffer alive
+	callstack va.Callstack // CreateFile stack return addresses
 }
 
 func (p *irp) storeExtendedDataItems(disposition uint64, status uint32) {
-	p.items = etw.AppendEventHeaderFileExtendedDataItems(p.rec, disposition, status, p.callstack)
+	//p.items = etw.AppendEventHeaderFileExtendedDataItems(p.rec, disposition, status, p.callstack)
 }
 
 func (p *irp) storeCallstack(r *etw.EventRecord) {
-	p.callstack = r.ReadCallstackInto(16, va.GetCallstack())
+	//p.callstack = r.ReadCallstackInto(16, va.GetCallstack())
 }
 
 func (p *irp) releasePools() {
 	p.rec.ReleasePool()
-	if p.items != nil {
-		p.items.ReleasePool()
-	}
+	// if p.items != nil {
+	// 	p.items.ReleasePool()
+	// }
 	if p.callstack != nil {
 		p.callstack.ReleasePool()
 	}

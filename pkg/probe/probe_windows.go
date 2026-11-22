@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2026 by Nedim Sabic Sabic
+ * Copyright 2026 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -22,6 +22,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -41,7 +42,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
-	"github.com/rabbitstack/fibratus/pkg/util/multierror"
+	"github.com/rabbitstack/fibratus/pkg/util/key"
 	"github.com/rabbitstack/fibratus/pkg/util/ntstatus"
 	"github.com/rabbitstack/fibratus/pkg/util/pair"
 	"github.com/rabbitstack/fibratus/pkg/util/periodical"
@@ -51,13 +52,12 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/utf16"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/registry"
 
 	log "github.com/sirupsen/logrus"
 )
 
 const maxEnqueuedIORequests = 200
-
-const ringSize = 1 << 16
 
 // maxPendingIOWait is how long a CreateFile may wait for its FileOpEnd before
 // it is considered lost and evicted. Normal completions take microseconds, so
@@ -70,8 +70,8 @@ const ioSweepInterval = time.Second
 type Probe struct {
 	PlatformProbe
 
-	kernelTrace *libetw.KernelTrace
-	userTrace   *libetw.UserTrace
+	kernelTrace *Trace[*libetw.KernelTrace]
+	userTrace   *Trace[*libetw.UserTrace]
 
 	filePathResolver map[uint64]FileInfo              // maps file object pointer to file info
 	fcbPathResolver  *expirable.LRU[uint64, FileInfo] // maps FCB (File Control Block) pointer to file info
@@ -106,9 +106,6 @@ type Probe struct {
 
 	linker *CallstackLinker
 
-	// periodics keeps a list of periodical runners per pipeline producer ID.
-	periodics [pipeline.ProducerMax + 1][]periodical.Periodic
-
 	regionProber *va.RegionProber
 }
 
@@ -127,8 +124,8 @@ func (p *Probe) Init(rs *config.RulesCompileResult) error {
 	var enableDNS bool
 	var enableRegistry bool
 	var enableAuditAPI bool
-	p.rs = rs
 
+	p.rs = rs
 	if rs != nil {
 		// Configure drop types if the rule engine is enabled, which is
 		// the default for sensor mode. For any event not present in the
@@ -164,7 +161,7 @@ func (p *Probe) Init(rs *config.RulesCompileResult) error {
 			return rs.ContainsEvent(t)
 		})...)
 
-		p.kernelTrace.SetKernelEventFlags(p.toKernelEventFlags(rs))
+		p.kernelTrace.Trace.SetKernelEventFlags(p.toKernelEventFlags(rs))
 
 		enableDNS = rs.HasDNSEvents
 		enableRegistry = rs.HasRegistryEvents
@@ -179,25 +176,25 @@ func (p *Probe) Init(rs *config.RulesCompileResult) error {
 	// additional attributes and guaranteeing that any event published by
 	// the security telemetry session doesn't miss its respective process
 	// from the snapshotter
-	p.userTrace.AddProvider(etw.WindowsKernelProcessGUID, libetw.WithKeywords(etw.ProcessKeyword|etw.ImageKeyword), libetw.WithCaptureState())
+	p.userTrace.Trace.AddProvider(etw.WindowsKernelProcessGUID, libetw.WithKeywords(etw.ProcessKeyword|etw.ImageKeyword), libetw.WithCaptureState())
 
 	// In a similar vein, Windows Kernel Registry provider publishes
 	// the RegSetValue event with the full captured data for the
 	// modified value. This data is used to attach various parameters
 	// to the RegSetValue event published by the NT Kernel Logger
 	if enableRegistry {
-		p.userTrace.AddProvider(etw.WindowsKernelRegistryGUID, libetw.WithKeywords(etw.SetValueKeyword), libetw.WithEventFilterDescriptors(etw.EventFilterDescriptor{
+		p.userTrace.Trace.AddProvider(etw.WindowsKernelRegistryGUID, libetw.WithKeywords(etw.SetValueKeyword), libetw.WithEventFilterDescriptors(etw.EventFilterDescriptor{
 			Ptr:  uintptr(unsafe.Pointer(&etw.CaptureRegistryValue)),
 			Size: 4,
 		}))
 	}
 
 	if enableDNS {
-		p.userTrace.AddProvider(etw.DNSClientGUID)
+		p.userTrace.Trace.AddProvider(etw.DNSClientGUID)
 	}
 
 	if enableAuditAPI {
-		p.userTrace.AddProvider(etw.KernelAuditAPICallsGUID, libetw.WithCallstack(p.config.EventSource.StackEnrichment))
+		p.userTrace.Trace.AddProvider(etw.KernelAuditAPICallsGUID, libetw.WithCallstack(p.config.EventSource.StackEnrichment))
 	}
 
 	return nil
@@ -226,21 +223,11 @@ func (p *Probe) toKernelEventFlags(rs *config.RulesCompileResult) etw.EventTrace
 }
 
 func (p *Probe) Start() error {
-	if err := p.userTrace.Start(); err != nil {
-		return err
-	}
-	if err := p.kernelTrace.Start(); err != nil {
+	if err := p.userTrace.Run(); err != nil {
 		return err
 	}
 
-	if err := p.userTrace.Open(); err != nil {
-		return err
-	}
-	if err := p.userTrace.CaptureState(); err != nil {
-		log.Warnf("unable to capture trace %s state: %v", p.userTrace.Name(), err)
-	}
-
-	if err := p.kernelTrace.Open(); err != nil {
+	if err := p.kernelTrace.Run(); err != nil {
 		return err
 	}
 
@@ -256,8 +243,9 @@ func (p *Probe) Start() error {
 	go func() {
 		defer p.wg.Done()
 		defer handlePanic()
-		p.userTrace.Process(func(rec *etw.EventRecord) error {
-			return p.processEvent(pipeline.ProducerUser, rec)
+		log.Infof("starting trace [%s]", p.userTrace.Trace.Name())
+		p.userTrace.Trace.Process(func(rec *etw.EventRecord) error {
+			return p.processEvent(rec, p.userTrace)
 		}, p.errs)
 	}()
 
@@ -265,8 +253,9 @@ func (p *Probe) Start() error {
 	go func() {
 		defer p.wg.Done()
 		defer handlePanic()
-		p.kernelTrace.Process(func(rec *etw.EventRecord) error {
-			return p.processEvent(pipeline.ProducerKernel, rec)
+		log.Infof("starting trace [%s]", p.kernelTrace.Trace.Name())
+		p.kernelTrace.Trace.Process(func(rec *etw.EventRecord) error {
+			return p.processEvent(rec, p.kernelTrace)
 		}, p.errs)
 	}()
 
@@ -299,30 +288,14 @@ func (p *Probe) Start() error {
 }
 
 func (p *Probe) Close() error {
-	var errs []error
-
 	// Flush and stop the user trace
-	if err := p.userTrace.Flush(); err != nil {
-		errs = append(errs, err)
-	}
-	time.Sleep(time.Millisecond * 100)
-	if err := p.userTrace.Close(); err != nil {
-		errs = append(errs, err)
-	}
-	if err := p.userTrace.Stop(); err != nil {
-		errs = append(errs, err)
+	if err := p.userTrace.Shutdown(); err != nil {
+		return err
 	}
 
 	// Flush and stop the kernel trace
-	if err := p.kernelTrace.Flush(); err != nil {
-		errs = append(errs, err)
-	}
-	time.Sleep(time.Millisecond * 100)
-	if err := p.kernelTrace.Close(); err != nil {
-		errs = append(errs, err)
-	}
-	if err := p.kernelTrace.Stop(); err != nil {
-		errs = append(errs, err)
+	if err := p.kernelTrace.Shutdown(); err != nil {
+		return err
 	}
 
 	p.pipeline.Close()
@@ -330,14 +303,14 @@ func (p *Probe) Close() error {
 	p.cancelFunc()
 	p.wg.Wait()
 
-	return multierror.Wrap(errs...)
+	return nil
 }
 
 // processEvent is the entry point for every ETW event record delivered by the
 // producer. Depending on the event type, the record is either committed to the
 // ring buffer, parked until a related event arrives, used for state management
 // or discarded.
-func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecord) error {
+func (p *Probe) processEvent(rec *etw.EventRecord, pub TracePublisher) error {
 	t := event.TypeFromEventRecord(rec)
 
 	if event.IsCurrentProcDropped(rec) {
@@ -364,11 +337,10 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 	case event.StackWalk:
 		// I/O requests are held aside until FileOpEnd, so their callstacks are parked
 		// on the pending request instead of becoming a pipeline event per I/O event.
-		// The pending requests are only touched by the kernel trace goroutine.
-		if producerID == pipeline.ProducerKernel && p.claimIORequestStack(rec) {
+		if p.claimIORequestStack(rec) {
 			return nil
 		}
-		return p.pipeline.Publish(producerID, t, func(evt *event.Event) { evt.Parse(rec) })
+		return pub.Publish(rec)
 	case event.RegKCBRundown, event.RegCreateKCB:
 		kcb := rec.ReadUint64(16)
 		path := rec.ConsumeUTF16String(24)
@@ -384,40 +356,18 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 
 	switch t {
 	case event.FileOpEnd:
-		return p.completeIORequest(producerID, rec)
+		return p.completeIORequest(rec, pub)
 	case event.MapViewOfSection, event.UnmapViewOfSection, event.MapViewSectionRundown, event.SetFileInformation, event.RenameFile, event.EnumDirectory, event.ReadFile, event.WriteFile:
-		return p.pipeline.Publish(producerID, t, func(evt *event.Event) {
-			evt.Parse(rec)
-			p.addFileInfoFromFCB(rec, evt)
-		})
+		return pub.Publish(rec, WithMutateFunc(func(evt *event.Event) { p.addFileInfoFromFCB(rec, evt) }))
 	case event.RegOpenKey, event.RegCreateKey, event.RegDeleteKey, event.RegQueryKey, event.RegQueryValue, event.RegSetValue, event.RegDeleteValue:
 		path := p.resolveKCBPath(rec)
-		if path == "" {
-			path = rec.ConsumeUTF16String(24)
+		if (t == event.RegOpenKey || t == event.RegQueryKey || t == event.RegQueryValue) &&
+			!p.isRegPathApproved(path) {
+			registryApproverRejections.Add(1)
+			return nil
 		}
-
-		// rootkey, subkey := key.Format(path)
-		// if rootkey != key.Invalid {
-		// 	root := rootkey.String()
-		// 	if subkey != "" {
-		// 		path = root + `\` + subkey
-		// 	} else {
-		// 		path = root
-		// 	}
-		// }
-
-		// if (t == event.RegOpenKey || t == event.RegQueryKey || t == event.RegQueryValue) &&
-		// 	!p.isRegPathApproved(path) {
-		// 	registryApproverRejections.Add(1)
-		// 	return nil
-		// }
-
-		// registryApproverApprovals.Add(1)
-
-		// return p.pipeline.Publish(producerID, t, func(evt *event.Event) {
-		// 	evt.Parse(rec)
-		// 	_ = evt.Params.SetValue(params.RegPath, path)
-		// })
+		registryApproverApprovals.Add(1)
+		return pub.Publish(rec, WithMutateFunc(func(evt *event.Event) { evt.SetParam(params.RegPath, params.Str(path)) }))
 	case event.OpenProcess, event.OpenThread:
 		pid := rec.ReadUint32(0)
 		if !p.isExecutablePathApproved(pid, t == event.OpenThread && rec.Header.ProcessID != pid) {
@@ -427,22 +377,7 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 		procApproverApprovals.Add(1)
 	}
 
-	producer := p.pipeline.Producer(producerID)
-	evt := producer.Acquire(t)
-	if evt == nil {
-		return pipeline.ErrRingNoSlots
-	}
-	evt.Parse(rec)
-
-	producer.Publish()
-
-	timestamp := evt.Timestamp.UnixNano()
-	// Run periodical tasks driven by monotonic event-time clock
-	for _, periodic := range p.periodics[producerID] {
-		periodic.RunPeriodic(timestamp)
-	}
-
-	return nil
+	return pub.Publish(rec)
 }
 
 // initIORequest clones the CreateFile record and keeps it in the
@@ -458,8 +393,8 @@ func (p *Probe) initIORequest(rec *etw.EventRecord) error {
 }
 
 // completeIORequest completes the pending CreateFile request identified
-// by the IRP address and commits the resulting event to the ring buffer.
-func (p *Probe) completeIORequest(producerID pipeline.ProducerID, rec *etw.EventRecord) error {
+// by the IRP address and commits the resulting event to the pipeline.
+func (p *Probe) completeIORequest(rec *etw.EventRecord, pub TracePublisher) error {
 	var (
 		disposition     uint32
 		status          uint32
@@ -477,7 +412,7 @@ func (p *Probe) completeIORequest(producerID pipeline.ProducerID, rec *etw.Event
 	}
 	delete(p.enqueuedIORequests, irp)
 	if req.rec.Header.EventDescriptor.Opcode == event.DeleteFileID {
-		return p.completeDeleteIORequest(producerID, req, rec)
+		return p.completeDeleteIORequest(req, rec, pub)
 	}
 	defer req.rec.ReleasePool()
 
@@ -542,8 +477,7 @@ func (p *Probe) completeIORequest(producerID pipeline.ProducerID, rec *etw.Event
 
 	fsApproverApprovals.Add(1)
 
-	return p.pipeline.Publish(producerID, event.CreateFile, func(evt *event.Event) {
-		evt.Parse(req.rec)
+	return pub.Publish(rec, WithMutateFunc(func(evt *event.Event) {
 		// Rewrite create disposition and set NT status/file type parameters
 		evt.SetParam(params.FileOperation, params.U32(disposition))
 		evt.SetParam(params.NTStatus, params.U32(status))
@@ -553,21 +487,20 @@ func (p *Probe) completeIORequest(producerID pipeline.ProducerID, rec *etw.Event
 		if req.stack != nil {
 			evt.SetParam(params.Callstack, params.Addresses(req.stack))
 		}
-	})
+	}))
 }
 
-func (p *Probe) completeDeleteIORequest(producerID pipeline.ProducerID, req ioRequest, endop *etw.EventRecord) error {
+func (p *Probe) completeDeleteIORequest(req ioRequest, endop *etw.EventRecord, pub TracePublisher) error {
 	var status uint32
 
 	status = endop.ReadUint32(16)
-	return p.pipeline.Publish(producerID, event.DeleteFile, func(evt *event.Event) {
-		evt.Parse(req.rec)
+	return pub.Publish(req.rec, WithMutateFunc(func(evt *event.Event) {
 		evt.SetParam(params.NTStatus, params.U32(status))
 		if req.stack != nil {
 			evt.SetParam(params.Callstack, params.Addresses(req.stack))
 		}
 		p.addFileInfoFromFCB(req.rec, evt)
-	})
+	}))
 	// if !ntSuccess(end.ReadUint32(16)) {
 	// 	p.discard(req.rec)
 	// 	return nil
@@ -697,20 +630,21 @@ func (p *Probe) resolveFileInfo(rec *etw.EventRecord) (FileInfo, bool) {
 // key name and concatenate its relative path.
 func (p *Probe) resolveKCBPath(rec *etw.EventRecord) string {
 	kcb := rec.ReadUint64(16)
+	path := rec.ConsumeUTF16String(24)
 	if kcb == 0 {
-		return ""
+		return key.Format(path)
 	}
 
 	if base, exists := p.kcbPathResolver[kcb]; exists {
-		path := rec.ConsumeUTF16String(24)
-		return base + `\` + path
+		return key.Format(base + `\` + path)
 	}
 
-	return ""
+	return path
 }
 
 func (p *Probe) handleEvent(evt *event.Event) error {
 	var pid uint32
+	var err error
 	switch evt.Type {
 	case event.CreateFile:
 		p.handleCreateFile(evt)
@@ -720,43 +654,27 @@ func (p *Probe) handleEvent(evt *event.Event) error {
 		p.linkCallstack(evt)
 		return nil
 	case event.MapViewSectionRundown, event.MapViewOfSection:
-		if err := p.addMmap(evt); err != nil {
-			return err
-		}
+		p.addMmap(evt)
 	case event.UnmapViewOfSection:
-		if err := p.removeMmap(evt); err != nil {
-			return err
-		}
+		p.removeMmap(evt)
 	case event.CreateProcess, event.CreateProcessInternal, event.ProcessRundown, event.ProcessRundownInternal:
-		if err := p.addProcess(evt); err != nil {
-			return err
-		}
+		err = p.addProcess(evt)
 	case event.TerminateProcess:
-		if err := p.removeProcess(evt); err != nil {
-			return err
-		}
+		p.removeProcess(evt)
 	case event.CreateThread, event.ThreadRundown:
 		pid = evt.Params.GetPid()
-		if err := p.addThread(evt); err != nil {
-			return err
-		}
+		p.addThread(evt)
 	case event.TerminateThread:
 		pid = evt.Params.GetPid()
-		if err := p.removeThread(evt); err != nil {
-			return err
-		}
+		p.removeThread(evt)
 	case event.OpenProcess, event.OpenThread:
 		pid = evt.Params.GetPid()
 	case event.LoadModule, event.ModuleRundown, event.LoadModuleInternal:
-		if err := p.addModule(evt); err != nil {
-			return err
-		}
+		p.addModule(evt)
 	case event.UnloadModule:
-		if err := p.removeModule(evt); err != nil {
-			return err
-		}
+		p.removeModule(evt)
 	case event.RegSetValue, event.RegSetValueInternal:
-		p.handleRegSetValue(evt)
+		err = p.handleRegSetValue(evt)
 	case event.VirtualAlloc:
 		p.handleVirtualAlloc(evt)
 		pid = evt.Params.GetPid()
@@ -774,7 +692,7 @@ func (p *Probe) handleEvent(evt *event.Event) error {
 	// state, so simply by replaying the flow of these
 	// events we are able to reconstruct system-wide
 	// process state.
-	exists, proc := p.psnap.Find(evt.PID)
+	proc, exists := p.psnap.Find(evt.PID)
 	if !exists {
 		p.psnap.Put(proc)
 	}
@@ -806,7 +724,7 @@ func (p *Probe) handleEvent(evt *event.Event) error {
 		return nil
 	}
 
-	return p.dispatchEvent(evt)
+	return errors.Join(p.dispatchEvent(evt), err)
 }
 
 func (p *Probe) dispatchEvent(evt *event.Event) error {
@@ -823,8 +741,11 @@ func (p *Probe) dispatchEvent(evt *event.Event) error {
 
 func (p *Probe) addProcess(evt *event.Event) error {
 	if evt.IsCreateProcessInternal() || evt.IsProcessRundownInternal() {
-		return nil
+		return p.psnap.AddProcess(ps.DefaultMapper().Proc(evt))
 	}
+
+	proc := ps.DefaultMapper().Proc(evt)
+	err := p.psnap.AddProcess(proc)
 
 	cmndline := cmdline.New(evt.GetParamAsString(params.Cmdline)).
 		// get rid of leading/trailing quotes in the executable path
@@ -835,39 +756,62 @@ func (p *Probe) addProcess(evt *event.Event) error {
 		// but we can expand the path from the SystemRoot environment variable
 		CompleteSysProc(evt.GetParamAsString(params.ProcessName))
 
-	// append executable path parameter
 	exe := cmndline.Exeline()
 	if exe == "" {
 		exe = evt.GetParamAsString(params.ProcessName)
 	}
-	evt.SetParam(params.Exe, params.Str(exe))
 
-	evt.SetParam(params.StartTime, params.Timestamp(evt.Timestamp))
-
-	return p.psnap.Write(evt)
-}
-
-func (p *Probe) removeProcess(evt *event.Event) error {
-	p.regionProber.Remove(evt.Params.GetPid())
-	if err := p.psnap.Remove(evt); err != nil {
-		return err
+	// set executable path parameter
+	if proc.Exe != "" {
+		evt.SetParam(params.Exe, params.Str(proc.Exe))
+	} else {
+		evt.SetParam(params.Exe, params.Str(exe))
 	}
-	return nil
+
+	if !proc.StartTime.IsZero() {
+		evt.SetParam(params.StartTime, params.Timestamp(proc.StartTime))
+	} else {
+		evt.SetParam(params.StartTime, params.Timestamp(evt.Timestamp))
+	}
+
+	if proc.Username != "" {
+		evt.SetParam(params.Username, params.Str(proc.Username))
+	}
+	if proc.Domain != "" {
+		evt.SetParam(params.Domain, params.Str(proc.Domain))
+	}
+
+	if proc.TokenIntegrityLevel != "" {
+		evt.SetParam(params.ProcessTokenIsElevated, params.Boolean(proc.IsTokenElevated))
+		evt.SetParam(params.ProcessTokenIntegrityLevel, params.Bin(sys.RidStringToSIDBytes(proc.TokenIntegrityLevel)))
+	}
+	if proc.TokenElevationType != "" {
+		evt.SetParam(params.ProcessTokenElevationType, params.U32(params.StringToElevationType(proc.TokenElevationType)))
+	}
+
+	return err
 }
 
-func (p *Probe) addThread(evt *event.Event) error {
-	return p.psnap.AddThread(evt)
+func (p *Probe) removeProcess(evt *event.Event) {
+	p.regionProber.Remove(evt.Params.GetPid())
+	p.psnap.RemoveProcess(evt.Params.GetPid())
 }
 
-func (p *Probe) removeThread(evt *event.Event) error {
+func (p *Probe) addThread(evt *event.Event) {
+	p.psnap.AddThread(ps.DefaultMapper().Thread(evt))
+}
+
+func (p *Probe) removeThread(evt *event.Event) {
 	pid := evt.Params.GetPid()
 	tid := evt.Params.GetTid()
-	return p.psnap.RemoveThread(pid, tid)
+	p.psnap.RemoveThread(pid, tid)
 }
 
-func (p *Probe) addModule(evt *event.Event) error {
+func (p *Probe) addModule(evt *event.Event) {
+	p.psnap.AddModule(ps.DefaultMapper().Module(evt))
+
 	if evt.IsLoadModuleInternal() {
-		return p.psnap.AddModule(evt)
+		return
 	}
 
 	typ := signature.Type(evt.GetParamAsUint32(params.ModuleSignatureType))
@@ -876,11 +820,12 @@ func (p *Probe) addModule(evt *event.Event) error {
 	// Code Integrity successfully validated the file's trust chain.
 	// The signature level WINDOWS and WINDOWS_TCB describes the trust
 	// level assigned after verification.
-	// A file can reach the WINDOWS signing level through either an embedded PE
-	// Authenticode signature or a catalog signature where the file hash lives
-	// in a trusted .cat file.
-	// Trusted signatures are automatically pushed to the store. On the contrary,
-	// signature verification is delegated to the async workers
+	// A file can reach the WINDOWS signing level through either an
+	// embedded PE Authenticode signature or a catalog signature
+	// where the file hash lives in a trusted .cat file.
+	// Trusted signatures are automatically pushed to the store. On
+	// the contrary, signature verification is delegated to the async
+	// workers
 	key := evt.SignatureKey()
 	if signature.IsTrusted(typ, lvl) {
 		signature.GetSignatures().PutSignature(key, typ, lvl)
@@ -890,35 +835,34 @@ func (p *Probe) addModule(evt *event.Event) error {
 
 	// request module file metadata by queueing async work
 	fs.GetMetadataStore().DoRequestAsync(evt.GetParamAsString(params.ModulePath), evt.IsModuleRundown())
-
-	return p.psnap.AddModule(evt)
 }
 
-func (p *Probe) removeModule(evt *event.Event) error {
+func (p *Probe) removeModule(evt *event.Event) {
 	pid := evt.Params.GetPid()
 	addr := evt.Params.GetAddressByName(params.ModuleBase)
 	if pid == 0 {
 		pid = evt.PID
 	}
-	return p.psnap.RemoveModule(pid, addr)
+	p.psnap.RemoveModule(pid, addr)
 }
 
-func (p *Probe) addMmap(evt *event.Event) error {
+func (p *Probe) addMmap(evt *event.Event) {
 	totalMapRundownFiles.Add(1)
-	return p.psnap.AddMmap(evt)
+	p.psnap.AddMmap(ps.DefaultMapper().Mmap(evt))
 }
 
-func (p *Probe) removeMmap(evt *event.Event) error {
+func (p *Probe) removeMmap(evt *event.Event) {
 	totalMapRundownFiles.Add(-1)
-	addr := evt.Params.GetAddressByName(params.FileViewBase)
-	return p.psnap.RemoveMmap(evt.PID, addr)
+	addr := evt.Params.GetAddress(0)
+	p.psnap.RemoveMmap(evt.PID, addr)
 }
 
 func (p *Probe) handleCreateFile(evt *event.Event) {
 	// Invalidate signature cache / file metadata
 	if evt.IsOverwriteDisposition() {
-		fs.GetMetadataStore().RemoveFile(evt.GetParamAsString(params.FilePath))
-		signature.GetSignatures().RemoveSignature(evt.GetParamAsString(params.FilePath))
+		path := evt.GetParamAsString(params.FilePath)
+		fs.GetMetadataStore().RemoveFile(path)
+		signature.GetSignatures().RemoveSignature(path)
 	}
 	// Start async file metadata resolution
 	if evt.IsCreateDisposition() && evt.IsSuccess() {
@@ -934,44 +878,74 @@ func (p *Probe) handleModifyFile(evt *event.Event) {
 	}
 }
 
-func (p *Probe) handleRegSetValue(evt *event.Event) {
+func (p *Probe) handleRegSetValue(evt *event.Event) error {
 	if evt.IsRegSetValueInternal() {
 		// Park the internal RegSetValue event until the public
 		// RegSetValue event for the same pid/value shows up
-		path := evt.Params.GetStringByName(params.RegPath)
-		k := pair.New(evt.PID, filepath.Base(path))
+		k := pair.New(evt.PID, evt.GetParamAsString(params.RegValue))
 		p.enqueuedRegSetValues.Add(k, evt.Clone())
-		return
+		return nil
 	}
+
+	path := evt.GetParamAsString(params.RegPath)
+	evt.SetParam(params.RegPath, params.Str(filepath.Join(path, evt.GetParamAsString(params.RegValue))))
 
 	// Returns and removes the parked internal event
 	// matching e, or nil if there is none to grab.
 	// Previously stored RegSetValueInternal event
 	// is popped from the queue. RegSetValue can
 	// be enriched with registry value type/data
-	k := pair.New(evt.PID, filepath.Base(evt.GetParamAsString(params.RegPath)))
-	// e, ok := p.enqueuedRegSetValues.Peek(k)
-	// if !ok {
-	// 	// Try to read captured data from userspace
-	// 	populateRegistryData(evt)
-	// 	return
-	// }
-	p.enqueuedRegSetValues.Remove(k)
+	k := pair.New(evt.PID, evt.GetParamAsString(params.RegValue))
+	e, ok := p.enqueuedRegSetValues.Peek(k)
+	if !ok {
+		// Try to read captured data from userspace
+		path := evt.Params.GetStringByName(params.RegPath)
+		typ, val, err := key.ReadValue(path, e.GetParamAsString(params.RegValue))
+		if err != nil {
+			// Sandboxed hives such as \Registry\WC have no root that the registry
+			// API can address. That is unreadable by design, not broken, so emit
+			// the event without the value the way a missing or access-denied value
+			// is already handled below
+			if errors.Is(err, key.ErrInvalidRoot) {
+				return nil
+			}
+			errno, ok := err.(windows.Errno)
+			if ok && (errno.Is(os.ErrNotExist) || err == windows.ERROR_ACCESS_DENIED) {
+				return nil
+			}
+			return fmt.Errorf("unable to read registry value %s : %v", path, err)
+		}
+		e.SetParam(params.RegValueType, params.U32(typ))
 
-	// Enrich the event with value data/type parameters
-	// valueType, err := e.Params.GetUint32(params.RegValueType)
-	// if err == nil {
-	// 	evt.AppendEnum(params.RegValueType, valueType, key.RegistryValueTypes)
-	// }
-
-	// valueData, err := e.Params.Get(params.RegData)
-	// if err == nil {
-	// 	evt.AppendParam(params.RegData, valueData.Type, valueData.Value)
-	// }
+		switch v := val.(type) {
+		case string:
+			e.SetParam(params.RegData, params.Str(v))
+		case []string:
+			e.SetParam(params.RegData, params.StrSlice(v))
+		case []byte:
+			e.SetParam(params.RegData, params.Bin(v))
+		case uint64:
+			if typ == registry.DWORD {
+				e.SetParam(params.RegData, params.U32(uint32(v)))
+			} else {
+				e.SetParam(params.RegData, params.U64(v))
+			}
+		}
+	} else {
+		// Enrich the event with value data/type parameters
+		p.enqueuedRegSetValues.Remove(k)
+		if e.Params.Contains(params.RegValueType) {
+			evt.SetParam(params.RegValueType, e.Params.ValueByName(params.RegValueType))
+		}
+		if e.Params.Contains(params.RegData) {
+			evt.SetParam(params.RegData, e.Params.ValueByName(params.RegData))
+		}
+	}
+	return nil
 }
 
 func (p *Probe) handleVirtualAlloc(evt *event.Event) {
-	// retrieve info about the range of pages and enrich the event
+	// Retrieve info about the range of pages and enrich the event
 	// with allocation protection options and the type of pages in
 	// the allocated region. If the region is mapped, we try to find
 	// the backing file name
@@ -1020,36 +994,6 @@ func (p *Probe) Handle(evt *event.Event) {
 	}
 }
 
-// AddPeriodic adds a new periodic to the given producer slot. Beware periodics run in the
-// event processing thread. For this reason, never run CPU-intensive tasks inside the periodic.
-func (p *Probe) AddPeriodic(producerID pipeline.ProducerID, periodic periodical.Periodic) error {
-	if producerID >= pipeline.ProducerMax {
-		return fmt.Errorf("producer ID (%d) not allowed", producerID)
-	}
-	p.periodics[producerID] = append(p.periodics[producerID], periodic)
-	return nil
-}
-
-// classifyEvent assigns the shedding priority of an event type. Events that
-// build or tear down state (process, thread, module, the rundowns that seed
-// them, and the internal RegSetValue that enriches the public one) must never
-// be shed, or the process snapshot drifts and every later lookup misses.
-// Everything else is ClassNormal. Once their volume is measured, move the
-// high-volume types (file, registry, network) to pipeline.ClassNoisy so they
-// are the first to go under pressure.
-func classifyEvent(t event.Type) pipeline.ShedClass {
-	switch t {
-	case event.CreateProcess, event.CreateProcessInternal, event.ProcessRundown, event.ProcessRundownInternal,
-		event.TerminateProcess, event.CreateThread, event.ThreadRundown, event.TerminateThread,
-		event.LoadModule, event.ModuleRundown, event.LoadModuleInternal, event.UnloadModule,
-		event.RegSetValueInternal, event.StackWalk:
-		return pipeline.ClassState
-	case event.CreateFile, event.RegOpenKey, event.RegQueryKey, event.RegQueryValue, event.OpenProcess:
-		return pipeline.ClassNoisy
-	}
-	return pipeline.ClassNormal
-}
-
 func New(ctx context.Context, psnap ps.Snapshotter, config *config.Config) (*Probe, error) {
 	ctx, cancel := context.WithCancel(ctx)
 
@@ -1058,8 +1002,6 @@ func New(ctx context.Context, psnap ps.Snapshotter, config *config.Config) (*Pro
 		cancelFunc:       cancel,
 		psnap:            psnap,
 		config:           config,
-		kernelTrace:      libetw.NewKernelTrace(config),
-		userTrace:        libetw.NewUserTrace(config),
 		errs:             make(chan error, 200),
 		filePathResolver: make(map[uint64]FileInfo),
 		fcbPathResolver:  expirable.NewLRU[uint64, FileInfo](3000, nil, time.Minute*10),
@@ -1075,15 +1017,16 @@ func New(ctx context.Context, psnap ps.Snapshotter, config *config.Config) (*Pro
 	}
 
 	pipeConfig := pipeline.DefaultConfig(2)
-	pipeConfig.RingSize = ringSize
-	pipeConfig.Classifier = classifyEvent
-	pipeConfig.Handler = p
+	pipeConfig.Sink = p
 
 	var err error
 	p.pipeline, err = pipeline.New(pipeConfig)
 	if err != nil {
 		return nil, err
 	}
+
+	p.userTrace = newTrace(libetw.NewUserTrace(config), pipeline.SourceUser, p.pipeline)
+	p.kernelTrace = newTrace(libetw.NewKernelTrace(config), pipeline.SourceKernel, p.pipeline)
 
 	if config.EventSource.StackEnrichment {
 		p.linker = NewCallstackLinker(p)

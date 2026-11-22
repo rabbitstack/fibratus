@@ -98,7 +98,7 @@ type ReorderStats struct {
 // stream. behind is how far (ns) its timestamp is below the last emitted
 // timestamp, and delay is the delivery delay (ns), i.e. now - event timestamp.
 // The p99.9 of delay per session is the value to use for lag.
-type LateHook func(producerID int, behind, delay int64)
+type LateHook func(id SourceID, behind, delay int64)
 
 // Reorderer restores a total timestamp order across sessions.
 //
@@ -195,10 +195,10 @@ func (r *Reorderer) SetLateHook(h LateHook) { r.onLate = h }
 // Len returns the number of pending events.
 func (r *Reorderer) Len() int { return len(r.h) }
 
-// Add inserts an event that arrived from the given producer at time now.
-func (r *Reorderer) Add(producerID int, ev *event.Event, now int64) {
-	if producerID < 0 || producerID >= len(r.maxTS) {
-		panic(fmt.Sprintf("pipeline: invalid producer index %d", producerID))
+// Add inserts an event that arrived from the given event source at time now.
+func (r *Reorderer) Add(sourceID SourceID, ev *event.Event, now int64) {
+	if sourceID < 0 || int(sourceID) >= len(r.maxTS) {
+		panic(fmt.Sprintf("pipeline: invalid source index %d", sourceID))
 	}
 	if ev == nil {
 		return
@@ -210,14 +210,14 @@ func (r *Reorderer) Add(producerID int, ev *event.Event, now int64) {
 	r.h.push(node{key: key, n: r.n, ev: ev})
 	r.pending.Add(1)
 
-	if !r.initialized[producerID] || key > r.maxTS[producerID] {
-		r.maxTS[producerID] = key
+	if !r.initialized[sourceID] || key > r.maxTS[sourceID] {
+		r.maxTS[sourceID] = key
 	}
-	r.initialized[producerID] = true
+	r.initialized[sourceID] = true
 
 	if key < r.lastEmitted && r.onLate != nil {
 		r.onLate(
-			producerID,
+			sourceID,
 			saturatingSub(r.lastEmitted, key),
 			saturatingSub(now, key),
 		)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2026 by Nedim Sabic Sabic
+ * Copyright 2026 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *

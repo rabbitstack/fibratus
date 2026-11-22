@@ -48,35 +48,8 @@ var (
 	mu       sync.Mutex
 )
 
-// New constructs a fresh event instance with basic fields and parameters
-// from the raw ETW event record.
-func New(rec *etw.EventRecord) *Event {
-	var (
-		pid = rec.Header.ProcessID
-		tid = rec.Header.ThreadID
-		cpu = *(*uint8)(unsafe.Pointer(&rec.BufferContext.ProcessorIndex[0]))
-		ts  = filetime.ToEpoch(rec.Header.Timestamp)
-	)
-
-	t := TypeFromEventRecord(rec)
-	e := &Event{
-		PID:       pid,
-		Tid:       tid,
-		CPU:       cpu,
-		Type:      t,
-		Params:    NewParams(t),
-		Timestamp: ts,
-		Host:      hostname.Get(),
-	}
-
-	_ = DecodeParams(rec, e)
-	e.adjustPID()
-
-	return e
-}
-
-// Parse constructs the event from the reused ring buffer instance.
-func (e *Event) Parse(rec *etw.EventRecord) {
+// Parse constructs the event from a freshed or reused pool's instance.
+func (e *Event) Parse(rec *etw.EventRecord, dec *ParamDecoder) error {
 	var (
 		pid = rec.Header.ProcessID
 		tid = rec.Header.ThreadID
@@ -92,8 +65,12 @@ func (e *Event) Parse(rec *etw.EventRecord) {
 	e.Timestamp = ts
 	e.Host = hostname.Get()
 
-	_ = DecodeParams(rec, e)
+	if err := dec.Decode(rec, e); err != nil {
+		return err
+	}
 	e.adjustPID()
+
+	return nil
 }
 
 // RawTimestamp returns the raw event record system timestamp.
