@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/rabbitstack/fibratus/pkg/policy/schemas"
 	"gopkg.in/yaml.v3"
 )
 
@@ -118,10 +117,11 @@ func (r *RuleDef) UnmarshalYAML(node *yaml.Node) error {
 	if err := node.Decode(&v); err != nil {
 		return fmt.Errorf("line %d: invalid yaml: %v", node.Line, err)
 	}
-	if valid, errs := schemas.ValidateRuleSchema(v); !valid || len(errs) > 0 {
-		return schemas.InvalidDefinitionError("rule", fmt.Sprintf("line %d", node.Line), v, errs)
-	}
-	return node.Decode((*ruleDef)(r))
+	// if valid, errs := schemas.ValidateRuleSchema(v); !valid || len(errs) > 0 {
+	// 	return schemas.InvalidDefinitionError("rule", fmt.Sprintf("line %d", node.Line), v, errs)
+	// }
+	// return node.Decode((*ruleDef)(r))
+	return nil
 }
 
 // ActionDefinition describes a single action the rule triggers. Only

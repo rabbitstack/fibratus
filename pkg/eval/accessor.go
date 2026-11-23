@@ -41,10 +41,6 @@ var (
 type Accessor interface {
 	// Get fetches the parameter value for the specified filter field.
 	Get(Field, *event.Event) (params.Value, error)
-	// SetFields sets all fields declared in the expression.
-	SetFields([]Field)
-	// SetSegments sets all segments utilized in the function predicate expression.
-	SetSegments([]fields.Segment)
 	// IsFieldAccessible determines if the field can be extracted from the
 	// given event. The condition is usually based on the event category,
 	// but it can also include different circumstances, like the presence

@@ -20,6 +20,7 @@ package eval
 
 import (
 	"slices"
+	"strings"
 
 	"github.com/rabbitstack/fibratus/pkg/compiler/ast"
 	"github.com/rabbitstack/fibratus/pkg/compiler/fields"
@@ -57,12 +58,14 @@ func (s Scope) IsUnbounded() bool {
 func scopeOf(expr ast.Expr) Scope {
 	var s Scope
 	switch expr := expr.(type) {
+	case *ast.ParenExpr:
+		return scopeOf(expr.Expr)
 	case *ast.BinaryExpr:
 		switch expr.Op {
 		case lexer.And:
-			s = intersect(scopeOf(expr.LHS), scopeOf(expr.RHS))
+			s = scopeOf(expr.LHS).intersect(scopeOf(expr.RHS))
 		case lexer.Or:
-			s = union(scopeOf(expr.LHS), scopeOf(expr.RHS))
+			s = scopeOf(expr.LHS).union(scopeOf(expr.RHS))
 		default:
 			s = scopeOfComparison(expr)
 		}
@@ -76,7 +79,7 @@ func scopeOf(expr ast.Expr) Scope {
 				s = step
 				continue
 			}
-			s = union(s, step)
+			s = s.union(step)
 		}
 	}
 	slices.Sort(s)
@@ -105,25 +108,36 @@ func scopeOfComparison(b *ast.BinaryExpr) Scope {
 		return nil
 	}
 
-	values := stringValues(operand)
+	var fold bool
+	switch b.Op {
+	case lexer.Eq, lexer.In:
+	case lexer.IEq, lexer.IIn:
+		// the evaluator compares these with strings.EqualFold
+		fold = true
+	default:
+		return nil
+	}
+
+	values := stringsFromExpr(operand)
 	if len(values) == 0 {
 		return nil
 	}
+
 	var s Scope
 	for _, name := range values {
-		t, ok := event.ParseType(name)
-		if !ok {
+		types := lookupTypes(name, fold)
+		if len(types) == 0 {
 			// can't tell what the name resolves to at runtime,
 			// so don't risk excluding events that might match
 			return nil
 		}
-		s = append(s, t)
+		s = append(s, types...)
 	}
 	return s
 }
 
-// stringValues returns the string constants of a string or list literal.
-func stringValues(expr ast.Expr) []string {
+// stringsFromExpr returns the string constants of a string or list literal.
+func stringsFromExpr(expr ast.Expr) []string {
 	switch v := expr.(type) {
 	case *ast.StringLiteral:
 		return []string{v.Value}
@@ -137,7 +151,7 @@ func stringValues(expr ast.Expr) []string {
 // constrains nothing, so the other side is returned as is. Disjoint scopes
 // can't match anything, but they are reported as unbounded, which is a safe
 // over-approximation.
-func intersect(a, b Scope) Scope {
+func (a Scope) intersect(b Scope) Scope {
 	if a.IsUnbounded() {
 		return b
 	}
@@ -155,7 +169,7 @@ func intersect(a, b Scope) Scope {
 
 // union returns the event types present in either scope. The union is
 // unbounded if either side is.
-func union(a, b Scope) Scope {
+func (a Scope) union(b Scope) Scope {
 	if a.IsUnbounded() || b.IsUnbounded() {
 		return nil
 	}
@@ -163,4 +177,24 @@ func union(a, b Scope) Scope {
 	s = append(s, a...)
 	s = append(s, b...)
 	return s
+}
+
+// lookupTypes resolves the event name to event types. The exact lookup mirrors
+// the case-sensitive `=` and `in` operators, while the folded lookup mirrors
+// `~=` and `iin`.
+func lookupTypes(name string, fold bool) []event.Type {
+	if !fold {
+		t, ok := event.ParseType(name)
+		if !ok {
+			return nil
+		}
+		return []event.Type{t}
+	}
+	var types []event.Type
+	for _, t := range event.AllTypes() {
+		if strings.EqualFold(t.String(), name) {
+			types = append(types, t)
+		}
+	}
+	return types
 }

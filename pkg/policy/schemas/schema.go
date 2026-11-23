@@ -20,11 +20,10 @@ package schemas
 
 import (
 	_ "embed"
-	"errors"
 	"fmt"
 
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
-	"github.com/xeipuuv/gojsonschema"
+	"github.com/rabbitstack/fibratus/pkg/util/schemavalidate"
 	"gopkg.in/yaml.v2"
 )
 
@@ -41,73 +40,15 @@ func InvalidDefinitionError(kind, resource string, def any, errs []error) error 
 	return fmt.Errorf("invalid %s definition: \n\n%v in %s: %v", kind, def, resource, multierror.Wrap(errs...))
 }
 
-func ValidateRuleSchema(m any) (bool, []error) {
-	return true, nil
+func ValidateRuleSchema(m any) (bool, error) {
+	schema, err := schemavalidate.NewFromString(ruleSchema)
+	if err != nil {
+		return false, err
+	}
+	err = schema.Validate(m)
+	return err == nil, err
 }
 
 func ValidateMacrosSchema(m any) (bool, []error) {
 	return true, nil
-}
-
-func validateSchema(schema string, m any) (bool, []error) {
-	converted, err := toStringKeys(m, "")
-	if err != nil {
-		return false, []error{fmt.Errorf("fail to convert keys to string: %v", err)}
-	}
-	r, err := gojsonschema.Validate(gojsonschema.NewStringLoader(schema), gojsonschema.NewGoLoader(converted))
-	if err != nil {
-		return false, []error{fmt.Errorf("fail to validate file through schema: %v", err)}
-	}
-	errs := make([]error, len(r.Errors()))
-	for i, err := range r.Errors() {
-		errs[i] = errors.New(err.String())
-	}
-	return r.Valid(), errs
-}
-
-// toStringKeys ensures YAML map keys are strings, as required by the JSON schema validator.
-func toStringKeys(value any, prefix string) (any, error) {
-	join := func(k string) string {
-		if prefix == "" {
-			return k
-		}
-		return prefix + "." + k
-	}
-	switch v := value.(type) {
-	case map[string]any:
-		dict := make(map[string]any, len(v))
-		for k, e := range v {
-			c, err := toStringKeys(e, join(k))
-			if err != nil {
-				return nil, err
-			}
-			dict[k] = c
-		}
-		return dict, nil
-	case map[any]any:
-		dict := make(map[string]any, len(v))
-		for k, e := range v {
-			ks, ok := k.(string)
-			if !ok {
-				return nil, fmt.Errorf("non-string key in %q: %#v", prefix, k)
-			}
-			c, err := toStringKeys(e, join(ks))
-			if err != nil {
-				return nil, err
-			}
-			dict[ks] = c
-		}
-		return dict, nil
-	case []any:
-		list := make([]any, 0, len(v))
-		for i, e := range v {
-			c, err := toStringKeys(e, fmt.Sprintf("%s[%d]", prefix, i))
-			if err != nil {
-				return nil, err
-			}
-			list = append(list, c)
-		}
-		return list, nil
-	}
-	return value, nil
 }

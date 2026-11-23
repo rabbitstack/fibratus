@@ -30,17 +30,16 @@ import (
 var accessorErrors = expvar.NewMap("eval.accessor.errors")
 
 // FieldsConfigurer is implemented by accessors whose behavior depends on the
-// fields referenced by the expression. For example, the PE accessor enables
-// only the parser options the fields in the rule need. Such an accessor holds
-// per-expression state, so every Extractor gets a private instance of it.
+// fields referenced by the expression. Such an accessor holds per-expression
+// state, so every Extractor gets a private instance of it.
 type FieldsConfigurer interface {
-	SetFields(fields []Field)
+	SetFields([]Field)
 }
 
 // SegmentsConfigurer is the same as FieldsConfigurer, but for accessors
 // that depend on the segments referenced by the expression.
 type SegmentsConfigurer interface {
-	SetSegments(segments []Segment)
+	SetSegments([]Segment)
 }
 
 // sharedAccessors holds the accessors that don't depend on the expression.
@@ -54,24 +53,22 @@ var sharedAccessors = sync.OnceValue(GetAccessors)
 // instances configured for this expression. The chain keeps the order
 // of GetAccessors.
 func newAccessors(flds []Field, segs []Segment) []Accessor {
-	//shared := sharedAccessors()
 	accessors := GetAccessors()
 
-	// 	for i, acc := range accessors {
-	// 		fc, hasFields := acc.(FieldsConfigurer)
-	// 		sc, hasSegments := acc.(SegmentsConfigurer)
-	// 		if !hasFields && !hasSegments {
-	// 			accessors[i] = shared[i]
-	// 			continue
-	// 		}
-	// 		if hasFields {
-	// 			fc.SetFields(flds)
-	// 		}
-	// 		if hasSegments {
-	// 			sc.SetSegments(segs)
-	// 		}
-	// 	}
-	// 	return accessors
+	for i, accessor := range accessors {
+		fc, hasFields := accessor.(FieldsConfigurer)
+		sc, hasSegments := accessor.(SegmentsConfigurer)
+		if !hasFields && !hasSegments {
+			accessors[i] = shared[i]
+			continue
+		}
+		if hasFields {
+			fc.SetFields(flds)
+		}
+		if hasSegments {
+			sc.SetSegments(segs)
+		}
+	}
 	return accessors
 }
 

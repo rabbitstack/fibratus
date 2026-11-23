@@ -30,7 +30,6 @@ import (
 // An Evaluator is immutable once constructed, so it is safe for concurrent
 // use as long as each goroutine brings its own ValuerCache and the accessors
 // are themselves safe for concurrent use.
-
 type Evaluator struct {
 	// ID identifies the evaluator, typically the rule or filter name.
 	ID string
@@ -78,8 +77,8 @@ func NewEvaluator(id string, expression string, opts ...Option) (*Evaluator, err
 		opt(&o)
 	}
 
-	var expr ast.Expr
 	var err error
+	var expr ast.Expr
 	if o.macros != nil {
 		expr, err = parser.Parse(expression, parser.WithMacroResolver(o.macros))
 		if err != nil {
@@ -143,6 +142,8 @@ func (e *Evaluator) GetExpr() ast.Expr {
 	return e.expr
 }
 
+// GetEventTypes returns all event types reachable in the expression.
+// Alias for event scopes.
 func (e *Evaluator) GetEventTypes() []event.Type {
 	return e.scope
 }
