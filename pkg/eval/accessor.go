@@ -21,7 +21,6 @@ package eval
 import (
 	"errors"
 	"net"
-	"reflect"
 	"time"
 
 	"github.com/rabbitstack/fibratus/pkg/compiler/fields"
@@ -40,7 +39,7 @@ var (
 // from the non-params constructs such as process' state or PE metadata.
 type Accessor interface {
 	// Get fetches the parameter value for the specified filter field.
-	Get(Field, *event.Event) (params.Value, error)
+	Get(Field, *event.Event) (any, error)
 	// IsFieldAccessible determines if the field can be extracted from the
 	// given event. The condition is usually based on the event category,
 	// but it can also include different circumstances, like the presence
@@ -52,7 +51,7 @@ type Accessor interface {
 type evtAccessor struct{}
 
 func (evtAccessor) SetFields([]Field)                   {}
-func (evtAccessor) SetSegments([]fields.Segment)        {}
+func (evtAccessor) SetSegments([]Segment)               {}
 func (evtAccessor) IsFieldAccessible(*event.Event) bool { return true }
 
 func newEventAccessor() Accessor {
@@ -138,35 +137,13 @@ func (*evtAccessor) get(f Field, evt *event.Event) (any, error) {
 	return nil, nil
 }
 
-// param returns the value of the named event parameter extracted by the getter. The
-// ErrParamNotFound error is returned if the event doesn't carry the parameter, so the
-// filter can fall back to the default value of the field.
-func param[T any](e *event.Event, name string, get func(event.Params, string) T) (T, error) {
+// param returns the value of the named event parameter extracted by the getter.
+func param[T any](e *event.Event, name string, get func(event.Params, string) T) T {
 	if !e.Params.Contains(name) {
 		var zero T
-		return zero, &errs.ErrParamNotFound{Name: name}
+		return zero
 	}
-	return get(e.Params, name), nil
-}
-
-// narrowAccessors dynamically disables filter accessors by walking
-// the fields declared in the expression. The field can be expressed
-// as a regular LHS/RHS component, used as a function parameter or
-// referenced in the bound field.
-func (f *filter) narrowAccessors() {
-	f.pruneUnusedAccessors()
-	for _, accessor := range f.accessors {
-		accessor.SetFields(f.fields)
-		accessor.SetSegments(f.segments)
-	}
-}
-
-func (f *filter) removeAccessor(removed Accessor) {
-	for i, accessor := range f.accessors {
-		if reflect.TypeOf(accessor) == reflect.TypeOf(removed) {
-			f.accessors = append(f.accessors[:i], f.accessors[i+1:]...)
-		}
-	}
+	return get(e.Params, name)
 }
 
 var (

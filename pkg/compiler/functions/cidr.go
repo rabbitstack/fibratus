@@ -28,6 +28,10 @@ import (
 // represent IP addresses in CIDR notation.
 type CIDRContains struct{}
 
+func init() {
+	Register(&CIDRContains{})
+}
+
 func (f CIDRContains) Call(args []interface{}) (interface{}, bool) {
 	if len(args) < 2 {
 		return false, false
@@ -82,7 +86,3 @@ func (f CIDRContains) Desc() FunctionDesc {
 }
 
 func (f CIDRContains) Name() Fn { return CIDRContainsFn }
-
-func init() {
-	Register(CIDRContainsFn, &CIDRContains{})
-}

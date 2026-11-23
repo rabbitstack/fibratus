@@ -22,15 +22,14 @@ import (
 	"time"
 
 	"github.com/rabbitstack/fibratus/pkg/event"
-	"github.com/rabbitstack/fibratus/pkg/event/params"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 )
 
-// baseTime is the default timestamp of the events built by MakeEvent.
-var baseTime = time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+// ts is the default timestamp of the events built by MakeEvent.
+var ts = time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 
 // BaseTime returns the default timestamp of the events built by MakeEvent.
-func BaseTime() time.Time { return baseTime }
+func BaseTime() time.Time { return ts }
 
 // EventOption customizes the event built by MakeEvent.
 type EventOption func(*event.Event)
@@ -41,8 +40,7 @@ type EventOption func(*event.Event)
 func MakeEvent(t event.Type, opts ...EventOption) *event.Event {
 	e := &event.Event{
 		Type:      t,
-		Timestamp: baseTime,
-		Params:    make(event.Params),
+		Timestamp: ts,
 		Metadata:  make(event.Metadata),
 	}
 	for _, opt := range opts {
@@ -65,12 +63,12 @@ func WithTimestamp(ts time.Time) EventOption { return func(e *event.Event) { e.T
 
 // WithOffset sets the event timestamp relative to BaseTime.
 func WithOffset(d time.Duration) EventOption {
-	return func(e *event.Event) { e.Timestamp = baseTime.Add(d) }
+	return func(e *event.Event) { e.Timestamp = ts.Add(d) }
 }
 
 // WithParam appends the event parameter.
-func WithParam(name string, typ params.Type, value params.Value) EventOption {
-	return func(e *event.Event) { e.Params.Append(name, typ, value) }
+func WithParams(params ...event.Param) EventOption {
+	return func(e *event.Event) { e.Params = event.ParamsOf(params...) }
 }
 
 // WithMetadata attaches the metadata tag to the event.
@@ -97,7 +95,7 @@ func MakePS(pid uint32, name string, opts ...PSOption) *pstypes.PS {
 	ps := &pstypes.PS{
 		PID:       pid,
 		Name:      name,
-		StartTime: baseTime,
+		StartTime: ts,
 		Threads:   make(map[uint32]pstypes.Thread),
 		Modules:   make([]pstypes.Module, 0),
 	}

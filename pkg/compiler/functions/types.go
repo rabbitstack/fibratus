@@ -18,6 +18,11 @@
 
 package functions
 
+import (
+	"fmt"
+	"strings"
+)
+
 const maxArgs = 1 << 5
 
 // Fn is the type alias for function definitions.
@@ -114,8 +119,7 @@ const (
 	Unknown
 )
 
-// funcs represents the function registry
-var funcs = make(map[Fn]FunctionDef)
+var funcs = map[string]FunctionDef{} // functions registry
 
 // String returns the argument type as a string value.
 func (typ ArgType) String() string {
@@ -250,18 +254,6 @@ func (f Fn) String() string {
 	}
 }
 
-func Register(name Fn, fn FunctionDef) {
-	if _, exists := funcs[name]; exists {
-		panic("function already registered: " + name.String())
-	}
-	funcs[name] = fn
-}
-
-func Get(name Fn) (FunctionDef, bool) {
-	fn, ok := funcs[name]
-	return fn, ok
-}
-
 // parseString yields a string value from the specific position in the args slice.
 func parseString(index int, args []interface{}) string {
 	if index > len(args)-1 {
@@ -272,4 +264,20 @@ func parseString(index int, args []interface{}) string {
 		return ""
 	}
 	return s
+}
+
+// Register makes a function available by name (case-insensitive).
+// It is intended to be called from init() and panics on errors.
+func Register(fn FunctionDef) {
+	n := strings.ToUpper(fn.Name().String())
+	if _, ok := funcs[n]; ok {
+		panic(fmt.Sprintf("function %s already registered", n))
+	}
+	funcs[n] = fn
+}
+
+// Lookup returns the function registered under name, if any.
+func Lookup(n string) (FunctionDef, bool) {
+	fn, ok := funcs[strings.ToUpper(n)]
+	return fn, ok
 }

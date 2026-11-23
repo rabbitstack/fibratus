@@ -342,7 +342,7 @@ func (s *SequenceEvaluator) evalBound(step *SequenceStep, c *SequenceChain, e *e
 		if ref.stage >= len(c.events) {
 			continue
 		}
-		valuer.Valuer[ref.value] = ref.field.Extract(c.events[ref.stage])
+		valuer.Valuer[ref.value] = s.evaluator.ExtractField(ref.field, c.events[ref.stage])
 	}
 	defer func() {
 		for _, ref := range step.bound {
@@ -395,36 +395,6 @@ func (s *SequenceEvaluator) expireChain(id uint64) {
 	}
 	log.Debugf("sequence maxspan [%s] elapsed, dropping the chain of %d event(s)", s.maxSpan, len(c.events))
 	s.drop(c)
-}
-
-// expire drops the chains that contain the events of the process terminated by the event.
-func (s *SequenceEvaluator) expire(evt *event.Event) {
-	if !evt.IsTerminateProcess() {
-		return
-	}
-
-	pid := evt.Params.GetPid()
-	canExpire := func(e *event.Event, pid uint32) bool {
-		// the chain can be dropped only if the remote process terminates
-		if e.IsCreateRemoteThread() {
-			return e.Params.GetPid() == pid
-		}
-		// final stage holds a CreateProcess event. Only expire
-		// if the spawned pid matches the terminating pid
-		//TODO:
-
-		// Everything else
-		return e.PID == pid
-	}
-
-	for _, stage := range s.lookups {
-		for _, chain := range stage {
-			if slices.ContainsFunc(chain.events,
-				func(evt *event.Event) bool { return canExpire(evt, pid) }) {
-				s.drop(chain)
-			}
-		}
-	}
 }
 
 // Len returns the number of in-progress chains.

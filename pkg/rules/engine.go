@@ -187,7 +187,7 @@ func NewEngine(cfg config.RulesConfig, opts ...EngineOption) *Engine {
 		e.providers = []policy.Provider{policy.NewDirProvider(cfg.RulePaths, cfg.MacroPaths)}
 	}
 	e.policyLoader = policy.NewLoader(policy.DefaultLoadOptions(), e.providers...)
-	e.ruleSet.Store(NewEmptyRuleSet())
+	//e.ruleSet.Store(NewEmptyRuleSet())
 	return e
 }
 
@@ -272,16 +272,17 @@ func (e *Engine) LoadPolicies(sendLoadedReport bool) error {
 	e.reloadMu.Lock()
 	defer e.reloadMu.Unlock()
 
-	policies, err := e.policyLoader.LoadPolicies()
-	if err != nil {
-		return e.loadFailed(err)
-	}
+	//policies, err := e.policyLoader.LoadPolicies()
+	// if err != nil {
+	// 	return e.loadFailed(err)
+	// }
 
-	opts := append([]Option{WithMatchAll(e.cfg.MatchAll)}, e.rsOpts...)
-	rs, err := NewRuleSet(policies, opts...)
-	if err != nil {
-		return e.loadFailed(err)
-	}
+	//opts := append([]Option{WithMatchAll(e.cfg.MatchAll)}, e.rsOpts...)
+	//rs, err := NewRuleSet(policies, opts...)
+	rs := NewRuleSet()
+	// if err != nil {
+	// 	return e.loadFailed(err)
+	// }
 
 	// the engine is notified about every rule that matches
 	rs.AddListener(e)

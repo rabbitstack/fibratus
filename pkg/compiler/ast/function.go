@@ -91,16 +91,16 @@ type FunctionDef interface {
 // FunctionValuer implements the CallValuer interface and delegates
 // the evaluation of function calls to the corresponding functions.
 type FunctionValuer struct {
-	m map[string]interface{}
+	m map[string]any
 }
 
-func (f FunctionValuer) Value(key string) (interface{}, bool) {
+func (f FunctionValuer) Value(key string) (any, bool) {
 	v, ok := f.m[key]
 	return v, ok
 }
 
-func (FunctionValuer) Call(name string, args []interface{}) (interface{}, bool) {
-	fn, ok := funcs[strings.ToUpper(name)]
+func (FunctionValuer) Call(name string, args []any) (any, bool) {
+	fn, ok := functions.Lookup(name)
 	if !ok {
 		return nil, false
 	}

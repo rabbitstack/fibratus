@@ -52,9 +52,9 @@ func (e *evtAccessor) Get(f Field, evt *event.Event) (any, error) {
 
 	switch f.Name {
 	case fields.EvtRetval:
-		return param(evt, params.Retval, event.Params.GetInt64ByName)
+		return param(evt, params.Retval, event.Params.GetInt64ByName), nil
 	case fields.EvtSyscallID:
-		return param(evt, params.SyscallID, event.Params.GetUint32ByName)
+		return param(evt, params.SyscallID, event.Params.GetUint32ByName), nil
 	}
 
 	return nil, err
@@ -122,12 +122,12 @@ func (a *psAccessor) Get(f Field, e *event.Event) (any, error) {
 		if e.PS != nil {
 			return e.PS.UID, nil
 		}
-		return param(e, params.UID, event.Params.GetUint32ByName)
+		return param(e, params.UID, event.Params.GetUint32ByName), nil
 	case fields.PsGID:
 		if e.PS != nil {
 			return e.PS.GID, nil
 		}
-		return param(e, params.GID, event.Params.GetUint32ByName)
+		return param(e, params.GID, event.Params.GetUint32ByName), nil
 	case fields.PsUUID:
 		if e.PS == nil {
 			return nil, ErrPsNil
@@ -212,19 +212,16 @@ func (a *psAccessor) Get(f Field, e *event.Event) (any, error) {
 		}
 		return envs, nil
 	case fields.PsSignal:
-		sig, err := param(e, params.Signal, event.Params.GetInt32ByName)
-		if err != nil {
-			return nil, err
-		}
+		sig := param(e, params.Signal, event.Params.GetInt32ByName)
 		return int64(sig), nil
 	case fields.PsTargetPID:
-		return param(e, params.TargetProcessID, event.Params.GetInt64ByName)
+		return param(e, params.TargetProcessID, event.Params.GetInt64ByName), nil
 	case fields.PsPtraceRequest:
-		return param(e, params.PtraceRequest, event.Params.GetInt64ByName)
+		return param(e, params.PtraceRequest, event.Params.GetInt64ByName), nil
 	case fields.PsPrctlOption:
-		return param(e, params.PrctlOption, event.Params.GetInt64ByName)
+		return param(e, params.PrctlOption, event.Params.GetInt64ByName), nil
 	case fields.PsCloneFlags:
-		return param(e, params.CloneFlags, event.Params.GetUint64ByName)
+		return param(e, params.CloneFlags, event.Params.GetUint64ByName), nil
 	default:
 		return nil, nil
 	}
@@ -250,13 +247,13 @@ func (*fileAccessor) Get(f Field, e *event.Event) (any, error) {
 	case fields.FilePathTarget:
 		return e.GetParamAsString(params.FileNewPath), nil
 	case fields.FileDirFD:
-		return param(e, params.DirFD, event.Params.GetInt64ByName)
+		return param(e, params.DirFD, event.Params.GetInt64ByName), nil
 	case fields.FileFD:
-		return param(e, params.FD, event.Params.GetInt64ByName)
+		return param(e, params.FD, event.Params.GetInt64ByName), nil
 	case fields.FileFlags:
-		return param(e, params.FileFlags, event.Params.GetUint64ByName)
+		return param(e, params.FileFlags, event.Params.GetUint64ByName), nil
 	case fields.FileMode:
-		return param(e, params.FileMode, event.Params.GetUint64ByName)
+		return param(e, params.FileMode, event.Params.GetUint64ByName), nil
 	default:
 		return nil, nil
 	}
@@ -272,19 +269,19 @@ func newNetworkAccessor() Accessor                            { return &networkA
 func (*networkAccessor) Get(f Field, e *event.Event) (any, error) {
 	switch f.Name {
 	case fields.NetDIP:
-		return param(e, params.NetDIP, event.Params.GetIPByName)
+		return param(e, params.NetDIP, event.Params.GetIPByName), nil
 	case fields.NetSIP:
-		return param(e, params.NetSIP, event.Params.GetIPByName)
+		return param(e, params.NetSIP, event.Params.GetIPByName), nil
 	case fields.NetDport:
-		return param(e, params.NetDport, event.Params.GetUint16ByName)
+		return param(e, params.NetDport, event.Params.GetUint16ByName), nil
 	case fields.NetSport:
-		return param(e, params.NetSport, event.Params.GetUint16ByName)
+		return param(e, params.NetSport, event.Params.GetUint16ByName), nil
 	case fields.NetFamily:
-		return param(e, params.SockFamily, event.Params.GetUint16ByName)
+		return param(e, params.SockFamily, event.Params.GetUint16ByName), nil
 	case fields.NetUnixPath:
 		return e.GetParamAsString(params.SockPath), nil
 	case fields.NetFD:
-		return param(e, params.FD, event.Params.GetInt64ByName)
+		return param(e, params.FD, event.Params.GetInt64ByName), nil
 	default:
 		return nil, nil
 	}
@@ -300,19 +297,19 @@ func newMemAccessor() Accessor                            { return &memAccessor{
 func (*memAccessor) Get(f Field, e *event.Event) (any, error) {
 	switch f.Name {
 	case fields.MemBaseAddress:
-		return param(e, params.MemBaseAddress, event.Params.GetUint64ByName)
+		return param(e, params.MemBaseAddress, event.Params.GetUint64ByName), nil
 	case fields.MemRegionSize:
-		return param(e, params.MemRegionSize, event.Params.GetUint64ByName)
+		return param(e, params.MemRegionSize, event.Params.GetUint64ByName), nil
 	case fields.MemProtection:
-		return param(e, params.MemProtect, event.Params.GetUint32ByName)
+		return param(e, params.MemProtect, event.Params.GetUint32ByName), nil
 	case fields.MemMmapFlags:
-		return param(e, params.MmapFlags, event.Params.GetUint64ByName)
+		return param(e, params.MmapFlags, event.Params.GetUint64ByName), nil
 	case fields.MemMmapFD:
-		return param(e, params.FD, event.Params.GetInt64ByName)
+		return param(e, params.FD, event.Params.GetInt64ByName), nil
 	case fields.MemMmapOffset:
-		return param(e, params.MmapOffset, event.Params.GetUint64ByName)
+		return param(e, params.MmapOffset, event.Params.GetUint64ByName), nil
 	case fields.MemTargetPID:
-		return param(e, params.TargetProcessID, event.Params.GetInt64ByName)
+		return param(e, params.TargetProcessID, event.Params.GetInt64ByName), nil
 	default:
 		return nil, nil
 	}
@@ -344,49 +341,4 @@ func pathStem(p string) string {
 		return p
 	}
 	return p[:n]
-}
-
-func (f *filter) pruneUnusedAccessors() {
-	removeEvtAccessor := true
-	removePsAccessor := true
-	removeFileAccessor := true
-	removeNetworkAccessor := true
-	removeMemAccessor := true
-	removeThreadAccessor := true
-
-	for _, field := range f.fields {
-		switch {
-		case field.Name.IsEvtField() || field.Name.IsKevtField():
-			removeEvtAccessor = false
-		case field.Name.IsPsField():
-			removePsAccessor = false
-		case field.Name.IsFileField():
-			removeFileAccessor = false
-		case field.Name.IsNetworkField():
-			removeNetworkAccessor = false
-		case field.Name.IsMemField():
-			removeMemAccessor = false
-		case field.Name.IsThreadField():
-			removeThreadAccessor = false
-		}
-	}
-
-	if removeEvtAccessor {
-		f.removeAccessor(&evtAccessor{})
-	}
-	if removePsAccessor {
-		f.removeAccessor(&psAccessor{})
-	}
-	if removeFileAccessor {
-		f.removeAccessor(&fileAccessor{})
-	}
-	if removeNetworkAccessor {
-		f.removeAccessor(&networkAccessor{})
-	}
-	if removeMemAccessor {
-		f.removeAccessor(&memAccessor{})
-	}
-	if removeThreadAccessor {
-		f.removeAccessor(&threadAccessor{})
-	}
 }

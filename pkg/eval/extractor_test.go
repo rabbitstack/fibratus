@@ -1,7 +1,5 @@
-//go:build windows
-
 /*
- * Copyright 2026 by Mostafa Moradian
+ * Copyright 2026 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -18,10 +16,4 @@
  * limitations under the License.
  */
 
-package filter
-
-import "github.com/rabbitstack/fibratus/pkg/event"
-
-// AlwaysAllowed has no Windows counterpart because the ETW source does its own
-// approver work in internal/etw/approvers.
-func AlwaysAllowed(event.Type) bool { return false }
+package eval

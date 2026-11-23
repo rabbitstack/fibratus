@@ -22,7 +22,6 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/rabbitstack/fibratus/pkg/compiler/fields"
 	"github.com/rabbitstack/fibratus/pkg/compiler/macro"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/policy"
@@ -73,45 +72,6 @@ func fieldNames(e *Evaluator) []string {
 		names = append(names, f.String())
 	}
 	return names
-}
-
-func TestFieldsAreUnique(t *testing.T) {
-	f := NewFields()
-	f.Add(Field{Name: fields.PsName, Value: "ps.name"})
-	f.Add(Field{Name: fields.PsName, Value: "ps.name"})
-	f.Add(Field{Name: fields.PsName, Value: "ps.name"}, Field{Name: fields.FileName, Value: "file.name"})
-	// the same field bound to a different aliases is a distinct field
-	f.Add(Field{Name: fields.PsName, Value: "$e1.ps.name", BoundVar: "e1"})
-	f.Add(Field{Name: fields.PsName, Value: "$e1.ps.name", BoundVar: "e1"})
-	f.Add(Field{Name: fields.PsName, Value: "$e2.ps.name", BoundVar: "e2"})
-	// fields with arguments are distinct from fields without
-	f.Add(Field{Name: fields.EvtArg, Value: "evt.arg", Arg: "cmdline"}, Field{Name: fields.EvtArg, Value: "evt.arg", Arg: "exe"})
-
-	assert.Len(t, f.List(), 6)
-
-	// the zero value is usable
-	var zero Fields
-	zero.Add(Field{Name: fields.PsName, Value: "ps.name"})
-	assert.Len(t, zero.List(), 1)
-}
-
-func TestExtractToValuerSkipsBoundFields(t *testing.T) {
-	f := NewFields()
-	f.Add(
-		Field{Name: fields.PsName, Value: "ps.name"},
-		Field{Name: fields.PsName, Value: "$e1.ps.name", BoundVar: "e1"},
-	)
-
-	evt := testutil.MakeEvent(event.CreateProcess, testutil.WithPS(testutil.MakePS(1024, "cmd.exe")))
-
-	valuer := AcquireValuerCache()
-	defer valuer.Release()
-
-	f.ExtractToValuer(evt, valuer)
-
-	assert.Equal(t, "cmd.exe", valuer.Valuer["ps.name"])
-	_, ok := valuer.Valuer["$e1.ps.name"]
-	assert.False(t, ok)
 }
 
 func TestEvaluatorEval(t *testing.T) {
@@ -205,22 +165,4 @@ func TestEvaluatorBooleanFields(t *testing.T) {
 	ev, err := NewEvaluator(uuid.New().String(), "evt.name = 'CreateFile' and not file.is_exec")
 	require.NoError(t, err)
 	assert.Contains(t, fieldNames(ev), "file.is_exec")
-}
-
-func TestEvaluatorBoundFields(t *testing.T) {
-	ev, err := NewEvaluator(uuid.New().String(), `sequence
-		|evt.name = 'CreateProcess'| as e1
-		|evt.name = 'CreateFile' and ps.sid != $e1.ps.sid|
-	`)
-	require.NoError(t, err)
-
-	var bound []Field
-	for _, f := range ev.GetFields() {
-		if f.IsBound() {
-			bound = append(bound, f)
-		}
-	}
-	require.Len(t, bound, 1)
-	assert.Equal(t, "$e1.ps.sid", bound[0].Value)
-	assert.Equal(t, fields.PsSID, bound[0].Name)
 }

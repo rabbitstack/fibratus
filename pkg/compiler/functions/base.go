@@ -26,6 +26,10 @@ import (
 // Base returns the last element of the path.
 type Base struct{}
 
+func init() {
+	Register(&Base{})
+}
+
 func (f Base) Call(args []interface{}) (interface{}, bool) {
 	if len(args) < 1 {
 		return false, false
@@ -70,8 +74,4 @@ func (f Base) trimExt(base string, args []interface{}) string {
 		}
 	}
 	return base
-}
-
-func init() {
-	Register(BaseFn, &Base{})
 }

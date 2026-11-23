@@ -47,9 +47,9 @@ func (c *ValuerCache) Release() {
 	valuerCachePool.Put(c)
 }
 
-func (c *ValuerCache) Put(event *event.Event, f Field) {
+func (c *ValuerCache) Put(evt *event.Event, f Field, extractor *Extractor) {
 	n := f.String()
 	if _, ok := c.Valuer[n]; !ok {
-		c.Valuer[n] = f.Extract(event)
+		c.Valuer[n] = extractor.Extract(f, evt)
 	}
 }

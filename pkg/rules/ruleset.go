@@ -131,19 +131,20 @@ type RuleSet struct {
 
 // NewRuleSet returns a new ruleset for the specified data model
 func NewRuleSet(opts ...Option) *RuleSet {
-	logger := log.OrNullLogger(opts.Logger)
+	// logger := log.OrNullLogger(opts.Logger)
 
-	if evalOpts.MacroStore == nil {
-		evalOpts.WithMacroStore(&eval.MacroStore{})
-	}
+	// if evalOpts.MacroStore == nil {
+	// 	evalOpts.WithMacroStore(&eval.MacroStore{})
+	// }
 
-	if evalOpts.VariableStore == nil {
-		evalOpts.WithVariableStore(&eval.VariableStore{})
-	}
+	// if evalOpts.VariableStore == nil {
+	// 	evalOpts.WithVariableStore(&eval.VariableStore{})
+	// }
 
-	return &RuleSet{
-		opts:             opts,
-	}
+	// return &RuleSet{
+	// 	opts: opts,
+	// }
+	return &RuleSet{}
 }
 
 // NewRuleSet builds the rule set from the policies. The macros of all
@@ -190,7 +191,6 @@ func NewRuleSet(opts ...Option) *RuleSet {
 
 // 	return rs, nil
 // }
-
 
 // func NewEmptyRuleSet(opts ...Option) *RuleSet {
 // 	rs := &RuleSet{
@@ -272,7 +272,7 @@ func (rs *RuleSet) AddRule(ruleDef *policy.RuleDef, source string) error {
 		}
 	}
 
-	scope := rule.scope
+	scope := rule.evaluator.GetScope()
 	if scope == nil {
 		log.Warnf("%q rule doesn't have the event type condition! "+
 			"This rule is being discarded by the engine. Please consider "+
@@ -282,7 +282,7 @@ func (rs *RuleSet) AddRule(ruleDef *policy.RuleDef, source string) error {
 		rs.discard(ruleDef.Name, source, "the rule is not scoped by the event type")
 		return nil
 	}
-	if scope.IsEmpty() {
+	if scope.IsUnbounded() {
 		log.Warnf("%q rule can never match because its event type "+
 			"conditions are contradicting. This rule is being "+
 			"discarded by the engine", ruleDef.Name)
@@ -349,7 +349,7 @@ func validateEventRefs(rule *Rule) error {
 func (rs *RuleSet) AddListener(listener RuleSetListener) {
 	rs.listenersLock.Lock()
 	defer rs.listenersLock.Unlock()
-	rs.listeners = append(rs.listeners, listener)\
+	rs.listeners = append(rs.listeners, listener)
 }
 
 // NotifyRuleMatch notifies the rule set listeners that the rule matched. The
@@ -542,76 +542,77 @@ func (rs *RuleSet) Len() int {
 }
 
 // LoadPolicies loads policies from the provided policy loader and returns
-func (rs *RuleSet) LoadPolicies() ([]*policy.RuleDef, *multierror.Error) {
-	var (
-		errs          *multierror.Error
-		allRules      []*policy.RuleDef
-		filteredRules []*policy.RuleDef
-		allMacros     []*policy.MacroDef
-		macroIndex    = make(map[string]*policy.MacroDef)
-		rulesIndex    = make(map[string]*policy.RuleDef)
-	)
+func (rs *RuleSet) LoadPolicies() ([]*policy.RuleDef, multierror.MultiError) {
+	// var (
+	// 	errs          *multierror.Error
+	// 	allRules      []*policy.RuleDef
+	// 	filteredRules []*policy.RuleDef
+	// 	allMacros     []*policy.MacroDef
+	// 	macroIndex    = make(map[string]*policy.MacroDef)
+	// 	rulesIndex    = make(map[string]*policy.RuleDef)
+	// )
 
-	policies, err := rs.policyLoader.LoadPolicies(opts)
-	if err != nil {
-		errs = multierror.Append(errs, err)
-	}
-	rs.policies.Store(policies)
+	// policies, err := rs.policyLoader.LoadPolicies(opts)
+	// if err != nil {
+	// 	errs = multierror.Append(errs, err)
+	// }
+	// rs.policies.Store(policies)
 
-	for _, policy := range policies {
-		if len(policy.Macros) == 0 && len(policy.Rules) == 0 && (policy.Info.Name != DefaultPolicyName && !policy.Info.IsInternal) {
-			errs = multierror.Append(errs, &ErrPolicyLoad{
-				Name:    policy.Info.Name,
-				Type:    policy.Info.Type,
-				Version: policy.Info.Version,
-				Source:  policy.Info.Source,
-				Err:     ErrPolicyIsEmpty,
-			})
-			continue
-		}
+	// for _, policy := range policies {
+	// 	if len(policy.Macros) == 0 && len(policy.Rules) == 0 && (policy.Info.Name != DefaultPolicyName && !policy.Info.IsInternal) {
+	// 		errs = multierror.Append(errs, &ErrPolicyLoad{
+	// 			Name:    policy.Info.Name,
+	// 			Type:    policy.Info.Type,
+	// 			Version: policy.Info.Version,
+	// 			Source:  policy.Info.Source,
+	// 			Err:     ErrPolicyIsEmpty,
+	// 		})
+	// 		continue
+	// 	}
 
-		for _, macro := range policy.GetAcceptedMacros() {
-			if existingMacro := macroIndex[macro.Def.ID]; existingMacro != nil {
-				if err := existingMacro.MergeWith(macro); err != nil {
-					errs = multierror.Append(errs, err)
-				}
-			} else {
-				macroIndex[macro.Def.ID] = macro
-				allMacros = append(allMacros, macro)
-			}
-		}
+	// 	for _, macro := range policy.GetAcceptedMacros() {
+	// 		if existingMacro := macroIndex[macro.Def.ID]; existingMacro != nil {
+	// 			if err := existingMacro.MergeWith(macro); err != nil {
+	// 				errs = multierror.Append(errs, err)
+	// 			}
+	// 		} else {
+	// 			macroIndex[macro.Def.ID] = macro
+	// 			allMacros = append(allMacros, macro)
+	// 		}
+	// 	}
 
-		for _, rule := range policy.GetAcceptedRules() {
-			if existingRule := rulesIndex[rule.Def.ID]; existingRule != nil {
-				existingRule.UsedBy = append(existingRule.UsedBy, rule.Policy)
-				existingRule.MergeWith(rule)
-			} else {
-				rulesIndex[rule.Def.ID] = rule
-				allRules = append(allRules, rule)
-			}
-		}
+	// 	for _, rule := range policy.GetAcceptedRules() {
+	// 		if existingRule := rulesIndex[rule.Def.ID]; existingRule != nil {
+	// 			existingRule.UsedBy = append(existingRule.UsedBy, rule.Policy)
+	// 			existingRule.MergeWith(rule)
+	// 		} else {
+	// 			rulesIndex[rule.Def.ID] = rule
+	// 			allRules = append(allRules, rule)
+	// 		}
+	// 	}
 
-		for _, rule := range policy.GetFilteredRules() {
-			if existingRule := rulesIndex[rule.Def.ID]; existingRule != nil {
-				// if the rule is already in the rules index, this means that a rule with the same ID was already accepted
-				// in this case let's only report the version of the rule that was accepted
-				continue
-			}
-			filteredRules = append(filteredRules, rule)
-		}
-	}
+	// 	for _, rule := range policy.GetFilteredRules() {
+	// 		if existingRule := rulesIndex[rule.Def.ID]; existingRule != nil {
+	// 			// if the rule is already in the rules index, this means that a rule with the same ID was already accepted
+	// 			// in this case let's only report the version of the rule that was accepted
+	// 			continue
+	// 		}
+	// 		filteredRules = append(filteredRules, rule)
+	// 	}
+	// }
 
-	if err := rs.AddMacros(allMacros); err.ErrorOrNil() != nil {
-		errs = multierror.Append(errs, err)
-	}
+	// if err := rs.AddMacros(allMacros); err.ErrorOrNil() != nil {
+	// 	errs = multierror.Append(errs, err)
+	// }
 
-	if err := rs.PopulateFieldsWithRuleActionsData(allRules, opts); err.ErrorOrNil() != nil {
-		errs = multierror.Append(errs, err)
-	}
+	// if err := rs.PopulateFieldsWithRuleActionsData(allRules, opts); err.ErrorOrNil() != nil {
+	// 	errs = multierror.Append(errs, err)
+	// }
 
-	if err := rs.AddRules(allRules); err.ErrorOrNil() != nil {
-		errs = multierror.Append(errs, err)
-	}
+	// if err := rs.AddRules(allRules); err.ErrorOrNil() != nil {
+	// 	errs = multierror.Append(errs, err)
+	// }
 
-	return filteredRules, errs
+	// return filteredRules, errs
+	return nil, nil
 }

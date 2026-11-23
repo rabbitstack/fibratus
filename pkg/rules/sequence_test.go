@@ -459,12 +459,12 @@ func TestSequenceExpire(t *testing.T) {
 		  |evt.name = 'CreateProcess'| by ps.pid
 		  |evt.name = 'CreateFile'| by ps.pid
 	`)
-	_, _ = evalSeq(rule, makeEvent(event.CreateProcess, 10, testutil.WithParam(params.ProcessID, params.PID, uint32(10))))
-	_, _ = evalSeq(rule, makeEvent(event.CreateProcess, 20, testutil.WithParam(params.ProcessID, params.PID, uint32(20))))
+	_, _ = evalSeq(rule, makeEvent(event.CreateProcess, 10, testutil.WithParams(event.NewParam(params.ProcessID, params.PID, params.U32(10)))))
+	_, _ = evalSeq(rule, makeEvent(event.CreateProcess, 20, testutil.WithParams(event.NewParam(params.ProcessID, params.PID, params.U32(20)))))
 	require.Equal(t, 2, pendingSeq(rule))
 
 	terminate := func(pid uint32) *event.Event {
-		return testutil.MakeEvent(event.TerminateProcess, testutil.WithParam(params.ProcessID, params.PID, pid))
+		return testutil.MakeEvent(event.TerminateProcess, testutil.WithParams(event.NewParam(params.ProcessID, params.PID, params.U32(pid))))
 	}
 
 	evalSeq(rule, terminate(10))
@@ -485,12 +485,12 @@ func TestSequenceExpireTerminateProcessFinalStage(t *testing.T) {
 		  |evt.name = 'CreateProcess'| by ps.parent.pid
 	`)
 
-	_, _ = evalSeq(rule, makeEvent(event.CreateProcess, 10, testutil.WithParam(params.ProcessID, params.PID, uint32(10)), testutil.WithPS(testutil.MakePS(10, "rundll32.exe", testutil.PSPpid(30)))))
-	_, _ = evalSeq(rule, makeEvent(event.CreateProcess, 20, testutil.WithParam(params.ProcessID, params.PID, uint32(20)), testutil.WithPS(testutil.MakePS(20, "cmd.exe", testutil.PSPpid(10)))))
+	_, _ = evalSeq(rule, makeEvent(event.CreateProcess, 10, testutil.WithParams(event.NewParam(params.ProcessID, params.PID, params.U32(10))), testutil.WithPS(testutil.MakePS(10, "rundll32.exe", testutil.PSPpid(30)))))
+	_, _ = evalSeq(rule, makeEvent(event.CreateProcess, 20, testutil.WithParams(event.NewParam(params.ProcessID, params.PID, params.U32(20))), testutil.WithPS(testutil.MakePS(20, "cmd.exe", testutil.PSPpid(10)))))
 	require.Equal(t, 2, pendingSeq(rule))
 
 	terminate := func(pid uint32) *event.Event {
-		return testutil.MakeEvent(event.TerminateProcess, testutil.WithParam(params.ProcessID, params.PID, pid))
+		return testutil.MakeEvent(event.TerminateProcess, testutil.WithParams(event.NewParam(params.ProcessID, params.PID, params.U32(pid))))
 	}
 
 	evalSeq(rule, terminate(10))

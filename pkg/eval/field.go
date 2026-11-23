@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-present by Nedim Sabic Sabic
+ * Copyright 2026 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -19,8 +19,10 @@
 package eval
 
 import (
+	"cmp"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -30,58 +32,10 @@ import (
 
 // Field contains field meta attributes all accessors need to extract the value.
 type Field struct {
-	Name     fields.Field
-	Value    string
-	Arg      string
-	BoundVar string
+	Name  fields.Field
+	Value string
+	Arg   string
 }
-
-// Fields is the set of unique fields referenced by an expression.
-type Fields struct {
-	fields []Field
-	keys   map[string]struct{}
-}
-
-// NewFields creates an empty set of fields.
-func NewFields() Fields {
-	return Fields{keys: make(map[string]struct{})}
-}
-
-// Add adds the fields to the set. Fields that are already in
-// the set, as determined by the field name, argument and bound
-// variable, are ignored.
-func (f *Fields) Add(flds ...Field) {
-	if f.keys == nil {
-		f.keys = make(map[string]struct{})
-	}
-	for _, fld := range flds {
-		// key := fld.String() + "|" + fld.BoundVar
-		// if _, ok := f.keys[key]; ok {
-		// 	continue
-		// }
-		// f.keys[key] = struct{}{}
-		f.fields = append(f.fields, fld)
-	}
-}
-
-// List returns all fields in the order they were added.
-func (f Fields) List() []Field { return f.fields }
-
-// ExtractToValuer extracts the field values from the event and puts them
-// in the valuer. Bound fields are skipped, since their values originate
-// from the events matched in the preceding sequence steps rather than from
-// the current event.
-func (f Fields) ExtractToValuer(event *event.Event, valuer *ValuerCache) {
-	for _, field := range f.fields {
-		if field.IsBound() {
-			continue
-		}
-		valuer.Put(event, field)
-	}
-}
-
-// IsBound determines if the field refers to the event matched by the sequence step.
-func (f Field) IsBound() bool { return f.BoundVar != "" }
 
 func (f *Field) String() string {
 	if f.Arg != "" {
@@ -96,23 +50,22 @@ func (f *Field) String() string {
 	return f.Value
 }
 
-func (f *Field) Extract(event *event.Event) any {
-	for _, accessor := range GetAccessors() {
-		if !accessor.IsFieldAccessible(event) {
-			continue
-		}
-		v, err := accessor.Get(*f, event)
-		if err != nil {
-			// if !errs.IsParamNotFound(err) {
-			// 	accessorErrors.Add(err.Error(), 1)
-			// }
-			//return defaultAccessorValue(*f)
-		}
-		if v != nil {
-			return v
-		}
-	}
-	return defaultAccessorValue(*f)
+// Fields is the set of unique fields referenced by an expression.
+type Fields []Field
+
+// Add add adds the field to the set. Fields that are already in
+// the set, as determined by the field name and argument are ignored.
+func (fields *Fields) Add(name fields.Field, val, arg string) {
+	field := Field{Name: name, Value: val, Arg: arg}
+	*fields = append(*fields, field)
+
+	slices.SortFunc(*fields, func(a, b Field) int {
+		return cmp.Compare(a.String(), b.String())
+	})
+
+	*fields = slices.CompactFunc(*fields, func(a, b Field) bool {
+		return a.String() == b.String()
+	})
 }
 
 type Segment struct {

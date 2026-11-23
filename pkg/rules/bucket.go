@@ -18,6 +18,9 @@
 package rules
 
 import (
+	"cmp"
+	"slices"
+
 	"github.com/rabbitstack/fibratus/pkg/eval"
 )
 
@@ -75,24 +78,24 @@ func (b *RuleBucket) Len() int {
 	return len(b.rules)
 }
 
-// Fields returns the unique fields referenced by all rules in the bucket.
-func (b *RuleBucket) Fields() []eval.Field {
+// GetFields returns the unique fields referenced by all rules in the bucket.
+func (b *RuleBucket) GetFields() []eval.Field {
 	if b == nil {
 		return nil
 	}
-	var (
-		flds []eval.Field
-		seen = make(map[string]struct{})
-	)
+
+	var flds []eval.Field
 	for _, r := range b.rules {
 		for _, f := range r.evaluator.GetFields() {
-			key := f.String() + "|" + f.BoundVar
-			if _, ok := seen[key]; ok {
-				continue
-			}
-			seen[key] = struct{}{}
 			flds = append(flds, f)
 		}
 	}
-	return flds
+
+	slices.SortFunc(flds, func(a, b eval.Field) int {
+		return cmp.Compare(a.String(), b.String())
+	})
+
+	return slices.CompactFunc(flds, func(a, b eval.Field) bool {
+		return a.String() == b.String()
+	})
 }

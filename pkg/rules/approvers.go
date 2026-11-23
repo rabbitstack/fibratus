@@ -25,11 +25,11 @@ import (
 	"strings"
 
 	"github.com/rabbitstack/fibratus/pkg/compiler/ast"
-	"github.com/rabbitstack/fibratus/pkg/compiler/eval"
+	"github.com/rabbitstack/fibratus/pkg/compiler/fields"
 	"github.com/rabbitstack/fibratus/pkg/compiler/lexer"
+	"github.com/rabbitstack/fibratus/pkg/eval"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
-	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 )
 
 // Approvers narrow down the high-volume events (registry key opens, file
@@ -491,11 +491,8 @@ func computeApprovers(rules []*Rule, caps ApproverCaps) *Approvers {
 }
 
 func defaultTypesOf(expr ast.Expr) ([]event.Type, bool) {
-	scope, ok := eval.ScopeOf(expr)
-	if !ok {
-		return nil, false
-	}
-	return scope.Types(), true
+	scope := eval.NewScope(expr)
+	return scope, !scope.IsUnbounded()
 }
 
 // addRule registers the approvers for every expression of the rule.
@@ -603,15 +600,15 @@ func (b *builder) approver(leaves []*ast.BinaryExpr, keys []Key) Approver {
 		if !slices.Contains(keys, key) {
 			continue
 		}
-		vals, ok := b.literalValues(l.RHS)
-		if !ok {
-			continue
-		}
-		m, ok := NewMatcher(l.Op, vals)
-		if !ok {
-			continue
-		}
-		ap.Matchers = append(ap.Matchers, FieldMatcher{Key: key, Matcher: m, cost: opCost(l.Op)})
+		// vals, ok := b.literalValues(l.RHS)
+		// if !ok {
+		// 	continue
+		// }
+		// m, ok := NewMatcher(l.Op, vals)
+		// if !ok {
+		// 	continue
+		// }
+		//ap.Matchers = append(ap.Matchers, FieldMatcher{Key: key, Matcher: m, cost: opCost(l.Op)})
 	}
 	slices.SortStableFunc(ap.Matchers, func(x, y FieldMatcher) int { return cmp.Compare(x.cost, y.cost) })
 	return ap

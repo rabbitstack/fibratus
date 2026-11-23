@@ -34,7 +34,8 @@ type Evaluator struct {
 	// ID identifies the evaluator, typically the rule or filter name.
 	ID string
 
-	expr     ast.Expr
+	expr ast.Expr
+
 	fields   Fields
 	segments Segments
 
@@ -45,7 +46,7 @@ type Evaluator struct {
 	scope Scope
 
 	// extractor reads the field values from events using the accessors
-	// tuned to the fields and segments of this expression.
+	// tuned to the fields and segments of the evaluator's expression.
 	extractor *Extractor
 }
 
@@ -97,13 +98,11 @@ func NewEvaluator(id string, expression string, opts ...Option) (*Evaluator, err
 		evalOpts: o,
 		expr:     expr,
 		scope:    NewScope(expr),
-		fields:   NewFields(),
 	}
 
 	ast.WalkFunc(expr, e.visit)
 
-	// the accessors can only be configured once all fields and segments are known
-	//eval.extractor = NewExtractor(eval.fields.List(), eval.segments.List())
+	e.extractor = NewExtractor(e.fields, e.segments)
 
 	return e, nil
 }
@@ -125,6 +124,12 @@ func (e *Evaluator) Extract(evt *event.Event, valuer *ValuerCache) {
 	e.extractor.ExtractToValuer(evt, valuer)
 }
 
+// Extract extracts the value of the specified field referenced by the expression
+// from the event and returns its value without caching inside the valuer.
+func (e *Evaluator) ExtractField(f Field, evt *event.Event) any {
+	return e.extractor.Extract(f, evt)
+}
+
 func (e *Evaluator) eval(expr ast.Expr, evt *event.Event, valuer *ValuerCache) bool {
 	if e.evalOpts.scopeEval && !e.scope.Contains(evt.Type) {
 		return false
@@ -142,6 +147,10 @@ func (e *Evaluator) GetExpr() ast.Expr {
 	return e.expr
 }
 
+func (e *Evaluator) GetScope() Scope {
+	return e.scope
+}
+
 // GetEventTypes returns all event types reachable in the expression.
 // Alias for event scopes.
 func (e *Evaluator) GetEventTypes() []event.Type {
@@ -150,7 +159,7 @@ func (e *Evaluator) GetEventTypes() []event.Type {
 
 // GetFields returns the unique fields referenced by the expression.
 func (e *Evaluator) GetFields() []Field {
-	return e.fields.List()
+	return e.fields
 }
 
 // visit records the fields and segments the expression refers to, so they
@@ -159,9 +168,7 @@ func (e *Evaluator) GetFields() []Field {
 func (e *Evaluator) visit(n ast.Node) {
 	switch n := n.(type) {
 	case *ast.FieldLiteral:
-		e.addField(n)
-	case *ast.BoundFieldLiteral:
-		e.fields.Add(Field{Name: n.Field.Field, Value: n.Value, Arg: n.Field.Arg, BoundVar: n.BoundVar.Value})
+		e.fields.Add(n.Field, n.Value, n.Arg)
 	case *ast.BoundSegmentLiteral:
 		//e.segments.Add(Segment{BoundVar: n.BoundVar.Value, Name: n.Segment})
 	case *ast.Function:
@@ -169,23 +176,17 @@ func (e *Evaluator) visit(n ast.Node) {
 	case *ast.SequenceExpr:
 		// the `by` fields aren't nodes of the tree, so Walk never reaches them
 		if n.By != nil {
-			e.addFields(n.By.Fields...)
+			for _, f := range n.By.Fields {
+				e.fields.Add(f.Field, f.Value, f.Arg)
+			}
 		}
 		for _, step := range n.Steps {
 			if step.By == nil {
 				continue
 			}
-			e.addFields(step.By.Fields...)
+			for _, f := range step.By.Fields {
+				e.fields.Add(f.Field, f.Value, f.Arg)
+			}
 		}
-	}
-}
-
-func (e *Evaluator) addField(f *ast.FieldLiteral) {
-	e.fields.Add(Field{Name: f.Field, Value: f.Value, Arg: f.Arg})
-}
-
-func (e *Evaluator) addFields(fields ...*ast.FieldLiteral) {
-	for _, f := range fields {
-		e.addField(f)
 	}
 }

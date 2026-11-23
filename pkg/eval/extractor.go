@@ -22,7 +22,6 @@ import (
 	"expvar"
 	"sync"
 
-	errs "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/event"
 )
 
@@ -53,6 +52,7 @@ var sharedAccessors = sync.OnceValue(GetAccessors)
 // instances configured for this expression. The chain keeps the order
 // of GetAccessors.
 func newAccessors(flds []Field, segs []Segment) []Accessor {
+	shared := sharedAccessors()
 	accessors := GetAccessors()
 
 	for i, accessor := range accessors {
@@ -75,10 +75,10 @@ func newAccessors(flds []Field, segs []Segment) []Accessor {
 // Extractor extracts field values from events using accessors tailored to
 // the fields and segments of a single expression.
 type Extractor struct {
-	// unbound are the fields whose values come from the evaluated event.
-	// Bound fields are skipped, since their values originate from the events
-	// matched in the preceding sequence steps.
-	unbound   []Field
+	// fields are the fields whose values come from the evaluated event.
+	// Bound fields are skipped, since their values originate from the
+	// events matched in the preceding sequence steps.
+	fields    []Field
 	accessors []Accessor
 }
 
@@ -87,9 +87,7 @@ type Extractor struct {
 func NewExtractor(flds []Field, segs []Segment) *Extractor {
 	x := &Extractor{accessors: newAccessors(flds, segs)}
 	for _, f := range flds {
-		if !f.IsBound() {
-			x.unbound = append(x.unbound, f)
-		}
+		x.fields = append(x.fields, f)
 	}
 	return x
 }
@@ -97,24 +95,22 @@ func NewExtractor(flds []Field, segs []Segment) *Extractor {
 // ExtractToValuer puts the values of all the unbound fields from the
 // event into the valuer, so they are available before the evaluation.
 func (x *Extractor) ExtractToValuer(evt *event.Event, valuer *ValuerCache) {
-	// for _, f := range x.unbound {
-	// 	valuer.Put(evt, f, x)
-	// }
+	for _, f := range x.fields {
+		valuer.Put(evt, f, x)
+	}
 }
 
 // Extract returns the value of the field in the event. The accessors are
 // tried in order and the first one that has a value wins. If none does, the
 // default value for the field is returned.
 func (x *Extractor) Extract(f Field, evt *event.Event) any {
-	for _, acc := range x.accessors {
-		if !acc.IsFieldAccessible(evt) {
+	for _, accessor := range x.accessors {
+		if !accessor.IsFieldAccessible(evt) {
 			continue
 		}
-		v, err := acc.Get(f, evt)
+		v, err := accessor.Get(f, evt)
 		if err != nil {
-			if !errs.IsParamNotFound(err) {
-				accessorErrors.Add(err.Error(), 1)
-			}
+			accessorErrors.Add(err.Error(), 1)
 			continue
 		}
 		if v != nil {

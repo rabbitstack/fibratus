@@ -18,7 +18,7 @@
  * limitations under the License.
  */
 
-package filter
+package rules
 
 import (
 	"testing"
