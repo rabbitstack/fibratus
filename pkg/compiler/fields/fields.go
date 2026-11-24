@@ -19,8 +19,9 @@
 package fields
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"sort"
+
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 )
 
 // FieldInfo is the field metadata descriptor.

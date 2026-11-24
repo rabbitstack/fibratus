@@ -19,9 +19,8 @@
 //
 // The parser classifies identifiers (fields, functions, macro references) but
 // never expands macros. Expansion is a dedicated rewrite pass over the AST,
-// similar to how the C preprocessor, Scheme macro expanders or SQL view
-// inlining are separate phases. This has a few benefits over expanding macros
-// while parsing:
+// similar to how the C preprocessor. This has a few benefits over expanding
+// macros while parsing:
 //
 //   - macro bodies are parsed once, when the store is built, and not on every
 //     use site

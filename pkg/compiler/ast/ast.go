@@ -54,10 +54,10 @@ func Eval(expr Expr, m map[string]interface{}, opts EvalOptions) bool {
 }
 
 // MapValuer is a valuer that substitutes values for the mapped interface.
-type MapValuer map[string]interface{}
+type MapValuer map[string]any
 
 // Value returns the value for a key in the MapValuer.
-func (m MapValuer) Value(key string) (interface{}, bool) {
+func (m MapValuer) Value(key string) (any, bool) {
 	v, ok := m[key]
 	return v, ok
 }
@@ -65,7 +65,7 @@ func (m MapValuer) Value(key string) (interface{}, bool) {
 // Valuer is the interface that wraps the Value() method.
 type Valuer interface {
 	// Value returns the value and existence flag for a given key.
-	Value(key string) (interface{}, bool)
+	Value(key string) (any, bool)
 }
 
 // CallValuer implements the Call method for evaluating function calls.
@@ -73,7 +73,7 @@ type CallValuer interface {
 	Valuer
 
 	// Call is invoked to evaluate a function call (if possible).
-	Call(name string, args []interface{}) (interface{}, bool)
+	Call(name string, args []any) (any, bool)
 }
 
 // MultiValuer returns a Valuer that iterates over multiple Valuer instances
@@ -135,39 +135,10 @@ func (v *ValuerEval) Eval(expr Expr, opts EvalOptions) interface{} {
 			return nil
 		case *Function:
 			if valuer, ok := v.Valuer.(CallValuer); ok {
-				var args []interface{}
-
+				var args []any
 				if len(exp.Args) > 0 {
-					args = make([]interface{}, len(exp.Args))
-
-					for i := range exp.Args {
-						// foreach function exhibits some corner cases.
-						// Instead of evaluating the expression and storing
-						// the value in the args slice, it operates on raw
-						// binary and unary expressions.
-						if exp.IsForeach() {
-							switch {
-							case exp.IsBinaryExprArg(i) || exp.IsNotExprArg(i) || exp.IsBareBoundVariableArg(i):
-								args[i] = exp.Args[i]
-							case exp.IsFieldArg(i):
-								if i != 0 {
-									field := exp.Args[i].(*FieldLiteral)
-									// the final argument passed to the function is
-									// a map with the key equal to the field name and
-									// the value is the result of the map valuer access
-									// in the outer context.
-									args[i] = MapValuer{field.String(): v.Eval(field, opts)}
-								} else {
-									// otherwise, this is the slice (iterable) argument
-									args[i] = v.Eval(exp.Args[i], opts)
-								}
-							}
-						} else {
-							args[i] = v.Eval(exp.Args[i], opts)
-						}
-					}
+					args = v.evalFunctionArgs(exp, opts)
 				}
-
 				value, _ := valuer.Call(exp.Name, args)
 				if value == nil {
 					return true
@@ -234,38 +205,10 @@ func (v *ValuerEval) Eval(expr Expr, opts EvalOptions) interface{} {
 		return expr.Value
 	case *Function:
 		if valuer, ok := v.Valuer.(CallValuer); ok {
-			var args []interface{}
-
+			var args []any
 			if len(expr.Args) > 0 {
-				args = make([]interface{}, len(expr.Args))
-				for i := range expr.Args {
-					// foreach function exhibits some corner cases.
-					// Instead of evaluating the expression and storing
-					// the value in the args slice, it operates on raw
-					// binary and unary expressions.
-					if expr.IsForeach() {
-						switch {
-						case expr.IsBinaryExprArg(i) || expr.IsNotExprArg(i) || expr.IsBareBoundVariableArg(i):
-							args[i] = expr.Args[i]
-						case expr.IsFieldArg(i):
-							if i != 0 {
-								field := expr.Args[i].(*FieldLiteral)
-								// the final argument passed to the function is
-								// a map with the key equal to the field name and
-								// the value is the result of the map valuer access
-								// in the outer context.
-								args[i] = MapValuer{field.String(): v.Eval(field, opts)}
-							} else {
-								// otherwise, this is the slice (iterable) argument
-								args[i] = v.Eval(expr.Args[i], opts)
-							}
-						}
-					} else {
-						args[i] = v.Eval(expr.Args[i], opts)
-					}
-				}
+				args = v.evalFunctionArgs(expr, opts)
 			}
-
 			val, _ := valuer.Call(expr.Name, args)
 			return val
 		}
@@ -273,6 +216,34 @@ func (v *ValuerEval) Eval(expr Expr, opts EvalOptions) interface{} {
 	default:
 		return nil
 	}
+}
+
+// evalFunctionArgs foreach operates on raw binary and unary expressions
+func (v *ValuerEval) evalFunctionArgs(fn *Function, opts EvalOptions) []any {
+	args := make([]any, len(fn.Args))
+	for i := range fn.Args {
+		if fn.IsForeach() {
+			switch {
+			case fn.IsBinaryExprArg(i) || fn.IsNotExprArg(i) || fn.IsBareBoundVariableArg(i):
+				args[i] = fn.Args[i]
+			case fn.IsFieldArg(i):
+				if i != 0 {
+					field := fn.Args[i].(*FieldLiteral)
+					// the final argument passed to the function is
+					// a map with the key equal to the field name and
+					// the value is the result of the map valuer access
+					// in the outer context.
+					args[i] = MapValuer{field.String(): v.Eval(field, opts)}
+				} else {
+					// otherwise, this is the slice (iterable) argument
+					args[i] = v.Eval(fn.Args[i], opts)
+				}
+			}
+		} else {
+			args[i] = v.Eval(fn.Args[i], opts)
+		}
+	}
+	return args
 }
 
 func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr, opts EvalOptions) interface{} {
