@@ -25,7 +25,8 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/event"
 )
 
-// accessorErrors counts the unexpected errors accessors return, by message.
+// accessorErrors counts the unexpected errors accessors return, by normalized
+// message. The set of keys is bounded, see countAccessorError.
 var accessorErrors = expvar.NewMap("eval.accessor.errors")
 
 // FieldsConfigurer is implemented by accessors whose behavior depends on the
@@ -119,7 +120,7 @@ func (x *Extractor) Extract(f Field, evt *event.Event) any {
 		}
 		v, err := accessor.Get(f, evt)
 		if err != nil {
-			accessorErrors.Add(err.Error(), 1)
+			countAccessorError(err)
 			continue
 		}
 		if v != nil {
