@@ -1063,22 +1063,37 @@ func (pa *peAccessor) Get(f Field, e *event.Event) (any, error) {
 		return nil, nil
 	}
 
-	var p *pe.PE
-	if e.PS != nil && e.PS.PE != nil {
-		p = e.PS.PE
+	// the process state is shared by all the events of the process, and
+	// other goroutines may populate the PE metadata, so the state is only
+	// read and written while holding the process lock. The PE file is parsed
+	// outside the critical section, because parsing is slow
+	var (
+		p   *pe.PE
+		exe string
+	)
+	if e.PS != nil {
+		e.PS.RLock()
+		p, exe = e.PS.PE, e.PS.Exe
+		e.PS.RUnlock()
 	}
 
 	// PE enrichment is likely disabled. Load PE data lazily
 	// by only requesting parsing of the PE directories that
 	// are relevant to the fields present in the expression.
-	if e.PS != nil && e.PS.Exe != "" && p == nil {
+	if e.PS != nil && exe != "" && p == nil {
 		var err error
-		exe := e.PS.Exe
 		p, err = pe.ParseFile(exe, pa.parserOpts()...)
 		if err != nil {
 			return nil, err
 		}
-		e.PS.PE = p
+		e.PS.Lock()
+		if e.PS.PE == nil {
+			e.PS.PE = p
+		} else {
+			// someone else has set the PE metadata in the meantime
+			p = e.PS.PE
+		}
+		e.PS.Unlock()
 	}
 
 	// here we determine if the PE was tampered. This check
