@@ -36,8 +36,12 @@ type Evaluator struct {
 
 	expr ast.Expr
 
-	fields   Fields
-	segments Segments
+	fields Fields
+	// boundFields are the fields referenced through the bound variables
+	// of a sequence, e.g. $e1.ps.name. Their values are extracted from the
+	// events of the previous steps, never from the evaluated event.
+	boundFields Fields
+	segments    Segments
 
 	astOpts  ast.EvalOptions
 	evalOpts options
@@ -102,7 +106,7 @@ func NewEvaluator(id string, expression string, opts ...Option) (*Evaluator, err
 
 	ast.WalkFunc(expr, e.visit)
 
-	e.extractor = NewExtractor(e.fields, e.segments)
+	e.extractor = NewExtractor(e.fields, e.boundFields, e.segments)
 
 	return e, nil
 }
@@ -162,6 +166,12 @@ func (e *Evaluator) GetFields() []Field {
 	return e.fields
 }
 
+// GetBoundFields returns the unique fields the expression references
+// through the bound variables of the sequence steps.
+func (e *Evaluator) GetBoundFields() []Field {
+	return e.boundFields
+}
+
 // visit records the fields and segments the expression refers to, so they
 // can be extracted from the event before the evaluation. It is meant to be
 // called for every node of the expression through ast.WalkFunc.
@@ -169,6 +179,13 @@ func (e *Evaluator) visit(n ast.Node) {
 	switch n := n.(type) {
 	case *ast.FieldLiteral:
 		e.fields.Add(n.Field, n.Value, n.Arg)
+	case *ast.BoundFieldLiteral:
+		// Walk doesn't descend into the bound literal, so the inner field
+		// has to be recorded here. Otherwise, a bound field such as
+		// $e1.ps.pe.imphash would never configure the PE accessor
+		if n.Field != nil {
+			e.boundFields.Add(n.Field.Field, n.Field.Value, n.Field.Arg)
+		}
 	case *ast.BoundSegmentLiteral:
 		//e.segments.Add(Segment{BoundVar: n.BoundVar.Value, Name: n.Segment})
 	case *ast.Function:

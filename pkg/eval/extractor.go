@@ -83,12 +83,21 @@ type Extractor struct {
 }
 
 // NewExtractor creates the extractor for an expression that references
-// the given fields and segments.
-func NewExtractor(flds []Field, segs []Segment) *Extractor {
-	x := &Extractor{accessors: newAccessors(flds, segs)}
+// the given fields and segments. The bound fields (e.g. $e1.ps.pe.imphash)
+// are only used to configure the accessors, so the accessors know which
+// data the expression needs. They are never extracted eagerly from the
+// evaluated event, because their values come from the events of the
+// previous sequence steps through ExtractField.
+func NewExtractor(flds, bound []Field, segs []Segment) *Extractor {
+	configured := make(Fields, 0, len(flds)+len(bound))
 	for _, f := range flds {
-		x.fields = append(x.fields, f)
+		configured.Add(f.Name, f.Value, f.Arg)
 	}
+	for _, f := range bound {
+		configured.Add(f.Name, f.Value, f.Arg)
+	}
+	x := &Extractor{accessors: newAccessors(configured, segs)}
+	x.fields = append(x.fields, flds...)
 	return x
 }
 
