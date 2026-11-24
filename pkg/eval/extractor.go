@@ -129,3 +129,20 @@ func (x *Extractor) Extract(f Field, evt *event.Event) any {
 	}
 	return defaultAccessorValue(f)
 }
+
+// lookup returns the value of the field in the event, or nil if no accessor
+// has it. In contrast to Extract, it doesn't substitute the default value, and
+// it doesn't ask the accessors if the field is accessible, nor does it count
+// the errors. The caller is only interested in what the accessors really have.
+func (x *Extractor) lookup(f Field, evt *event.Event) any {
+	for _, accessor := range x.accessors {
+		v, err := accessor.Get(f, evt)
+		if err != nil {
+			continue
+		}
+		if v != nil {
+			return v
+		}
+	}
+	return nil
+}

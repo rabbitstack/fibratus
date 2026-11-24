@@ -25,6 +25,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/rabbitstack/fibratus/pkg/compiler/fields"
 	"github.com/rabbitstack/fibratus/pkg/event"
@@ -73,12 +74,38 @@ type Segment struct {
 
 type Segments []Segment
 
+// fieldsReplRegexp matches the field modifiers in the string to interpolate.
+var fieldsReplRegexp = regexp.MustCompile(`%([1-9]?)\.?([a-z0-9A-Z\[\]._]+)`)
+
+// defaultExtractor is the extractor with accessors that aren't tuned to
+// any expression. It resolves the field modifiers when the caller doesn't
+// own an evaluator.
+var defaultExtractor = sync.OnceValue(func() *Extractor { return NewExtractor(nil, nil, nil) })
+
 // InterpolateFields replaces all occurrences of field modifiers in the given string
 // with values extracted from the event. Field modifiers may contain a leading ordinal
 // which refers to the event in particular sequence stage. Otherwise, the modifier is
 // a well-known field name prepended with the `%` symbol.
+//
+// The values are resolved through accessors that aren't configured for any rule.
+// Prefer Evaluator.InterpolateFields when the rule's evaluator is at hand.
 func InterpolateFields(s string, evts []*event.Event) string {
-	var fieldsReplRegexp = regexp.MustCompile(`%([1-9]?)\.?([a-z0-9A-Z\[\]._]+)`)
+	return interpolateFields(s, evts, defaultExtractor())
+}
+
+// InterpolateFields replaces the field modifiers in the string with the
+// values extracted from the events. See the package level InterpolateFields.
+// The values are resolved through the extractor of the evaluator, so the
+// accessors are the ones already configured for the rule's expression
+// instead of being rebuilt for each modifier.
+func (e *Evaluator) InterpolateFields(s string, evts []*event.Event) string {
+	if e == nil || e.extractor == nil {
+		return InterpolateFields(s, evts)
+	}
+	return interpolateFields(s, evts, e.extractor)
+}
+
+func interpolateFields(s string, evts []*event.Event, x *Extractor) string {
 	matches := fieldsReplRegexp.FindAllStringSubmatch(s, -1)
 	r := s
 	if len(matches) == 0 {
@@ -114,19 +141,8 @@ func InterpolateFields(s string, evts []*event.Event) string {
 			}
 			evt := evts[i-1]
 			// extract field value from the event and replace in string
-			var val any
-			for _, accessor := range GetAccessors() {
-				name, arg := split(m[2])
-				f := Field{Value: m[2], Name: fields.Field(name), Arg: arg}
-				var err error
-				val, err = accessor.Get(f, evt)
-				if err != nil {
-					continue
-				}
-				if val != nil {
-					break
-				}
-			}
+			name, arg := split(m[2])
+			val := x.lookup(Field{Value: m[2], Name: fields.Field(name), Arg: arg}, evt)
 			if val != nil {
 				r = strings.ReplaceAll(r, m[0], fmt.Sprintf("%v", val))
 			} else {
