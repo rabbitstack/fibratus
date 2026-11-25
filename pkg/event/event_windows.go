@@ -48,6 +48,26 @@ var (
 	mu       sync.Mutex
 )
 
+// Init populates the event from the event record and prebuilt parameters.
+func (e *Event) Init(rec *etw.EventRecord, t Type, params ...Param) {
+	var (
+		pid = rec.Header.ProcessID
+		tid = rec.Header.ThreadID
+		cpu = *(*uint8)(unsafe.Pointer(&rec.BufferContext.ProcessorIndex[0]))
+		ts  = filetime.ToEpoch(rec.Header.Timestamp)
+	)
+
+	e.PID = pid
+	e.Tid = tid
+	e.CPU = cpu
+	e.Type = t
+	e.Timestamp = ts
+	e.Params = params
+	e.Host = hostname.Get()
+
+	e.adjustPID()
+}
+
 // Parse constructs the event from a freshed or reused pool's instance.
 func (e *Event) Parse(rec *etw.EventRecord, dec *ParamDecoder) error {
 	var (

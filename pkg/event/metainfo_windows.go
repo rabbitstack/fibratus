@@ -73,7 +73,7 @@ var table = [MaxEvent]Info{
 	RegKCBRundown:       {Name: "RegKCBRundown", Category: Registry, Source: SystemLogger, Description: "Builds the snapshot of existing Key Control Block objects", Flags: OnlyState | StateSnapshot, Params: params.RegistryDescriptor},
 
 	CreateFile:         {Name: "CreateFile", Category: File, Source: SystemLogger, Description: "Creates or opens a new file, directory, I/O device, pipe, console", Flags: WaitStack, Params: params.CreateFileDescriptor},
-	ReleaseFile:        {Name: "ReleaseFile", Category: File, Source: SystemLogger, Description: "Closes the last handle to the file object. Never published to the event stream", Flags: OnlyState, Params: params.ReleaseFileDescriptor},
+	CleanupFile:        {Name: "CleanupFile", Category: File, Source: SystemLogger, Description: "Closes the last handle to the file object. Never published to the event stream", Flags: OnlyState, Params: params.CleanupFileDescriptor},
 	CloseFile:          {Name: "CloseFile", Category: File, Source: SystemLogger, Description: "Closes the file handle. Never published to the event stream", Flags: OnlyState, Params: params.CloseFileDescriptor},
 	ReadFile:           {Name: "ReadFile", Category: File, Source: SystemLogger, Description: "Reads data from the file or I/O device", Params: params.ReadWriteFileDescriptor},
 	WriteFile:          {Name: "WriteFile", Category: File, Source: SystemLogger, Description: "Writes data to the file or I/O device", Params: params.ReadWriteFileDescriptor},

@@ -841,7 +841,7 @@ func TestDecodeFile(t *testing.T) {
 			},
 		},
 		{
-			name: "ReleaseFile", opcode: ReleaseFileID,
+			name: "CleanupFile", opcode: CleanupFileID,
 			assertions: func(t *testing.T, e *Event) {
 				assert.Equal(t, 4, e.Params.Len())
 				assert.Equal(t, uint64(0xffffb58b9268d180), e.Params.GetUint64ByName(params.FileKey))
@@ -849,7 +849,7 @@ func TestDecodeFile(t *testing.T) {
 				assert.Equal(t, uint64(0xffffd78d7ca0b0f8), e.Params.GetUint64ByName(params.FileIrpPtr))
 				assert.Equal(t, uint32(3096), e.Params.GetTid())
 			},
-			event: &Event{Params: NewParams(ReleaseFile), Type: ReleaseFile},
+			event: &Event{Params: NewParams(CleanupFile), Type: CleanupFile},
 			buf: []byte{
 				248, 176, 160, 124, 141, 215, 255, 255,
 				176, 82, 69, 155, 141, 215, 255, 255,

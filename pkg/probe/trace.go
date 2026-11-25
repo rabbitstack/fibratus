@@ -21,17 +21,17 @@
 package probe
 
 import (
-	"time"
+	"errors"
 
 	libetw "github.com/rabbitstack/fibratus/internal/etw"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/pipeline"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
-	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 )
 
-// Trace is a probe wrapper around the native ETW trace API with
-// an extra state and operations to publish events to the pipeline.
+// Trace is a probe's wrapper around the native ETW trace API with
+// an extra state and operations for deocding and publishing events
+// to the pipeline.
 type Trace[T libetw.Trace] struct {
 	Trace T
 
@@ -47,6 +47,7 @@ type TracePublisher interface {
 
 type PubOpts struct {
 	MutateFunc func(*event.Event)
+	InitFunc   func(*event.Event)
 }
 
 type PubOption func(o *PubOpts)
@@ -54,6 +55,12 @@ type PubOption func(o *PubOpts)
 func WithMutateFunc(fn func(*event.Event)) PubOption {
 	return func(o *PubOpts) {
 		o.MutateFunc = fn
+	}
+}
+
+func WithInitFunc(fn func(*event.Event)) PubOption {
+	return func(o *PubOpts) {
+		o.InitFunc = fn
 	}
 }
 
@@ -65,56 +72,52 @@ func (t *Trace[T]) Run() error {
 	if err := t.Trace.Start(); err != nil {
 		return err
 	}
-
 	if err := t.Trace.Open(); err != nil {
 		return err
 	}
-
 	return t.Trace.CaptureState()
 }
 
 func (t *Trace[T]) Shutdown() error {
-	var errs multierror.MultiError
+	var errs []error
 
 	if err := t.Trace.Flush(); err != nil {
-		errs.Add(err)
+		errs = append(errs, err)
 	}
-
-	time.Sleep(time.Millisecond * 100)
-
 	if err := t.Trace.Close(); err != nil {
-		errs.Add(err)
+		errs = append(errs, err)
 	}
 
-	return errs.Wrap(t.Trace.Stop())
+	return errors.Join(append(errs, t.Trace.Stop())...)
 }
 
 func (t *Trace[T]) SourceID() pipeline.SourceID {
 	return t.id
 }
 
-func (t *Trace[T]) Publish(rec *etw.EventRecord, opts ...PubOption) error {
-	var options PubOpts
+func (t *Trace[T]) Publish(rec *etw.EventRecord, options ...PubOption) error {
+	var opts PubOpts
 
-	for _, opt := range opts {
-		opt(&options)
+	for _, opt := range options {
+		opt(&opts)
 	}
 
-	ev := t.pipeline.Acquire(t.id)
-	if ev == nil {
+	evt := t.pipeline.Acquire(t.id)
+	if evt == nil {
 		return pipeline.ErrClosed
 	}
 
-	if err := ev.Parse(rec, t.decoder); err != nil {
-		t.pipeline.Release(t.id, ev)
+	if opts.InitFunc != nil {
+		opts.InitFunc(evt)
+	} else if err := evt.Parse(rec, t.decoder); err != nil {
+		t.pipeline.Release(t.id, evt)
 		return err
 	}
 
-	if options.MutateFunc != nil {
-		options.MutateFunc(ev)
+	if opts.MutateFunc != nil {
+		opts.MutateFunc(evt)
 	}
 
-	t.pipeline.Publish(t.id, ev)
-
+	t.pipeline.Publish(t.id, evt)
 	return nil
 }

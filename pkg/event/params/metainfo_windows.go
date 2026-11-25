@@ -576,7 +576,7 @@ var CreateFileDescriptor = []ParamInfo{
 	{Name: Callstack, Type: Slice},
 }
 
-// ReleaseFileDescriptor is the event schema for file cleanup events.
+// CleanupFileDescriptor is the event schema for file cleanup events.
 //
 //	typedef struct _PERFINFO_FILE_SIMPLE_OPERATION {
 //	    ULONG_PTR Irp;
@@ -584,7 +584,7 @@ var CreateFileDescriptor = []ParamInfo{
 //	    ULONG_PTR FileKey;
 //	    ULONG IssuingThreadId;
 //	} PERFINFO_FILE_SIMPLE_OPERATION, *PPERFINFO_FILE_SIMPLE_OPERATION;
-var ReleaseFileDescriptor = []ParamInfo{
+var CleanupFileDescriptor = []ParamInfo{
 	{Name: FileIrpPtr, Type: Address, WireFormat: WireU64},
 	{Name: FileObject, Type: Address, WireFormat: WireU64},
 	{Name: FileKey, Type: Address, WireFormat: WireU64},

@@ -99,7 +99,7 @@ const (
 	RegDeleteKCB
 	RegKCBRundown
 	CreateFile
-	ReleaseFile
+	CleanupFile
 	CloseFile
 	ReadFile
 	WriteFile
@@ -151,7 +151,7 @@ const (
 	UnmapViewOfSectionID    uint8 = 38
 	MapViewSectionRundownID uint8 = 39
 	CreateFileID            uint8 = 64
-	ReleaseFileID           uint8 = 65
+	CleanupFileID           uint8 = 65
 	CloseFileID             uint8 = 66
 	ReadFileID              uint8 = 67
 	WriteFileID             uint8 = 68
@@ -246,8 +246,8 @@ func TypeFromEventRecord(r *etw.EventRecord) Type {
 			return MapViewSectionRundown
 		case CreateFileID:
 			return CreateFile
-		case ReleaseFileID:
-			return ReleaseFile
+		case CleanupFileID:
+			return CleanupFile
 		case CloseFileID:
 			return CloseFile
 		case ReadFileID:

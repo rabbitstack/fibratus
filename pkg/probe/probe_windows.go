@@ -81,9 +81,10 @@ type Probe struct {
 	filePathStringCache *stringcache.StringCache
 	kcbPathStringCache  *stringcache.ScopedStringCache
 
-	// stores pending I/O request packets
-	enqueuedIORequests    map[uint64]ioRequest
-	enqueuedDeleteOnClose map[uint64]struct{}
+	// enqueuedIORequests stores pending I/O request packets
+	enqueuedIORequests map[uint64]ioRequest
+	// enqueuedDeleteOnClose stores pending delete-on-close requests
+	enqueuedDeleteOnClose map[uint64]ioRequest
 
 	ioRequestsPurger *periodical.Periodical
 
@@ -245,7 +246,7 @@ func (p *Probe) Start() error {
 		defer handlePanic()
 		log.Infof("starting trace [%s]", p.userTrace.Trace.Name())
 		p.userTrace.Trace.Process(func(rec *etw.EventRecord) error {
-			return p.processEvent(rec, p.userTrace)
+			return p.ProcessEvent(rec, p.userTrace)
 		}, p.errs)
 	}()
 
@@ -255,7 +256,7 @@ func (p *Probe) Start() error {
 		defer handlePanic()
 		log.Infof("starting trace [%s]", p.kernelTrace.Trace.Name())
 		p.kernelTrace.Trace.Process(func(rec *etw.EventRecord) error {
-			return p.processEvent(rec, p.kernelTrace)
+			return p.ProcessEvent(rec, p.kernelTrace)
 		}, p.errs)
 	}()
 
@@ -306,11 +307,11 @@ func (p *Probe) Close() error {
 	return nil
 }
 
-// processEvent is the entry point for every ETW event record delivered by the
+// ProcessEvent is the entry point for every ETW event record delivered by the
 // producer. Depending on the event type, the record is either committed to the
-// ring buffer, parked until a related event arrives, used for state management
+// pipeline, parked until a related event arrives, used for state management
 // or discarded.
-func (p *Probe) processEvent(rec *etw.EventRecord, pub TracePublisher) error {
+func (p *Probe) ProcessEvent(rec *etw.EventRecord, pub TracePublisher) error {
 	t := event.TypeFromEventRecord(rec)
 
 	if event.IsCurrentProcDropped(rec) {
@@ -327,6 +328,7 @@ func (p *Probe) processEvent(rec *etw.EventRecord, pub TracePublisher) error {
 	case event.CloseFile:
 		object := rec.ReadUint64(8)
 		delete(p.filePathResolver, object)
+		delete(p.enqueuedDeleteOnClose, object)
 		return nil
 	case event.FileRundown:
 		totalRundownFiles.Add(1)
@@ -357,12 +359,13 @@ func (p *Probe) processEvent(rec *etw.EventRecord, pub TracePublisher) error {
 	switch t {
 	case event.FileOpEnd:
 		return p.completeIORequest(rec, pub)
+	case event.CleanupFile:
+		return p.cleanupFile(rec, pub)
 	case event.MapViewOfSection, event.UnmapViewOfSection, event.MapViewSectionRundown, event.SetFileInformation, event.RenameFile, event.EnumDirectory, event.ReadFile, event.WriteFile:
 		return pub.Publish(rec, WithMutateFunc(func(evt *event.Event) { p.addFileInfoFromFCB(rec, evt) }))
 	case event.RegOpenKey, event.RegCreateKey, event.RegDeleteKey, event.RegQueryKey, event.RegQueryValue, event.RegSetValue, event.RegDeleteValue:
 		path := p.resolveKCBPath(rec)
-		if (t == event.RegOpenKey || t == event.RegQueryKey || t == event.RegQueryValue) &&
-			!p.isRegPathApproved(path) {
+		if (t == event.RegOpenKey || t == event.RegQueryKey || t == event.RegQueryValue) && !p.isRegPathApproved(path) {
 			registryApproverRejections.Add(1)
 			return nil
 		}
@@ -380,8 +383,8 @@ func (p *Probe) processEvent(rec *etw.EventRecord, pub TracePublisher) error {
 	return pub.Publish(rec)
 }
 
-// initIORequest clones the CreateFile record and keeps it in the
-// pending I/O requests map until the matching FileOpEnd event arrives.
+// initIORequest clones the CreateFile/DeleteFile record and keeps it in
+// the pending I/O requests map until the matching FileOpEnd event arrives.
 func (p *Probe) initIORequest(rec *etw.EventRecord) error {
 	if len(p.enqueuedIORequests) > maxEnqueuedIORequests {
 		return nil
@@ -453,7 +456,8 @@ func (p *Probe) completeIORequest(rec *etw.EventRecord, pub TracePublisher) erro
 	if ntstatus.IsSuccess(status) && windows.NTStatus(status) != windows.STATUS_REPARSE {
 		o := opts & 0xFFFFFF // mask create options
 		if o&windows.FILE_DELETE_ON_CLOSE != 0 {
-
+			clone, buf := req.rec.Clone()
+			p.enqueuedDeleteOnClose[object] = ioRequest{rec: clone, buf: buf, stack: slices.Clone(req.stack)}
 		}
 	}
 
@@ -494,6 +498,8 @@ func (p *Probe) completeDeleteIORequest(req ioRequest, endop *etw.EventRecord, p
 	var status uint32
 
 	status = endop.ReadUint32(16)
+	defer req.rec.ReleasePool()
+
 	return pub.Publish(req.rec, WithMutateFunc(func(evt *event.Event) {
 		evt.SetParam(params.NTStatus, params.U32(status))
 		if req.stack != nil {
@@ -501,41 +507,6 @@ func (p *Probe) completeDeleteIORequest(req ioRequest, endop *etw.EventRecord, p
 		}
 		p.addFileInfoFromFCB(req.rec, evt)
 	}))
-	// if !ntSuccess(end.ReadUint32(16)) {
-	// 	p.discard(req.rec)
-	// 	return nil
-	// }
-
-	// var (
-	// 	object = req.rec.ReadUint64(8)
-	// 	key    = req.rec.ReadUint64(16)
-	// 	extra  = req.rec.ReadUint64(24)
-	// 	class  = req.rec.ReadUint32(36)
-	// )
-
-	// // FileDispositionInformation carries a BOOLEAN, the Ex variant carries flags
-	// var set bool
-	// if class == fileDispositionInformation {
-	// 	set = extra&0xFF != 0
-	// } else {
-	// 	set = extra&fileDispositionDelete != 0
-	// }
-
-	// p.dropPending(key) // either replaces or erases (undelete)
-
-	// if !set {
-	// 	p.discard(req.rec)
-	// 	return nil
-	// }
-
-	// p.pendingDeletes[key] = pendingDelete{
-	// 	pid:    req.rec.Header.ProcessID,
-	// 	tid:    req.rec.Header.ThreadID,
-	// 	posix:  class == fileDispositionInformationEx && extra&fileDispositionPosixSemantics != 0,
-	// 	object: object,
-	// 	rec:    req.rec, // ownership moves to the pending entry
-	// }
-	// _ = ts
 }
 
 // claimIORequestStack parks the callstack carried by a StackWalk record on the
@@ -553,6 +524,26 @@ func (p *Probe) claimIORequestStack(rec *etw.EventRecord) bool {
 		return true
 	}
 	return false
+}
+
+func (p *Probe) cleanupFile(rec *etw.EventRecord, pub TracePublisher) error {
+	object := rec.ReadUint64(8)
+	if f, ok := p.enqueuedDeleteOnClose[object]; ok {
+		pars := event.ParamsOf(
+			event.NewParam(params.FileIrpPtr, params.Address, params.U64(f.rec.ReadUint64(0))),
+			event.NewParam(params.FileObject, params.Address, params.U64(f.rec.ReadUint64(8))),
+			event.NewParam(params.FileKey, params.Address, params.U64(rec.ReadUint64(16))),
+			event.NewParam(params.FileExtraInfo, params.Address, params.U64(windows.FILE_DELETE_ON_CLOSE)),
+			event.NewParam(params.ThreadID, params.TID, params.U32(f.rec.ReadUint32(16))),
+			event.NewParam(params.FilePath, params.DOSPath, params.Str(f.rec.ConsumeUTF16String(32))),
+			event.NewParam(params.NTStatus, params.Status, params.U32(0)),
+			event.NewParam(params.Callstack, params.Slice, params.Addresses(f.stack)),
+		)
+		defer f.rec.ReleasePool()
+		delete(p.enqueuedDeleteOnClose, object)
+		return pub.Publish(rec, WithInitFunc(func(e *event.Event) { e.Init(f.rec, event.DeleteFile, pars...) }))
+	}
+	return nil
 }
 
 func (p *Probe) addFileInfoFromFCB(rec *etw.EventRecord, evt *event.Event) {
@@ -684,14 +675,7 @@ func (p *Probe) handleEvent(evt *event.Event) error {
 		p.resolvePortName(evt)
 	}
 
-	// Associate process' state with the event.
-	// We only override the process' state if it hasn't
-	// been set previously such as in the situation where
-	// captures are being taken. Events that construct
-	// the process' snapshot also have attached process
-	// state, so simply by replaying the flow of these
-	// events we are able to reconstruct system-wide
-	// process state.
+	// Associate process state with the event
 	proc, exists := p.psnap.Find(evt.PID)
 	if !exists {
 		p.psnap.Put(proc)
@@ -712,6 +696,7 @@ func (p *Probe) handleEvent(evt *event.Event) error {
 	}
 
 	if p.linker != nil {
+		// Run periodic callstack flush
 		p.linker.doPeriodic(evt.Timestamp.UnixNano())
 	}
 
@@ -768,6 +753,7 @@ func (p *Probe) addProcess(evt *event.Event) error {
 		evt.SetParam(params.Exe, params.Str(exe))
 	}
 
+	// set process start time
 	if !proc.StartTime.IsZero() {
 		evt.SetParam(params.StartTime, params.Timestamp(proc.StartTime))
 	} else {
@@ -898,7 +884,16 @@ func (p *Probe) handleRegSetValue(evt *event.Event) error {
 	// be enriched with registry value type/data
 	k := pair.New(evt.PID, evt.GetParamAsString(params.RegValue))
 	e, ok := p.enqueuedRegSetValues.Peek(k)
-	if !ok {
+	if ok {
+		// Enrich the event with value data/type parameters
+		p.enqueuedRegSetValues.Remove(k)
+		if e.Params.Contains(params.RegValueType) {
+			evt.SetParam(params.RegValueType, e.Params.ValueByName(params.RegValueType))
+		}
+		if e.Params.Contains(params.RegData) {
+			evt.SetParam(params.RegData, e.Params.ValueByName(params.RegData))
+		}
+	} else {
 		// Try to read captured data from userspace
 		path := evt.Params.GetStringByName(params.RegPath)
 		typ, val, err := key.ReadValue(path, e.GetParamAsString(params.RegValue))
@@ -906,8 +901,8 @@ func (p *Probe) handleRegSetValue(evt *event.Event) error {
 			// Sandboxed hives such as \Registry\WC have no root that the registry
 			// API can address. That is unreadable by design, not broken, so emit
 			// the event without the value the way a missing or access-denied value
-			// is already handled below
-			if errors.Is(err, key.ErrInvalidRoot) {
+			// is already handled below. Failed set value operations are also ignored
+			if errors.Is(err, key.ErrInvalidRoot) || !evt.IsSuccess() {
 				return nil
 			}
 			errno, ok := err.(windows.Errno)
@@ -931,15 +926,6 @@ func (p *Probe) handleRegSetValue(evt *event.Event) error {
 			} else {
 				e.SetParam(params.RegData, params.U64(v))
 			}
-		}
-	} else {
-		// Enrich the event with value data/type parameters
-		p.enqueuedRegSetValues.Remove(k)
-		if e.Params.Contains(params.RegValueType) {
-			evt.SetParam(params.RegValueType, e.Params.ValueByName(params.RegValueType))
-		}
-		if e.Params.Contains(params.RegData) {
-			evt.SetParam(params.RegData, e.Params.ValueByName(params.RegData))
 		}
 	}
 	return nil
@@ -1011,8 +997,9 @@ func New(ctx context.Context, psnap ps.Snapshotter, config *config.Config) (*Pro
 		filePathStringCache: stringcache.New(),
 		kcbPathStringCache:  stringcache.NewScoped(stringcache.CacheSize),
 
-		enqueuedIORequests:   make(map[uint64]ioRequest),
-		enqueuedRegSetValues: expirable.NewLRU[pair.Pair[uint32, string], *event.Event](50, nil, time.Second*10),
+		enqueuedIORequests:    make(map[uint64]ioRequest, 100),
+		enqueuedDeleteOnClose: make(map[uint64]ioRequest, 20),
+		enqueuedRegSetValues:  expirable.NewLRU[pair.Pair[uint32, string], *event.Event](50, nil, time.Second*10),
 
 		regionProber: va.NewRegionProber(),
 	}

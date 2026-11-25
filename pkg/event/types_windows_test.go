@@ -133,10 +133,10 @@ func TestNewTypeFromEventRecord(t *testing.T) {
 			want:     CreateFile,
 		},
 		{
-			name:     "File/ReleaseFile",
+			name:     "File/CleanupFile",
 			provider: FileEventGUID,
-			opcode:   ReleaseFileID,
-			want:     ReleaseFile,
+			opcode:   CleanupFileID,
+			want:     CleanupFile,
 		},
 		{
 			name:     "File/CloseFile",
