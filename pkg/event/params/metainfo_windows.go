@@ -365,7 +365,7 @@ var SetThreadContextDescriptor = []ParamInfo{
 
 // StackWalkDescriptor describes the event schema for the call stack emission events.
 // The binary layout is defined by the C struct
-
+//
 //	typedef struct _STACK_WALK_EVENT_DATA {
 //	        ULONGLONG   TimeStamp;
 //	        ULONG       ProcessId;
@@ -442,8 +442,8 @@ var UnloadModuleDescriptor = []ParamInfo{
 var ModuleRundownDescriptor = UnloadModuleDescriptor
 
 // LoadModuleInternalDescriptor is the module load event emitted by the Windows
-// Kerne Process provider. Its binary layout is represented by the template
-
+// Kernel Process provider. Its binary layout is represented by the template
+//
 // <template tid="ImageLoadArgs">
 //
 //	<data name="ImageBase" inType="win:Pointer" />
@@ -548,6 +548,7 @@ var RegSetValueInternalDescriptor = []ParamInfo{
 }
 
 // CreateFileDescriptor is the parameters schema for CreateFile events.
+// Its binary layout is represented by the C struct
 //
 //	typedef struct _PERFINFO_FILE_CREATE {
 //		    LONG_PTR Irp;
@@ -576,7 +577,8 @@ var CreateFileDescriptor = []ParamInfo{
 	{Name: Callstack, Type: Slice},
 }
 
-// ReleaseFileDescriptor is the event schema for file cleanup events.
+// ReleaseFileDescriptor is the event schema for file cleanup/close events.
+// The binary format is represented by the C struct
 //
 //	typedef struct _PERFINFO_FILE_SIMPLE_OPERATION {
 //	    ULONG_PTR Irp;
@@ -598,6 +600,7 @@ var CloseFileDescriptor = []ParamInfo{
 }
 
 // ReadWriteFileDescriptor is the event schema for file read/write operations.
+// Its binary layout is represented by the C struct
 //
 //	typedef struct _PERFINFO_FILE_READ_WRITE {
 //	    ULONGLONG Offset;
@@ -621,6 +624,7 @@ var ReadWriteFileDescriptor = []ParamInfo{
 }
 
 // SetFileInformationDescriptor represents the event schema for file information events.
+// Its binary layout is represented by the C struct
 //
 //	typedef struct _PERFINFO_FILE_INFORMATION {
 //	    ULONG_PTR Irp;
@@ -666,6 +670,7 @@ var RenameFileDescriptor = []ParamInfo{
 }
 
 // EnumDirectoryDescriptor is the event schema for directory enumeration events.
+// Its binary layout is represented by the C struct
 //
 //	typedef struct _PERFINFO_FILE_DIRENUM {
 //	     ULONG_PTR Irp;
@@ -695,6 +700,7 @@ var FileRundownDescriptor = []ParamInfo{
 }
 
 // FileOpEndDescriptor is the event schema for file operation end events.
+// Its binary layout is represented by the C struct
 //
 //	typedef struct _PERFINFO_FILE_OPERATION_END {
 //	    ULONG_PTR Irp;
@@ -785,6 +791,7 @@ var UnmapViewOfSectionDescriptor = MapViewOfSectionDescriptor
 var MapViewSectionRundownDescriptor = MapViewOfSectionDescriptor
 
 // VirtualAllocDescriptor is the event schema for memory allocation events.
+// The binary format is represented by the C struct
 //
 //	typedef struct _PERFINFO_VIRTUAL_ALLOC {
 //	    PVOID CapturedBase;
