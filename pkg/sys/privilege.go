@@ -23,16 +23,15 @@ package sys
 import (
 	"bytes"
 	"encoding/binary"
+	"unsafe"
+
 	"github.com/pkg/errors"
 	"golang.org/x/sys/windows"
-	"unsafe"
 )
 
 const (
 	// SeDebugPrivilege is the name of the privilege used to debug programs.
 	SeDebugPrivilege = "SeDebugPrivilege"
-	// SeTcbPrivilege privilege identifies its holder as part of the trusted computer base.
-	SeTcbPrivilege = "SeTcbPrivilege"
 )
 
 // Errors returned by AdjustTokenPrivileges.
@@ -87,12 +86,13 @@ func adjustTokenPrivileges(token windows.Token, state uint32, privileges ...stri
 
 	privs := (*windows.Tokenprivileges)(unsafe.Pointer(&b.Bytes()[0]))
 	err = windows.AdjustTokenPrivileges(token, false, privs, uint32(b.Len()), nil, nil)
-	if err != nil {
-		return err
-	}
 	if err == ErrorNotAllAsigned {
 		return errors.Wrap(err, "error not all privileges were assigned")
 	}
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -101,24 +101,8 @@ func SetDebugPrivilege() {
 	enablePrivileges(SeDebugPrivilege)
 }
 
-// SetTcbPrivilege sets the TCB privilege in the current process token.
-func SetTcbPrivilege() {
-	enablePrivileges(SeTcbPrivilege)
-}
-
-// RemoveTcbPrivilege removes the TCB privilege from the access token of the current process.
-func RemoveTcbPrivilege() {
-	removePrivileges(SeTcbPrivilege)
-}
-
 func enablePrivileges(privs ...string) {
 	var token windows.Token
 	_ = windows.OpenProcessToken(windows.CurrentProcess(), windows.TOKEN_ADJUST_PRIVILEGES|windows.TOKEN_QUERY, &token)
 	_ = adjustTokenPrivileges(token, PrivilegedEnabled, privs...)
-}
-
-func removePrivileges(privs ...string) {
-	var token windows.Token
-	_ = windows.OpenProcessToken(windows.CurrentProcess(), windows.TOKEN_ADJUST_PRIVILEGES|windows.TOKEN_QUERY, &token)
-	_ = adjustTokenPrivileges(token, PrivilegeRemoved, privs...)
 }

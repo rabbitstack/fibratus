@@ -60,6 +60,7 @@ var (
 	procSymUnloadModule64                    = moddbghelp.NewProc("SymUnloadModule64")
 	procCreateThread                         = modkernel32.NewProc("CreateThread")
 	procFreeConsole                          = modkernel32.NewProc("FreeConsole")
+	procGetConsoleProcessList                = modkernel32.NewProc("GetConsoleProcessList")
 	procGetPackageId                         = modkernel32.NewProc("GetPackageId")
 	procGetProcessIdOfThread                 = modkernel32.NewProc("GetProcessIdOfThread")
 	procTerminateThread                      = modkernel32.NewProc("TerminateThread")
@@ -83,8 +84,14 @@ var (
 	procDefWindowProcW                       = moduser32.NewProc("DefWindowProcW")
 	procDestroyIcon                          = moduser32.NewProc("DestroyIcon")
 	procDestroyWindow                        = moduser32.NewProc("DestroyWindow")
+	procDispatchMessageW                     = moduser32.NewProc("DispatchMessageW")
+	procGetMessageW                          = moduser32.NewProc("GetMessageW")
 	procLoadImageW                           = moduser32.NewProc("LoadImageW")
+	procPostMessageW                         = moduser32.NewProc("PostMessageW")
+	procPostQuitMessage                      = moduser32.NewProc("PostQuitMessage")
 	procRegisterClassExW                     = moduser32.NewProc("RegisterClassExW")
+	procRegisterWindowMessageW               = moduser32.NewProc("RegisterWindowMessageW")
+	procTranslateMessage                     = moduser32.NewProc("TranslateMessage")
 	procCryptCATAdminAcquireContext2         = modwintrust.NewProc("CryptCATAdminAcquireContext2")
 	procCryptCATAdminCalcHashFromFileHandle2 = modwintrust.NewProc("CryptCATAdminCalcHashFromFileHandle2")
 	procCryptCATAdminEnumCatalogFromHash     = modwintrust.NewProc("CryptCATAdminEnumCatalogFromHash")
@@ -155,6 +162,12 @@ func CreateThread(attributes *windows.SecurityAttributes, stackSize uint, startA
 
 func FreeConsole() {
 	syscall.Syscall(procFreeConsole.Addr(), 0, 0, 0, 0)
+	return
+}
+
+func GetConsoleProcessList(pids *uint32, count uint32) (n uint32) {
+	r0, _, _ := syscall.Syscall(procGetConsoleProcessList.Addr(), 2, uintptr(unsafe.Pointer(pids)), uintptr(count), 0)
+	n = uint32(r0)
 	return
 }
 
@@ -323,6 +336,18 @@ func DestroyWindow(hwnd Hwnd) {
 	return
 }
 
+func DispatchMessage(msg *WndMsg) (result uintptr) {
+	r0, _, _ := syscall.Syscall(procDispatchMessageW.Addr(), 1, uintptr(unsafe.Pointer(msg)), 0, 0)
+	result = uintptr(r0)
+	return
+}
+
+func GetMessage(msg *WndMsg, hwnd Hwnd, filterMin uint32, filterMax uint32) (ret int32) {
+	r0, _, _ := syscall.Syscall6(procGetMessageW.Addr(), 4, uintptr(unsafe.Pointer(msg)), uintptr(hwnd), uintptr(filterMin), uintptr(filterMax), 0, 0)
+	ret = int32(r0)
+	return
+}
+
 func LoadImage(inst windows.Handle, name *uint16, typ uint, cx int, cy int, flags uint) (handle windows.Handle, err error) {
 	r0, _, e1 := syscall.Syscall6(procLoadImageW.Addr(), 6, uintptr(inst), uintptr(unsafe.Pointer(name)), uintptr(typ), uintptr(cx), uintptr(cy), uintptr(flags))
 	handle = windows.Handle(r0)
@@ -332,11 +357,39 @@ func LoadImage(inst windows.Handle, name *uint16, typ uint, cx int, cy int, flag
 	return
 }
 
+func PostMessage(hwnd Hwnd, msg uint32, wparam uintptr, lparam uintptr) (err error) {
+	r1, _, e1 := syscall.Syscall6(procPostMessageW.Addr(), 4, uintptr(hwnd), uintptr(msg), uintptr(wparam), uintptr(lparam), 0, 0)
+	if r1 == 0 {
+		err = errnoErr(e1)
+	}
+	return
+}
+
+func PostQuitMessage(exitCode int32) {
+	syscall.Syscall(procPostQuitMessage.Addr(), 1, uintptr(exitCode), 0, 0)
+	return
+}
+
 func RegisterClass(class *WndClassEx) (err error) {
 	r1, _, e1 := syscall.Syscall(procRegisterClassExW.Addr(), 1, uintptr(unsafe.Pointer(class)), 0, 0)
 	if r1 == 0 {
 		err = errnoErr(e1)
 	}
+	return
+}
+
+func RegisterWindowMessage(name *uint16) (msg uint32, err error) {
+	r0, _, e1 := syscall.Syscall(procRegisterWindowMessageW.Addr(), 1, uintptr(unsafe.Pointer(name)), 0, 0)
+	msg = uint32(r0)
+	if msg == 0 {
+		err = errnoErr(e1)
+	}
+	return
+}
+
+func TranslateMessage(msg *WndMsg) (ok bool) {
+	r0, _, _ := syscall.Syscall(procTranslateMessage.Addr(), 1, uintptr(unsafe.Pointer(msg)), 0, 0)
+	ok = r0 != 0
 	return
 }
 

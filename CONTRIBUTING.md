@@ -47,8 +47,7 @@ If your pull request brings conflicting changes, you should follow these steps t
 - [`/build`](/build) Resources for producing software packages
     1. [`msi`](/build/msi) [WiX Toolset](https://wixtoolset.org/) manifest for creating the MSI package
 - [`/cmd`](/cmd)
-    1. [`/fibratus`](/cmd/fibratus/) - Contains Fibratus entrypoint source file, CLI command implementations and the resource compiler manifest.
-    2. [`/systray`](/cmd/systray/) - Systray server implementation. Uses named pipe IPC to pull [systray alertsender](https://www.fibratus.io/#/alerts/senders/systray) messages from the main process.
+    1. [`/fibratus`](/cmd/fibratus/) - Contains Fibratus entrypoint source file, CLI command implementations (including `fibratus systray`) and the resource compiler manifest.
 - [`/configs`](/config) - Configuration files in `yml` and `json` format, included in every release.
 - [`/docs`](/docs) - Markdown files for generating the [documentation](https://www.fibratus.io/) site.
 - [`/filaments`](/filaments) - The collection of [filaments](https://www.fibratus.io/#/filaments/introduction) that are included in every release.
@@ -66,7 +65,7 @@ If your pull request brings conflicting changes, you should follow these steps t
 
 No further dependencies are required if you have already installed the Go compiler. Fibratus includes a [`make.bat`](/make.bat) in the root directory of the repo. The `bat` script mimics the [Makefile](https://www.gnu.org/software/make/manual/html_node/Introduction.html) execution workflow. Refer to the [`make.bat`](/make.bat) file for a full list of tasks.
 
-To build the Fibratus binary, run `./make` from the Powershell terminal. The resulting binary is placed inside the `cmd\fibratus` directory. Additionally, `fibratus-systray.exe` binary is generated in the `cmd\systray` directory. It acts as a named pipe server and sends notifications to the systray area from the corresponding alert sender.
+To build the Fibratus binary, run `./make` from the Powershell terminal. The resulting binary is placed inside the `cmd\fibratus` directory. Notifications from the [systray alert sender](https://www.fibratus.io/#/alerts/senders/systray) are shown by the `fibratus systray` subcommand, which connects to a named pipe served by the Fibratus process.
 
 #### The Hard Way
 

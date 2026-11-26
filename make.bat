@@ -64,8 +64,6 @@ if "%~1"=="mc" goto mc
 :: set PKG_CONFIG_PATH=pkg-config
 go build -ldflags %LDFLAGS% -tags %TAGS% -o .\cmd\fibratus\fibratus.exe .\cmd\fibratus
 if errorlevel 1 goto fail
-go build -ldflags %LDFLAGS% -o .\cmd\systray\fibratus-systray.exe .\cmd\systray
-if errorlevel 1 goto fail
 goto :EOF
 
 :unit-test
@@ -97,8 +95,6 @@ goto :EOF
 set RC_VER=%VERSION:.=,%
 windres --define RC_VER=%RC_VER% --define VER=%VERSION% -i cmd\fibratus\fibratus.rc -O coff -o cmd\fibratus\fibratus.syso
 if errorlevel 1 goto fail
-windres --define RC_VER=%RC_VER% --define VER=%VERSION% -i cmd\systray\fibratus-systray.rc -O coff -o cmd\systray\fibratus-systray.syso
-if errorlevel 1 goto fail
 goto :EOF
 
 :mc
@@ -122,7 +118,6 @@ mkdir "%~dp0\%RELEASE_DIR%\Filaments"
 echo Copying artifacts...
 :: Copy artifacts
 copy /y ".\cmd\fibratus\fibratus.exe" "%RELEASE_DIR%\Bin"
-copy /y ".\cmd\systray\fibratus-systray.exe" "%RELEASE_DIR%\Bin"
 copy /y ".\cmd\fibratus\fibratus.ico" "%RELEASE_DIR%\Bin"
 copy /y ".\configs\fibratus.yml" "%RELEASE_DIR%\Config\fibratus.yml"
 
@@ -181,7 +176,6 @@ mkdir "%~dp0\%RELEASE_DIR%\Rules"
 echo Copying artifacts...
 :: Copy artifacts
 copy /y ".\cmd\fibratus\fibratus.exe" "%RELEASE_DIR%\Bin"
-copy /y ".\cmd\systray\fibratus-systray.exe" "%RELEASE_DIR%\Bin"
 copy /y ".\cmd\fibratus\fibratus.ico" "%RELEASE_DIR%\Bin"
 copy /y ".\configs\fibratus.yml" "%RELEASE_DIR%\Config\fibratus.yml"
 
@@ -203,7 +197,6 @@ goto :EOF
 
 :clean
 del cmd\fibratus\fibratus.exe
-del cmd\systray\fibratus-systray.exe
 goto :EOF
 
 :: Install the dev MSI. This target executes

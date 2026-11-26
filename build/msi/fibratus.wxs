@@ -54,6 +54,12 @@
         </ServiceInstall>
         <ServiceControl Id="Fibratus" Name="Fibratus" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
       </Component>
+
+      <!-- Notifications from the systray alert sender are shown by `fibratus systray`. The service runs in
+           the isolated session 0 and can't reach the desktop, so every user starts the helper at logon. -->
+      <Component Directory="BINDIR" Guid="60D918EB-A6AB-407A-9E89-4BF040C072C0">
+        <RegistryValue Root="HKLM" Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Run" Name="FibratusSystray" Type="string" Value="&quot;[BINDIR]fibratus.exe&quot; systray" KeyPath="yes" />
+      </Component>
     </ComponentGroup>
 
     <StandardDirectory Id="ProgramFiles64Folder">
@@ -74,7 +80,8 @@
     <Property Id="ConfigureServiceRecovery" Value="&quot;SC.EXE&quot; failureflag fibratus 1" />
     <CustomAction Id="ConfigureServiceRecovery" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" DllEntry="WixQuietExec" Impersonate="no" Execute="deferred" Return="ignore" />
 
-    <util:CloseApplication Id="CloseSystray" CloseMessage="yes" Target="fibratus-systray.exe" RebootPrompt="no" />
+    <!-- Asks the `fibratus systray` helpers to close, since they keep fibratus.exe locked during upgrades -->
+    <util:CloseApplication Id="CloseSystray" CloseMessage="yes" Target="fibratus.exe" RebootPrompt="no" />
 
     <InstallExecuteSequence>
       <Custom Action="ConfigureServiceRecovery" After="InstallServices" Condition="NOT REMOVE" />
