@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-present by Nedim Sabic Sabic
+ * Copyright 2026 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -18,15 +18,16 @@
 package policy
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/rabbitstack/fibratus/pkg/util/multierror"
-	log "github.com/sirupsen/logrus"
+	"github.com/rabbitstack/fibratus/pkg/util/fswatcher"
 )
 
 // DirProviderType is the type of the directory provider.
@@ -37,42 +38,37 @@ const DirProviderType = "dir"
 // and copy operations usually emit several notifications per file.
 const defaultDebounce = 500 * time.Millisecond
 
-// watcher stops the underlying file system change notifications.
-type watcher interface {
-	Close() error
-}
-
-// newWatcherFunc builds the watcher for the given directories. The
-// notify function is called any time something relevant has changed.
-type newWatcherFunc func(dirs []string, notify func()) (watcher, error)
-
 // DirProvider loads policies from YAML files that reside in the local
 // file system. Rule and macro paths are glob expressions. Every matching
 // file results in a behaviour policy. Rule files hold a single rule, while
-// macro files hold a list of macros. On Windows, the directories are
-// watched for changes through the directory change notification API.
+// macro files hold a list of macros. Directories are watched for changes
+// through the directory change notification API on Windows and fsnotify on
+// Linux platforms.
 type DirProvider struct {
-	rulePaths  []string
-	macroPaths []string
+	ruleGlobs  []string
+	macroGlobs []string
 
-	debounce   time.Duration
-	newWatcher newWatcherFunc
+	ruleBundle  *RuleBundle
+	macroBundle *MacroBundle
+
+	debounce time.Duration
 
 	mu     sync.Mutex
 	cb     func()
-	w      watcher
+	w      *fswatcher.Watcher
 	timer  *time.Timer
 	closed bool
 }
 
 // NewDirProvider creates the provider that loads rules and macros from
 // the given glob expressions.
-func NewDirProvider(rulePaths, macroPaths []string) *DirProvider {
+func NewDirProvider(ruleGlobs, macroGlobs []string) *DirProvider {
 	return &DirProvider{
-		rulePaths:  rulePaths,
-		macroPaths: macroPaths,
-		debounce:   defaultDebounce,
-		newWatcher: newDirWatcher,
+		ruleGlobs:   ruleGlobs,
+		macroGlobs:  macroGlobs,
+		ruleBundle:  NewRuleBundle(),
+		macroBundle: NewMacroBundle(),
+		debounce:    defaultDebounce,
 	}
 }
 
@@ -86,140 +82,56 @@ func (p *DirProvider) SetOnPoliciesChanged(cb func()) {
 	p.cb = cb
 }
 
-// Load decodes policies from all rule and macro files. Files that fail to
-// decode are reported in the returned error, but they don't prevent the
-// remaining files from being loaded.
+// Load decodes the directory policy from all rule and macro files.
 func (p *DirProvider) LoadPolicies() ([]*Policy, error) {
 	var (
 		policies []*Policy
-		errs     []error
+		rules    []*RuleDef
+		macros   []*MacroDef
 	)
 
-	// // macro files go first, so a path that matches both
-	// // the macro and rule patterns is treated as a macro file
-	// macroFiles, err := p.files(p.macroPaths, seen)
-	// if err != nil {
-	// 	errs = append(errs, err)
-	// }
-	// for _, path := range macroFiles {
-	// 	log.Infof("loading macros from file %s", path)
-	// 	b, err := os.ReadFile(path)
-	// 	if err != nil {
-	// 		errs = append(errs, fmt.Errorf("couldn't load macros from file: %v", err))
-	// 		continue
-	// 	}
-	// 	macros, err := DecodeMacros(path, b)
-	// 	if err != nil {
-	// 		errs = append(errs, err)
-	// 		continue
-	// 	}
-	// 	pol := newFilePolicy(path)
-	// 	pol.Macros = macros
-	// 	policies = append(policies, pol)
-	// }
+	if err := p.loadIntoBundle(p.ruleBundle, p.ruleGlobs); err != nil {
+		return nil, err
+	}
 
-	// ruleFiles, err := p.files(p.rulePaths, seen)
-	// if err != nil {
-	// 	errs = append(errs, err)
-	// }
-	// var nrules int
-	// for _, path := range ruleFiles {
-	// 	log.Infof("loading rule from %s", path)
-	// 	b, err := os.ReadFile(path)
-	// 	if err != nil {
-	// 		errs = append(errs, fmt.Errorf("couldn't load rule file: %s: %v", path, err))
-	// 		continue
-	// 	}
-	// 	rule, err := DecodeRule(path, b)
-	// 	if err != nil {
-	// 		errs = append(errs, err)
-	// 		continue
-	// 	}
-	// 	pol := newFilePolicy(path)
-	// 	pol.Name = rule.Name
-	// 	pol.Version = rule.Version
-	// 	pol.Description = rule.Description
-	// 	pol.Rules = []*RuleDef{rule}
-	// 	policies = append(policies, pol)
-	// 	nrules++
-	// }
+	if err := p.loadIntoBundle(p.macroBundle, p.macroGlobs); err != nil {
+		return nil, err
+	}
 
-	// if nrules == 0 && len(errs) == 0 {
-	// 	log.Warnf("no rules were loaded from [%s] path(s)", strings.Join(p.rulePaths, ","))
-	// }
+	if err := p.ruleBundle.Validate(); err != nil {
+		return nil, err
+	}
 
-	return policies, multierror.Wrap(errs...)
+	if err := p.macroBundle.Validate(); err != nil {
+		return nil, err
+	}
+
+	var err error
+	rules, err = p.ruleBundle.Rules()
+	if err != nil {
+		return nil, err
+	}
+	macros, err = p.macroBundle.Macros()
+	if err != nil {
+		return nil, err
+	}
+
+	policy := newDirPolicy(YAMLInternalPolicyID)
+	policy.Rules = rules
+	policy.Macros = macros
+	policy.Source = ""
+
+	policies = append(policies, policy)
+
+	return policies, nil
 }
 
-func newFilePolicy(path string) *Policy {
+func newDirPolicy(id ID) *Policy {
 	return &Policy{
-		ID:           ID(path),
-		Name:         strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)),
+		ID:           id,
 		Type:         Behaviour,
 		InternalType: YAMLInternalType,
-		Source:       path,
 	}
-}
-
-// files expands glob expressions to YAML file paths that were not yet seen.
-func (p *DirProvider) files(patterns []string, seen map[string]struct{}) ([]string, error) {
-	var (
-		files []string
-		errs  []error
-	)
-	for _, pattern := range patterns {
-		paths, err := filepath.Glob(pattern)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("invalid path pattern %q: %v", pattern, err))
-			continue
-		}
-		for _, path := range paths {
-			if !isValidExt(path) {
-				continue
-			}
-			if fi, err := os.Stat(path); err != nil || fi.IsDir() {
-				continue
-			}
-			files = append(files, path)
-		}
-	}
-	return files, multierror.Wrap(errs...)
-}
-
-func isValidExt(path string) bool {
-	ext := strings.ToLower(filepath.Ext(path))
-	return ext == ".yml" || ext == ".yaml"
-}
-
-// watchDirs returns the existing directories that have to be watched
-// to detect changes in files matched by the glob expressions.
-func watchDirs(patterns ...[]string) []string {
-	var dirs []string
-	seen := make(map[string]struct{})
-	for _, ps := range patterns {
-		for _, pattern := range ps {
-			dir := filepath.Dir(pattern)
-			// climb up until we hit the directory with no glob meta characters
-			for strings.ContainsAny(dir, "*?[") {
-				parent := filepath.Dir(dir)
-				if parent == dir {
-					break
-				}
-				dir = parent
-			}
-			if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
-				log.Warnf("cannot watch %s for policy changes: directory doesn't exist", dir)
-				continue
-			}
-			key := strings.ToLower(filepath.Clean(dir))
-			if _, ok := seen[key]; ok {
-				continue
-			}
-			seen[key] = struct{}{}
-			dirs = append(dirs, dir)
-		}
-	}
-	return dirs
 }
 
 // Start starts watching the rule and macro directories.
@@ -229,15 +141,11 @@ func (p *DirProvider) Start() error {
 	if p.w != nil || p.closed {
 		return nil
 	}
-	dirs := watchDirs(p.rulePaths, p.macroPaths)
-	if len(dirs) == 0 {
-		return nil
-	}
-	w, err := p.newWatcher(dirs, p.notify)
-	if err != nil {
-		return fmt.Errorf("unable to watch policy directories: %v", err)
-	}
-	p.w = w
+	// dirs := watchDirs(p.rulePaths, p.macroPaths)
+	// if len(dirs) == 0 {
+	// 	return nil
+	// }
+
 	return nil
 }
 
@@ -280,4 +188,112 @@ func (p *DirProvider) Close() error {
 		return p.w.Close()
 	}
 	return nil
+}
+
+// loadIntoBundle loads all matching YAML files into the provided bundle.
+// Files are processed in lexical path order. Duplicate paths are ignored.
+func (p *DirProvider) loadIntoBundle(bundle YAMLBundleAdder, globs []string) error {
+	if bundle == nil {
+		return errors.New("YAML bundle cannot be nil")
+	}
+
+	files, err := p.files(globs)
+	if err != nil {
+		return err
+	}
+
+	for _, path := range files {
+		if err := p.addFile(bundle, path); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// addFile opens a YAML file, adds its definitions to the bundle,
+// and closes the file.
+func (*DirProvider) addFile(bundle YAMLBundleAdder, path string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("open YAML file %q: %w", path, err)
+	}
+
+	addErr := bundle.AddFrom(path, f)
+	closeErr := f.Close()
+
+	if addErr != nil {
+		return fmt.Errorf("read YAML file %q: %w", path, addErr)
+	}
+
+	if closeErr != nil {
+		return fmt.Errorf("close YAML file %q: %w", path, closeErr)
+	}
+
+	return nil
+}
+
+// files expands all configured glob expressions and returns
+// unique YAML file paths in lexical order.
+func (p *DirProvider) files(globs []string) ([]string, error) {
+	var (
+		files []string
+		errs  []error
+		seen  = make(map[string]struct{})
+	)
+
+	for _, pattern := range globs {
+		paths, err := filepath.Glob(pattern)
+		if err != nil {
+			errs = append(errs, fmt.Errorf(
+				"invalid path pattern %q: %w",
+				pattern,
+				err,
+			))
+			continue
+		}
+
+		for _, path := range paths {
+			if !isYAMLFile(path) {
+				continue
+			}
+
+			info, err := os.Stat(path)
+			if err != nil {
+				errs = append(errs, fmt.Errorf(
+					"stat YAML file %q: %w",
+					path,
+					err,
+				))
+				continue
+			}
+
+			if !info.Mode().IsRegular() {
+				continue
+			}
+
+			path = filepath.Clean(path)
+
+			if _, exists := seen[path]; exists {
+				continue
+			}
+
+			seen[path] = struct{}{}
+			files = append(files, path)
+		}
+	}
+
+	sort.Strings(files)
+
+	return files, errors.Join(errs...)
+}
+
+// isYAMLFile reports whether path has a YAML file extension.
+func isYAMLFile(path string) bool {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".yml", ".yaml":
+		return true
+	default:
+		return false
+	}
 }

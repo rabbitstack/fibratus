@@ -21,9 +21,6 @@ package policy
 import (
 	"fmt"
 	"regexp"
-
-	"github.com/rabbitstack/fibratus/pkg/policy/schemas"
-	"gopkg.in/yaml.v3"
 )
 
 // MacroID represents the ID of a macro.
@@ -65,25 +62,4 @@ func (m *MacroDef) Validate() error {
 		return fmt.Errorf("macro %q must declare either expression or list", m.ID)
 	}
 	return nil
-}
-
-// MacroDefs is a list of macro definitions that validates itself on decode.
-type MacroDefs []*MacroDef
-
-// rawMacroDefs has no methods, so decoding into it doesn't re-enter
-// MacroDefs.UnmarshalYAML.
-type rawMacroDefs MacroDefs
-
-// UnmarshalYAML implements yaml.Unmarshaler. The whole document is
-// validated against the macro JSON schema first, then decoded and each
-// macro is checked with Validate.
-func (m *MacroDefs) UnmarshalYAML(node *yaml.Node) error {
-	var v any
-	if err := node.Decode(&v); err != nil {
-		return fmt.Errorf("line %d: invalid macro yaml: %v", node.Line, err)
-	}
-	if valid, errs := schemas.ValidateMacrosSchema(v); !valid || len(errs) > 0 {
-		return schemas.InvalidDefinitionError("macro", fmt.Sprintf("line %d", node.Line), v, errs)
-	}
-	return node.Decode((*rawMacroDefs)(m))
 }

@@ -40,15 +40,14 @@ func InvalidDefinitionError(kind, resource string, def any, errs []error) error 
 	return fmt.Errorf("invalid %s definition: \n\n%v in %s: %v", kind, def, resource, multierror.Wrap(errs...))
 }
 
-func ValidateRuleSchema(m any) (bool, error) {
+func ValidateRuleSchema(m any) error {
 	schema, err := schemavalidate.NewFromString(ruleSchema)
 	if err != nil {
-		return false, err
+		return err
 	}
-	err = schema.Validate(m)
-	return err == nil, err
+	return schema.Validate(m)
 }
 
-func ValidateMacrosSchema(m any) (bool, []error) {
-	return true, nil
+func ValidateMacrosSchema(m any) error {
+	return nil
 }

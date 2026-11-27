@@ -244,13 +244,13 @@ func (f *Function) Validate() error {
 		typ := functions.Unknown
 
 		switch reflect.TypeOf(expr) {
-		case reflect.TypeFor[*FieldLiteral]():
+		case reflect.TypeOf(&FieldLiteral{}):
 			typ = functions.Field
-		case reflect.TypeFor[*BoundFieldLiteral]():
+		case reflect.TypeOf(&BoundFieldLiteral{}):
 			typ = functions.BoundField
 		case reflect.TypeOf(&BoundSegmentLiteral{}):
 			typ = functions.BoundSegment
-		case reflect.TypeFor[*BareBoundVariableLiteral]():
+		case reflect.TypeOf(&BareBoundVariableLiteral{}):
 			typ = functions.BareBoundVariable
 		case reflect.TypeOf(&IPLiteral{}):
 			typ = functions.IP
@@ -267,6 +267,7 @@ func (f *Function) Validate() error {
 		case reflect.TypeOf(&BinaryExpr{}), reflect.TypeOf(&ParenExpr{}), reflect.TypeOf(&NotExpr{}):
 			typ = functions.Expression
 		}
+
 		if !arg.ContainsType(typ) {
 			return ErrArgumentTypeMismatch(i, arg.Keyword, fn.Name(), arg.Types)
 		}

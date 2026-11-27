@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-present by Nedim Sabic Sabic
+ * Copyright 2026 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -28,7 +28,7 @@ import (
 // RuleID represents the ID of a rule.
 type RuleID string
 
-// RuleDef is the definition of a detection rule.
+// RuleDef is the definition of a detection rule as described by the YAML format.
 type RuleDef struct {
 	// ID is the unique rule identifier (UUID).
 	ID RuleID `yaml:"id" json:"id"`
@@ -102,25 +102,6 @@ func (r *RuleDef) Validate() error {
 			return fmt.Errorf("rule %q action #%d: %v", r.Name, i+1, err)
 		}
 	}
-	return nil
-}
-
-// ruleDef has the same fields as RuleDef but none of its methods, so
-// decoding into it doesn't call RuleDef.UnmarshalYAML again.
-type ruleDef RuleDef
-
-// UnmarshalYAML implements yaml.Unmarshaler. The node is validated against
-// the rule JSON schema first, then decoded into the RuleDef and checked
-// with Validate.
-func (r *RuleDef) UnmarshalYAML(node *yaml.Node) error {
-	var v any
-	if err := node.Decode(&v); err != nil {
-		return fmt.Errorf("line %d: invalid yaml: %v", node.Line, err)
-	}
-	// if valid, errs := schemas.ValidateRuleSchema(v); !valid || len(errs) > 0 {
-	// 	return schemas.InvalidDefinitionError("rule", fmt.Sprintf("line %d", node.Line), v, errs)
-	// }
-	// return node.Decode((*ruleDef)(r))
 	return nil
 }
 

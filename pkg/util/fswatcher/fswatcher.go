@@ -73,7 +73,7 @@ const (
 	Rename
 
 	// Chmod is reported when file attributes change. It is only reported
-	// on Linux; Windows folds attribute changes into Write.
+	// on Linux. Windows folds attribute changes into Write.
 	Chmod
 )
 

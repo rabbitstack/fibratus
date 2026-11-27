@@ -219,7 +219,7 @@ func TestMacroDefValidate(t *testing.T) {
 }
 
 func TestPolicyType(t *testing.T) {
-	assert.True(t, (&Policy{Type: BehaviourPolicyType}).IsBehaviour())
-	assert.False(t, (&Policy{Type: BehaviourPolicyType}).IsSignature())
-	assert.True(t, (&Policy{Type: SignaturePolicyType}).IsSignature())
+	assert.True(t, (&Policy{Type: Behaviour}).IsBehaviour())
+	assert.False(t, (&Policy{Type: Behaviour}).IsSignature())
+	assert.True(t, (&Policy{Type: Signature}).IsSignature())
 }

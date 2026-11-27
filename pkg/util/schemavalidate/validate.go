@@ -66,7 +66,7 @@ func NewFromLoader(loader gojsonschema.JSONLoader) (*Validator, error) {
 // It returns nil when the document is valid and a *ValidationError listing
 // every violation when it is not. Any other error means the document could
 // not be checked at all (for example a *KeyError for a non-string map key).
-func (v *Validator) Validate(doc interface{}) error {
+func (v *Validator) Validate(doc any) error {
 	normalized, err := NormalizeKeys(doc)
 	if err != nil {
 		return fmt.Errorf("schemavalidate: invalid document: %w", err)

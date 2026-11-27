@@ -40,6 +40,8 @@ const (
 // YAMLInternalType denotes the policies decoded from YAML files.
 const YAMLInternalType InternalType = "yaml"
 
+const YAMLInternalPolicyID ID = "default"
+
 // Policy is a named group of rules and macros. All rules and macros
 // are always bound to a policy.
 type Policy struct {
