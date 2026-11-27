@@ -202,9 +202,10 @@ func (s *Callstack) PushFrame(f Frame) {
 	*s = append(*s, f)
 }
 
-// FrameAt returns the stack frame at the specified index.
+// FrameAt returns the stack frame at the specified index. The empty frame
+// is returned if the index is out of range.
 func (s *Callstack) FrameAt(i int) Frame {
-	if i > len(*s)-1 {
+	if i < 0 || i >= len(*s) {
 		return Frame{}
 	}
 	return (*s)[i]

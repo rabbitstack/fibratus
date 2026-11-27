@@ -32,7 +32,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// declaredGoType returns the Go type an accessor has to return for a field
+// evaluateField returns the value the evaluator of the field gives for the
+// event, and false if the field has no evaluator or the evaluator has no value.
+func evaluateField(f Field, evt *event.Event) (any, bool) {
+	ev, err := GetEvaluator(f)
+	if err != nil {
+		return nil, false
+	}
+	v := ev.Eval(&EvalCtx{Evt: evt})
+	return v, v != nil
+}
+
+// declaredGoType returns the Go type an evaluator has to return for a field
 // whose declared type is typ. The second result is false if the declared
 // type has no single Go counterpart, e.g. the flags and the variants.
 func declaredGoType(typ params.Type) (reflect.Type, bool) {
@@ -73,11 +84,11 @@ func declaredGoType(typ params.Type) (reflect.Type, bool) {
 	return nil, false
 }
 
-// TestEvtAccessorReturnsDeclaredTypes checks that the dynamic type of the value
-// the generic event accessor returns is the type the field is declared with.
+// TestEvtEvaluatorsReturnDeclaredTypes checks that the dynamic type of the value
+// the event evaluators return is the type the field is declared with.
 // The declared type decides the default value of the field, so a disagreement
-// makes the fallback value incomparable with the value the accessor produces.
-func TestEvtAccessorReturnsDeclaredTypes(t *testing.T) {
+// makes the fallback value incomparable with the value the evaluator produces.
+func TestEvtEvaluatorsReturnDeclaredTypes(t *testing.T) {
 	evt := &event.Event{
 		Seq:       42,
 		PID:       1023,
@@ -99,7 +110,6 @@ func TestEvtAccessorReturnsDeclaredTypes(t *testing.T) {
 		fields.EvtArg:      {},
 	}
 
-	acc := &evtAccessor{}
 	var checked atomic.Int32
 	for _, fi := range fields.Get() {
 		if !fi.Field.IsEvtField() {
@@ -109,11 +119,10 @@ func TestEvtAccessorReturnsDeclaredTypes(t *testing.T) {
 			continue
 		}
 		t.Run(string(fi.Field), func(t *testing.T) {
-			v, err := acc.get(Field{Name: fi.Field, Value: string(fi.Field)}, evt)
-			require.NoError(t, err)
-			if v == nil {
-				// e.g. evt.retval or evt.is_direct_syscall
-				t.Skipf("%s isn't served by the generic event accessor", fi.Field)
+			v, ok := evaluateField(Field{Name: fi.Field, Value: string(fi.Field)}, evt)
+			if !ok {
+				// e.g. evt.retval or evt.is_direct_syscall on the other platform
+				t.Skipf("%s has no value for the event", fi.Field)
 			}
 
 			want, ok := declaredGoType(fi.Type)
@@ -121,7 +130,7 @@ func TestEvtAccessorReturnsDeclaredTypes(t *testing.T) {
 				t.Skipf("declared type %v has no single Go type", fi.Type)
 			}
 			assert.Equal(t, want, reflect.TypeOf(v),
-				"%s is declared as %v, but the accessor returns %T", fi.Field, fi.Type, v)
+				"%s is declared as %v, but the evaluator returns %T", fi.Field, fi.Type, v)
 			checked.Add(1)
 		})
 	}
@@ -129,14 +138,13 @@ func TestEvtAccessorReturnsDeclaredTypes(t *testing.T) {
 	assert.Greater(t, int(checked.Load()), 10)
 }
 
-func TestEvtAccessorTimeAndParamValues(t *testing.T) {
+func TestEvtEvaluatorTimeAndParamValues(t *testing.T) {
 	evt := &event.Event{
 		Timestamp: time.Date(2026, time.November, 24, 11, 31, 5, 123, time.UTC),
 		Params: event.ParamsOf(
 			event.NewParam(params.Cmdline, params.String, params.Str("cmd.exe")),
 		),
 	}
-	acc := &evtAccessor{}
 
 	var tests = []struct {
 		field fields.Field
@@ -153,8 +161,8 @@ func TestEvtAccessorTimeAndParamValues(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(string(tt.field), func(t *testing.T) {
-			v, err := acc.get(Field{Name: tt.field, Value: string(tt.field)}, evt)
-			require.NoError(t, err)
+			v, ok := evaluateField(Field{Name: tt.field, Value: string(tt.field)}, evt)
+			require.True(t, ok)
 			assert.Equal(t, tt.value, v)
 
 			// the default value has to be comparable with the produced one

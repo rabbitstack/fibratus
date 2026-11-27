@@ -34,7 +34,7 @@ import (
 // SequenceStepFunc is a pre-compiled sequence per-step callback. It
 // receives an event and advances the lookup ladder if the event
 // matches. It returns true if the event advanced the ladder.
-type SequenceStepFunc func(*event.Event, *eval.ValuerCache) bool
+type SequenceStepFunc func(*event.Event, *eval.EvalCtx) bool
 
 // SequenceStep is the compiled sequence step. Besides the callback, it
 // keeps the expression and the join/bound information of the step.
@@ -103,7 +103,7 @@ type boundRef struct {
 type SequenceEvaluator struct {
 	mu sync.Mutex
 
-	evaluator *eval.Evaluator
+	evaluator *eval.Program
 
 	// steps holds one compiled step per sequence step. They are stored
 	// in the reverse order and called in that order, so a single event
@@ -124,7 +124,7 @@ type SequenceEvaluator struct {
 }
 
 // MakeSequenceEvaluator creates the evaluator for the sequence rule.
-func MakeSequenceEvaluator(evaluator *eval.Evaluator) (RuleEvaluator, error) {
+func MakeSequenceEvaluator(evaluator *eval.Program) (RuleEvaluator, error) {
 	expr := evaluator.GetExpr().(*ast.SequenceExpr)
 	depth := expr.Depth()
 
@@ -169,7 +169,7 @@ func MakeSequenceEvaluator(evaluator *eval.Evaluator) (RuleEvaluator, error) {
 	for pos := depth - 1; pos >= 0; pos-- {
 		pos := pos // capture
 		step := compiled[pos]
-		step.fn = func(e *event.Event, valuer *eval.ValuerCache) bool {
+		step.fn = func(e *event.Event, valuer *eval.EvalCtx) bool {
 			evts := seq.advance(pos, e, valuer)
 			if evts == nil {
 				return false
@@ -211,7 +211,7 @@ func boundRefs(expr ast.Expr, aliases map[string]int) ([]boundRef, error) {
 		}
 		refs = append(refs, boundRef{
 			value: f.Value,
-			field: eval.Field{Name: f.Field.Field, Value: f.Field.Value, Arg: f.Field.Arg},
+			field: eval.NewField(f.Field.Field, f.Field.Value, f.Field.Arg),
 			stage: stage,
 		})
 	})
@@ -220,13 +220,14 @@ func boundRefs(expr ast.Expr, aliases map[string]int) ([]boundRef, error) {
 
 // Evaluate feeds the event to the sequence. It returns the events of all
 // steps if the event completes the sequence.
-func (s *SequenceEvaluator) Evaluate(e *event.Event, valuer *eval.ValuerCache) ([]*event.Event, bool) {
+func (s *SequenceEvaluator) Evaluate(e *event.Event, valuer *eval.EvalCtx) ([]*event.Event, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.expire(e)
 
-	s.evaluator.Extract(e, valuer)
+	// the fields are extracted by the steps that read them, and by the
+	// explicit extraction of the link fields
 
 	// the steps are stored from the last to the first one
 	for _, step := range s.steps {
@@ -244,7 +245,7 @@ func (s *SequenceEvaluator) Evaluate(e *event.Event, valuer *eval.ValuerCache) (
 
 // advance tries to advance the ladder with the event on the given step.
 // It returns the events of the matched sequence if the last step completes it.
-func (s *SequenceEvaluator) advance(pos int, e *event.Event, valuer *eval.ValuerCache) []*event.Event {
+func (s *SequenceEvaluator) advance(pos int, e *event.Event, valuer *eval.EvalCtx) []*event.Event {
 	step := &s.steps[len(s.steps)-1-pos]
 
 	if pos == 0 {
@@ -254,6 +255,7 @@ func (s *SequenceEvaluator) advance(pos int, e *event.Event, valuer *eval.Valuer
 		c := &SequenceChain{id: s.newID(), stage: 1, events: []*event.Event{e}}
 		switch {
 		case step.by != nil:
+			s.evaluator.ExtractLink(step.by, e, valuer)
 			c.link = eval.MakeSequenceLinkID(valuer, step.by)
 		case s.unique:
 			c.link = c.id
@@ -296,7 +298,7 @@ func (s *SequenceEvaluator) advance(pos int, e *event.Event, valuer *eval.Valuer
 }
 
 // match finds the chain waiting in the stage that the event advances.
-func (s *SequenceEvaluator) match(step *SequenceStep, stage map[any]*SequenceChain, e *event.Event, valuer *eval.ValuerCache) *SequenceChain {
+func (s *SequenceEvaluator) match(step *SequenceStep, stage map[any]*SequenceChain, e *event.Event, valuer *eval.EvalCtx) *SequenceChain {
 	// a step without bound fields only needs to be evaluated once
 	if len(step.bound) == 0 && !s.evaluator.EvalExpr(step.expr, e, valuer) {
 		return nil
@@ -304,6 +306,7 @@ func (s *SequenceEvaluator) match(step *SequenceStep, stage map[any]*SequenceCha
 
 	var candidates []*SequenceChain
 	if step.by != nil {
+		s.evaluator.ExtractLink(step.by, e, valuer)
 		if c, ok := stage[eval.MakeSequenceLinkID(valuer, step.by)]; ok {
 			candidates = append(candidates, c)
 		}
@@ -337,16 +340,16 @@ func (s *SequenceEvaluator) match(step *SequenceStep, stage map[any]*SequenceCha
 
 // evalBound evaluates the step expression with the bound fields
 // resolved from the events the chain has accumulated.
-func (s *SequenceEvaluator) evalBound(step *SequenceStep, c *SequenceChain, e *event.Event, valuer *eval.ValuerCache) bool {
+func (s *SequenceEvaluator) evalBound(step *SequenceStep, c *SequenceChain, e *event.Event, valuer *eval.EvalCtx) bool {
 	for _, ref := range step.bound {
 		if ref.stage >= len(c.events) {
 			continue
 		}
-		valuer.Valuer[ref.value] = s.evaluator.ExtractField(ref.field, c.events[ref.stage])
+		valuer.Values[ref.value] = s.evaluator.ExtractField(ref.field, c.events[ref.stage])
 	}
 	defer func() {
 		for _, ref := range step.bound {
-			delete(valuer.Valuer, ref.value)
+			delete(valuer.Values, ref.value)
 		}
 	}()
 	return s.evaluator.EvalExpr(step.expr, e, valuer)

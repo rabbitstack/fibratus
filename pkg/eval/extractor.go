@@ -19,77 +19,57 @@
 package eval
 
 import (
-	"expvar"
 	"sync"
 
 	"github.com/rabbitstack/fibratus/pkg/event"
 )
 
-// accessorErrors counts the unexpected errors accessors return, by normalized
-// message. The set of keys is bounded, see countAccessorError.
-var accessorErrors = expvar.NewMap("eval.accessor.errors")
-
-// FieldsConfigurer is implemented by accessors whose behavior depends on the
-// fields referenced by the expression. Such an accessor holds per-expression
-// state, so every Extractor gets a private instance of it.
-type FieldsConfigurer interface {
-	SetFields([]Field)
+// extractor reads the values of the fields of a single expression from events.
+//
+// Every field is bound to its typed evaluator when the extractor is created,
+// so nothing is looked up per event. What is still decided per event is whether
+// the source of the field can serve the event at all, because that depends on
+// the event itself: its category, the presence of the process state or the
+// callstack. A field that has no evaluator, or whose source can't serve the
+// event, evaluates to the default value of its type.
+type extractor struct {
+	// fields are the fields whose values come from the evaluated event, each
+	// bound to its evaluator. Bound fields are skipped, since their values
+	// originate from the events matched in the preceding sequence steps.
+	fields []boundField
+	// index maps the string form of the field, which is the key of its value
+	// in the evaluation context, to the field.
+	index map[string]*boundField
+	// resolvers are handed to the evaluators through the context
+	resolvers *Resolvers
+	// peOpts are the PE directories the expression needs
+	peOpts uint32
+	// evaluators are the evaluators of the fields extracted on demand, e.g. the
+	// ones of the bound variables, by the field as written in the expression.
+	// An evaluator holds no state, so it is shared by all the goroutines.
+	evaluators sync.Map
 }
 
-// SegmentsConfigurer is the same as FieldsConfigurer, but for accessors
-// that depend on the segments referenced by the expression.
-type SegmentsConfigurer interface {
-	SetSegments([]Segment)
+// boundField is the field together with its typed evaluator, if it has one.
+type boundField struct {
+	Field
+	// key is the string form of the field, under which the value is
+	// stored in the context
+	key  string
+	eval Evaluator
 }
 
-// sharedAccessors holds the accessors that don't depend on the expression.
-// They are created once and shared by all extractors, so they must be safe
-// for concurrent use.
-var sharedAccessors = sync.OnceValue(GetAccessors)
-
-// newAccessors returns the accessor chain for an expression that references
-// the given fields and segments. Stateless accessors are shared, while the
-// ones that implement FieldsConfigurer or SegmentsConfigurer are private
-// instances configured for this expression. The chain keeps the order
-// of GetAccessors.
-func newAccessors(flds []Field, segs []Segment) []Accessor {
-	shared := sharedAccessors()
-	accessors := GetAccessors()
-
-	for i, accessor := range accessors {
-		fc, hasFields := accessor.(FieldsConfigurer)
-		sc, hasSegments := accessor.(SegmentsConfigurer)
-		if !hasFields && !hasSegments {
-			accessors[i] = shared[i]
-			continue
-		}
-		if hasFields {
-			fc.SetFields(flds)
-		}
-		if hasSegments {
-			sc.SetSegments(segs)
-		}
-	}
-	return accessors
+func newBoundField(f Field, ev Evaluator) boundField {
+	return boundField{Field: f, key: f.String(), eval: ev}
 }
 
-// Extractor extracts field values from events using accessors tailored to
-// the fields and segments of a single expression.
-type Extractor struct {
-	// fields are the fields whose values come from the evaluated event.
-	// Bound fields are skipped, since their values originate from the
-	// events matched in the preceding sequence steps.
-	fields    []Field
-	accessors []Accessor
-}
-
-// NewExtractor creates the extractor for an expression that references
+// newExtractor creates the extractor for an expression that references
 // the given fields and segments. The bound fields (e.g. $e1.ps.pe.imphash)
-// are only used to configure the accessors, so the accessors know which
-// data the expression needs. They are never extracted eagerly from the
-// evaluated event, because their values come from the events of the
-// previous sequence steps through ExtractField.
-func NewExtractor(flds, bound []Field, segs []Segment) *Extractor {
+// only tell which data the expression needs, e.g. which PE directories to
+// parse. They are never extracted eagerly from the evaluated event, because
+// their values come from the events of the previous sequence steps through
+// ExtractField.
+func newExtractor(flds, bound []Field, segs []Segment) *extractor {
 	configured := make(Fields, 0, len(flds)+len(bound))
 	for _, f := range flds {
 		configured.Add(f.Name, f.Value, f.Arg)
@@ -97,52 +77,93 @@ func NewExtractor(flds, bound []Field, segs []Segment) *Extractor {
 	for _, f := range bound {
 		configured.Add(f.Name, f.Value, f.Arg)
 	}
-	x := &Extractor{accessors: newAccessors(configured, segs)}
-	x.fields = append(x.fields, flds...)
+	x := &extractor{resolvers: DefaultResolvers()}
+	x.fields = make([]boundField, 0, len(flds))
+	for _, f := range flds {
+		// a field without an evaluator reads as the default value
+		ev, _ := GetEvaluator(f)
+		x.fields = append(x.fields, newBoundField(f, ev))
+	}
+	x.peOpts = peOptions(configured, segs)
+	x.index = make(map[string]*boundField, len(x.fields))
+	for i := range x.fields {
+		x.index[x.fields[i].key] = &x.fields[i]
+	}
 	return x
 }
 
-// ExtractToValuer puts the values of all the unbound fields from the
-// event into the valuer, so they are available before the evaluation.
-func (x *Extractor) ExtractToValuer(evt *event.Event, valuer *ValuerCache) {
-	for _, f := range x.fields {
-		valuer.Put(evt, f, x)
+// byKey returns the field whose value is stored under the key in the context,
+// or nil if the extractor doesn't extract it, e.g. the bound variables.
+func (x *extractor) byKey(key string) *boundField {
+	return x.index[key]
+}
+
+// extractAll puts the values of all the unbound fields from the
+// event into the context, so they are available before the evaluation.
+func (x *extractor) extractAll(evt *event.Event, ctx *EvalCtx) {
+	ctx.Evt = evt
+	for i := range x.fields {
+		ctx.put(&x.fields[i], x)
 	}
 }
 
-// Extract returns the value of the field in the event. The accessors are
-// tried in order and the first one that has a value wins. If none does, the
-// default value for the field is returned.
-func (x *Extractor) Extract(f Field, evt *event.Event) any {
-	for _, accessor := range x.accessors {
-		if !accessor.IsFieldAccessible(evt) {
-			continue
-		}
-		v, err := accessor.Get(f, evt)
-		if err != nil {
-			countAccessorError(err)
-			continue
-		}
-		if v != nil {
-			return v
-		}
-	}
-	return defaultAccessorValue(f)
+// Extract returns the value of the field in the event. The value comes from
+// the typed evaluator of the field, provided the source of the field can
+// serve the event. Otherwise, or if there is no value, the default value for
+// the field is returned.
+func (x *extractor) Extract(f Field, evt *event.Event) any {
+	// the evaluators only read the event of the context, and the
+	// context isn't used afterwards, so it doesn't have to be pooled
+	ctx := EvalCtx{Evt: evt}
+	return x.extract(f, x.evaluator(f), &ctx)
 }
 
-// lookup returns the value of the field in the event, or nil if no accessor
-// has it. In contrast to Extract, it doesn't substitute the default value, and
-// it doesn't ask the accessors if the field is accessible, nor does it count
-// the errors. The caller is only interested in what the accessors really have.
-func (x *Extractor) lookup(f Field, evt *event.Event) any {
-	for _, accessor := range x.accessors {
-		v, err := accessor.Get(f, evt)
-		if err != nil {
-			continue
+// evaluator returns the evaluator of the field, or nil if there is none. It is
+// created the first time the field is asked for.
+func (x *extractor) evaluator(f Field) Evaluator {
+	key := f.String()
+	if ev, ok := x.evaluators.Load(key); ok {
+		if ev == noEval {
+			return nil
 		}
-		if v != nil {
+		return ev.(Evaluator)
+	}
+	ev, _ := GetEvaluator(f)
+	if ev == nil {
+		x.evaluators.Store(key, noEval)
+		return nil
+	}
+	x.evaluators.Store(key, ev)
+	return ev
+}
+
+// noEval marks a field that has no evaluator in the cache of the extractor.
+var noEval Evaluator = &noEvaluator{}
+
+type noEvaluator struct{ EvaluatorBase }
+
+func (*noEvaluator) Eval(*EvalCtx) any { return nil }
+
+func (x *extractor) extract(f Field, ev Evaluator, ctx *EvalCtx) any {
+	ctx.Resolvers = x.resolvers
+	ctx.peOpts = x.peOpts
+	if ev != nil && servesEvent(f.Name.Source(), ctx.Evt) {
+		if v := ev.Eval(ctx); v != nil {
 			return v
 		}
 	}
-	return nil
+	return defaultValue(f)
+}
+
+// lookup returns the value of the field in the event, or nil if the field has
+// none. In contrast to Extract, it doesn't substitute the default value, and it
+// doesn't ask the gate if the source can serve the event. The caller is only
+// interested in what the evaluator really has.
+func (x *extractor) lookup(f Field, evt *event.Event) any {
+	ev := x.evaluator(f)
+	if ev == nil {
+		return nil
+	}
+	ctx := EvalCtx{Evt: evt, Resolvers: x.resolvers, peOpts: x.peOpts}
+	return ev.Eval(&ctx)
 }

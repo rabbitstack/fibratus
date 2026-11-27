@@ -50,7 +50,7 @@ func (a *RuleAlerter) Alert(m rules.RuleMatch) error {
 		b.WriteString(evt.String())
 		b.WriteByte('\n')
 	}
-	text := rule.Evaluator().InterpolateFields(rule.Output, m.Events)
+	text := rule.Program().InterpolateFields(rule.Output, m.Events)
 	log.Infof("sending alert: [%s]. Text: %s Event(s): %s", rule.Name, text, b.String())
 
 	senders := a.senders()

@@ -127,6 +127,18 @@ type RuleSet struct {
 	// report is computed lazily, and discarded when the rules change
 	reportMu sync.Mutex
 	report   *RuleSetReport
+
+	// sourceEnabled tells whether the event source of a field is enabled. A
+	// rule that reads a field of a disabled source is warned about. If it isn't
+	// set, every source is assumed to be enabled.
+	sourceEnabled func(fields.Source) bool
+}
+
+// SetEventSources sets the predicate that tells whether the event source the
+// fields of the given source are read from is enabled, see EnabledSources. It
+// has to be called before the rules are added.
+func (rs *RuleSet) SetEventSources(enabled func(fields.Source) bool) {
+	rs.sourceEnabled = enabled
 }
 
 // NewRuleSet returns a new ruleset for the specified data model
@@ -272,6 +284,21 @@ func (rs *RuleSet) AddRule(ruleDef *policy.RuleDef, source string) error {
 		}
 	}
 
+	// the operands are evaluated in written order, so an expensive field that
+	// precedes a cheap one is read for the events the cheap one would reject
+	for _, w := range rule.evaluator.ExpensiveBeforeCheap() {
+		log.Warnf("%q rule reads the expensive %s field before the cheap %s field. "+
+			"Consider moving the condition on %s first, so the events can be rejected "+
+			"before the expensive field is evaluated.",
+			ruleDef.Name, w.Expensive, w.Cheap, w.Cheap)
+	}
+
+	// the fields that can't have a value for the rule: the event types the
+	// rule is scoped to never carry them, or their event source is disabled
+	for _, w := range rule.evaluator.FieldWarnings(rs.sourceEnabled) {
+		log.Warnf("%q rule uses the [%s] field which %s", ruleDef.Name, w.Field, w.Reason)
+	}
+
 	scope := rule.evaluator.GetScope()
 	if scope == nil {
 		log.Warnf("%q rule doesn't have the event type condition! "+
@@ -381,7 +408,7 @@ func (rs *RuleSet) Evaluate(evt *event.Event) bool {
 		return false
 	}
 
-	valuer := eval.AcquireValuerCache()
+	valuer := eval.AcquireEvalCtx()
 	defer valuer.Release()
 
 	var matched bool

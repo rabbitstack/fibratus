@@ -26,20 +26,20 @@ import (
 )
 
 type RuleEvaluator interface {
-	Evaluate(evt *event.Event, valuer *eval.ValuerCache) ([]*event.Event, bool)
+	Evaluate(evt *event.Event, valuer *eval.EvalCtx) ([]*event.Event, bool)
 }
 
 type NullEvaluator struct{}
 
 type DirectEvaluator struct {
-	evaluator *eval.Evaluator
+	evaluator *eval.Program
 }
 
-func MakeDirectEvaluator(evaluator *eval.Evaluator) RuleEvaluator {
+func MakeDirectEvaluator(evaluator *eval.Program) RuleEvaluator {
 	return &DirectEvaluator{evaluator: evaluator}
 }
 
-func (e *DirectEvaluator) Evaluate(evt *event.Event, valuer *eval.ValuerCache) ([]*event.Event, bool) {
+func (e *DirectEvaluator) Evaluate(evt *event.Event, valuer *eval.EvalCtx) ([]*event.Event, bool) {
 	if e.evaluator.Eval(evt, valuer) {
 		return []*event.Event{evt}, true
 	}
@@ -57,14 +57,14 @@ type Rule struct {
 	// the evaluation order deterministic.
 	order int
 
-	evaluator     *eval.Evaluator
+	evaluator     *eval.Program
 	ruleEvaluator RuleEvaluator
 }
 
 // Evaluate evaluates the event against the rule. If the rule matches, the events
 // that participated in the match are returned. Simple rules always match
 // with the evaluated event, while sequences return the ordered events of all steps.
-func (r *Rule) Evaluate(event *event.Event, valuer *eval.ValuerCache) ([]*event.Event, bool) {
+func (r *Rule) Evaluate(event *event.Event, valuer *eval.EvalCtx) ([]*event.Event, bool) {
 	return r.ruleEvaluator.Evaluate(event, valuer)
 }
 
@@ -74,13 +74,13 @@ func (r *Rule) IsSequence() bool { return r.evaluator.IsSequenceExpr() }
 // GetEventTypes returns the events the rule can match.
 func (r *Rule) GetEventTypes() []event.Type { return r.evaluator.GetEventTypes() }
 
-// Evaluator returns the underlying expression evaluator.
-func (r *Rule) Evaluator() *eval.Evaluator { return r.evaluator }
+// Program returns the compiled expression of the rule.
+func (r *Rule) Program() *eval.Program { return r.evaluator }
 
 // NewRule compiles the rule definition. The condition is parsed and its macros
 // are expanded with the given macro store, which may be nil.
 func NewRule(ruleDef *policy.RuleDef, macros *macro.Store) (*Rule, error) {
-	evaluator, err := eval.NewEvaluator(string(ruleDef.ID), ruleDef.Condition, eval.WithMacros(macros))
+	evaluator, err := eval.NewProgram(string(ruleDef.ID), ruleDef.Condition, eval.WithMacros(macros))
 	if err != nil {
 		return nil, err
 	}

@@ -31,12 +31,12 @@ import (
 var ErrSequence = errors.New("sequences are not allowed in filter expressions")
 
 type filter struct {
-	evaluator *eval.Evaluator
+	evaluator *eval.Program
 }
 
 // New parses the filter expression and returns the filter ready for evaluation.
 func New(expr string) (Filter, error) {
-	evaluator, err := eval.NewEvaluator("filter", expr)
+	evaluator, err := eval.NewProgram("filter", expr)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +64,7 @@ func NewFromCLI(args []string) (Filter, error) {
 }
 
 func (f *filter) Eval(evt *event.Event) bool {
-	valuer := eval.AcquireValuerCache()
+	valuer := eval.AcquireEvalCtx()
 	defer valuer.Release()
 	return f.evaluator.Eval(evt, valuer)
 }

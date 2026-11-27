@@ -222,17 +222,17 @@ func (f *Function) IsFieldArg(i int) bool {
 // make sure required arguments are supplied. Finally, it
 // checks the type of each argument with the expected one.
 func (f *Function) Validate() error {
-	fn, ok := funcs[strings.ToUpper(f.Name)]
+	desc, ok := functions.Lookup(f.Name)
 	if !ok {
 		return ErrUndefinedFunction(f.Name)
 	}
 
-	if len(f.Args) < fn.Desc().RequiredArgs() ||
-		len(f.Args) > len(fn.Desc().Args) {
-		return ErrFunctionSignature(fn.Desc(), len(f.Args))
+	if len(f.Args) < desc.RequiredArgs() ||
+		len(f.Args) > len(desc.Args) {
+		return ErrFunctionSignature(desc, len(f.Args))
 	}
 
-	validationFunc := fn.Desc().ArgsValidationFunc
+	validationFunc := desc.ArgsValidationFunc
 	if validationFunc != nil {
 		if err := validationFunc(f.ArgsSlice()); err != nil {
 			return err
@@ -240,7 +240,7 @@ func (f *Function) Validate() error {
 	}
 
 	for i, expr := range f.Args {
-		arg := fn.Desc().Args[i]
+		arg := desc.Args[i]
 		typ := functions.Unknown
 
 		switch reflect.TypeOf(expr) {
@@ -269,7 +269,7 @@ func (f *Function) Validate() error {
 		}
 
 		if !arg.ContainsType(typ) {
-			return ErrArgumentTypeMismatch(i, arg.Keyword, fn.Name(), arg.Types)
+			return ErrArgumentTypeMismatch(i, arg.Keyword, desc.Name, arg.Types)
 		}
 	}
 

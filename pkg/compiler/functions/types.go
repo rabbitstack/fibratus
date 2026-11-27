@@ -19,7 +19,6 @@
 package functions
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -119,47 +118,6 @@ const (
 	Unknown
 )
 
-var funcs = map[string]FunctionDef{} // functions registry
-
-// String returns the argument type as a string value.
-func (typ ArgType) String() string {
-	switch typ {
-	case String:
-		return "string"
-	case Number:
-		return "number"
-	case IP:
-		return "ip"
-	case Field:
-		return "field"
-	case Func:
-		return "func"
-	case Slice:
-		return "slice"
-	case Bool:
-		return "bool"
-	case Expression:
-		return "expression"
-	case BoundField:
-		return "boundfield"
-	case BoundSegment:
-		return "boundsegment"
-	case BareBoundVariable:
-		return "bareboundvar"
-	}
-	return "unknown"
-}
-
-// FunctionDef is the interface that all function definitions have to satisfy.
-type FunctionDef interface {
-	// Call is the main function method that contains the implementation logic.
-	Call(args []interface{}) (interface{}, bool)
-	// Desc returns the function descriptor.
-	Desc() FunctionDesc
-	// Name returns the function name.
-	Name() Fn
-}
-
 // FunctionDesc contains the function signature that
 // particular filter function has to satisfy.
 type FunctionDesc struct {
@@ -233,6 +191,8 @@ func (f Fn) String() string {
 		return "BASE"
 	case DirFn:
 		return "DIR"
+	case SymlinkFn:
+		return "SYMLINK"
 	case ExtFn:
 		return "EXT"
 	case GlobFn:
@@ -254,30 +214,43 @@ func (f Fn) String() string {
 	}
 }
 
-// parseString yields a string value from the specific position in the args slice.
-func parseString(index int, args []interface{}) string {
-	if index > len(args)-1 {
-		return ""
+// String returns the argument type as a string value.
+func (typ ArgType) String() string {
+	switch typ {
+	case String:
+		return "string"
+	case Number:
+		return "number"
+	case IP:
+		return "ip"
+	case Field:
+		return "field"
+	case Func:
+		return "func"
+	case Slice:
+		return "slice"
+	case Bool:
+		return "bool"
+	case Expression:
+		return "expression"
+	case BoundField:
+		return "boundfield"
+	case BoundSegment:
+		return "boundsegment"
+	case BareBoundVariable:
+		return "bareboundvar"
 	}
-	s, ok := args[index].(string)
-	if !ok {
-		return ""
-	}
-	return s
+	return "unknown"
 }
 
-// Register makes a function available by name (case-insensitive).
-// It is intended to be called from init() and panics on errors.
-func Register(fn FunctionDef) {
-	n := strings.ToUpper(fn.Name().String())
-	if _, ok := funcs[n]; ok {
-		panic(fmt.Sprintf("function %s already registered", n))
+
+// Parse returns the function of the name, which is case-insensitive.
+func Parse(name string) (Fn, bool) {
+	for fn := CIDRContainsFn; fn <= CountFn; fn++ {
+		if strings.EqualFold(fn.String(), name) {
+			return fn, true
+		}
 	}
-	funcs[n] = fn
+	return 0, false
 }
 
-// Lookup returns the function registered under name, if any.
-func Lookup(n string) (FunctionDef, bool) {
-	fn, ok := funcs[strings.ToUpper(n)]
-	return fn, ok
-}

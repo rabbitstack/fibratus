@@ -43,7 +43,7 @@ func seqRule(t *testing.T, condition string) *Rule {
 }
 
 func evalSeq(rule *Rule, evt *event.Event) ([]*event.Event, bool) {
-	valuer := eval.AcquireValuerCache()
+	valuer := eval.AcquireEvalCtx()
 	defer valuer.Release()
 	return rule.Evaluate(evt, valuer)
 }

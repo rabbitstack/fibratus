@@ -8,14 +8,14 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/bytes"
 )
 
-func MakeSequenceLinkID(valuer *ValuerCache, link *ast.SequenceLink) any {
+func MakeSequenceLinkID(valuer *EvalCtx, link *ast.SequenceLink) any {
 	if !link.IsCompound() {
-		return valuer.Valuer[link.First()]
+		return valuer.Values[link.First()]
 	}
 
 	values := make([]any, 0, len(link.Fields))
 	for _, fld := range link.Fields {
-		values = append(values, valuer.Valuer[fld.Value])
+		values = append(values, valuer.Values[fld.Value])
 	}
 
 	buf := make([]byte, 0)

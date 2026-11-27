@@ -57,8 +57,8 @@ func TestInterpolateFieldsUsesCompiledRegexp(t *testing.T) {
 	assert.Equal(t, "%3.evt.pid", InterpolateFields("%3.evt.pid", evts))
 }
 
-func TestEvaluatorInterpolateFields(t *testing.T) {
-	ev, err := NewEvaluator(uuid.New().String(), `evt.pid = 1023`)
+func TestProgramInterpolateFields(t *testing.T) {
+	ev, err := NewProgram(uuid.New().String(), `evt.pid = 1023`)
 	require.NoError(t, err)
 
 	evts := []*event.Event{{PID: 1023, Host: "kitty"}}
@@ -69,6 +69,58 @@ func TestEvaluatorInterpolateFields(t *testing.T) {
 	assert.Equal(t, "pid 1023 on kitty", ev.InterpolateFields(s, evts))
 
 	// the evaluator is optional
-	var noEvaluator *Evaluator
+	var noEvaluator *Program
 	assert.Equal(t, "pid 1023 on kitty", noEvaluator.InterpolateFields(s, evts))
+}
+
+func TestFieldIntArg(t *testing.T) {
+	var tests = []struct {
+		name  string
+		field Field
+		n     int
+		err   bool
+	}{
+		{"numeric argument", NewField(fields.PsAncestor, "ps.ancestor", "1"), 1, false},
+		{"zero", NewField(fields.PsAncestor, "ps.ancestor", "0"), 0, false},
+		{"negative", NewField(fields.PsAncestor, "ps.ancestor", "-1"), -1, false},
+		{"not a number", NewField(fields.PsAncestor, "ps.ancestor", "parent"), 0, true},
+		{"no argument", NewField(fields.PsName, "ps.name", ""), 0, true},
+		// a field that wasn't made by NewField still parses its argument
+		{"literal field", Field{Name: fields.PsAncestor, Value: "ps.ancestor", Arg: "7"}, 7, false},
+		{"literal field with a bad argument", Field{Name: fields.PsAncestor, Value: "ps.ancestor", Arg: "x"}, 0, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			n, err := tt.field.IntArg()
+			if tt.err {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.n, n)
+		})
+	}
+}
+
+func TestNewFieldParsesNumericArgumentOnce(t *testing.T) {
+	f := NewField(fields.PsAncestor, "ps.ancestor", "3")
+	assert.True(t, f.hasN)
+	assert.Equal(t, 3, f.n)
+	assert.Equal(t, "ps.ancestor[3]", f.String())
+
+	// a string argument is left alone
+	f = NewField(fields.EvtArg, "evt.arg", "cmdline")
+	assert.False(t, f.hasN)
+	assert.Equal(t, "cmdline", f.Arg)
+
+	// the fields collected from an expression carry the parsed argument
+	prog, err := NewProgram("ancestors", `ps.ancestor[1] = 'svchost.exe'`)
+	if err != nil {
+		t.Skipf("ps.ancestor isn't available on this platform: %v", err)
+	}
+	require.Len(t, prog.GetFields(), 1)
+	n, err := prog.GetFields()[0].IntArg()
+	require.NoError(t, err)
+	assert.Equal(t, 1, n)
+	assert.True(t, prog.GetFields()[0].hasN)
 }

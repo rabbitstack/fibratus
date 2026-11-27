@@ -182,3 +182,23 @@ func callstackFromFrames(frames ...Frame) Callstack {
 	}
 	return c
 }
+
+func TestCallstackFrameAtOutOfRange(t *testing.T) {
+	var callstack Callstack
+	callstack.Init(2)
+	callstack.PushFrame(Frame{Addr: 0x7ffb5c1d0396, Symbol: "CreateProcessW", Module: "KERNELBASE.dll"})
+	callstack.PushFrame(Frame{Addr: 0x7ffb5d8e61f4, Symbol: "CreateProcessW", Module: "KERNEL32.DLL"})
+
+	assert.Equal(t, "KERNELBASE.dll", callstack.FrameAt(0).Module)
+	assert.Equal(t, "KERNEL32.DLL", callstack.FrameAt(1).Module)
+
+	// out of range indexes yield the empty frame instead of panicking
+	assert.NotPanics(t, func() {
+		assert.Equal(t, Frame{}, callstack.FrameAt(-1))
+		assert.Equal(t, Frame{}, callstack.FrameAt(2))
+		assert.Equal(t, Frame{}, callstack.FrameAt(1<<20))
+	})
+
+	var empty Callstack
+	assert.Equal(t, Frame{}, empty.FrameAt(0))
+}

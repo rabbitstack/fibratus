@@ -36,7 +36,7 @@ type RuleBucket struct {
 
 // AddRule adds the rule to the bucket. Adding the same rule twice is a no-op.
 func (rb *RuleBucket) AddRule(rule *Rule) {
-	//for _, field := range rule.Evaluator().GetFields() {
+	//for _, field := range rule.Program().GetFields() {
 	// index := sort.SearchStrings(rb.fields, field)
 	// if index < len(rb.fields) && rb.fields[index] == field {
 	// 	continue

@@ -61,7 +61,7 @@ func validateRules() error {
 
 	for _, rule := range rs.GetRules() {
 		w := warning{rule: rule.Name}
-		for _, fld := range rule.Evaluator().GetFields() {
+		for _, fld := range rule.Program().GetFields() {
 			if isDeprecated, dep := fields.IsDeprecated(fld.Name); isDeprecated {
 				w.addMessage(fmt.Sprintf("%s field deprecated in favor of %v", fld.Name.String(), dep.Fields))
 			}
